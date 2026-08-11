@@ -1110,19 +1110,24 @@ onMounted(async () => {
 .week-container {
   flex: 1;
   padding: 24px;
-  overflow-x: auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .week-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(140px, 1fr));
+  display: flex;
   gap: 12px;
   flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
 }
 
 .day-column {
+  flex: 0 0 140px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1130,6 +1135,7 @@ onMounted(async () => {
   flex-direction: column;
   min-height: 400px;
   transition: border-color 0.15s ease;
+  scroll-snap-align: start;
 }
 
 .day-column.today {
@@ -1625,6 +1631,7 @@ onMounted(async () => {
     left: 0;
     top: 0;
     bottom: 0;
+    height: 100dvh;
     z-index: 150;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
@@ -1643,38 +1650,107 @@ onMounted(async () => {
 
   .sidebar-backdrop {
     display: block;
+    height: 100dvh;
   }
 }
 
 @media (max-width: 768px) {
   .header {
     padding: 12px 16px;
+    overflow: visible;
   }
 
   .header-left {
     gap: 12px;
+    flex-shrink: 0;
   }
 
   .logo h1 {
     font-size: 1.2rem;
   }
 
+  .logo svg {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .week-nav {
+    flex-shrink: 0;
+  }
+
   .week-display {
-    font-size: 0.85rem;
-    min-width: 150px;
+    font-size: 0.8rem;
+    min-width: 130px;
+  }
+
+  .today-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .nav-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .nav-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .week-container {
     padding: 16px;
+    overflow: hidden;
+    flex: 1;
+    height: 100%;
   }
 
   .week-grid {
-    grid-template-columns: repeat(7, minmax(100px, 1fr));
     gap: 8px;
+    margin: 0 -16px;
+    padding: 0 16px 8px 16px;
   }
 
   .day-column {
+    flex: 0 0 160px;
     min-height: 300px;
+    max-height: calc(100dvh - 180px);
+    overflow-y: auto;
+  }
+
+  .day-header {
+    padding: 10px;
+  }
+
+  .day-name {
+    font-size: 0.8rem;
+  }
+
+  .day-date {
+    font-size: 0.75rem;
+  }
+
+  .sidebar-toggle {
+    width: 44px;
+    height: 44px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    left: max(16px, env(safe-area-inset-left));
+  }
+
+  .sidebar {
+    width: 280px;
+    height: 100dvh;
+  }
+
+  .sidebar-backdrop {
+    height: 100dvh;
+  }
+
+  .header {
+    height: auto;
+    min-height: 60px;
   }
 }
 </style>
