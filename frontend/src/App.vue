@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from './api'
 import type { Project, Task, Property, PropertyValue, DayNote, WeekNote } from './types'
 
@@ -36,7 +36,11 @@ const deletingItem = ref<{ type: string; item: Project | Property; callback: () 
 const selectedColor = ref(PROJECT_COLORS[0])
 
 // Form data
-const taskForm = ref({ title: '', projectId: '', date: '' })
+const taskForm = ref({ title: '', description: '', projectId: '', date: '' })
+const expandedNotes = ref<Set<string>>(new Set())
+const expandedDayNotes = ref<Set<string>>(new Set())
+const openMenuTaskId = ref<string | null>(null)
+const menuPosition = ref({ top: 0, left: 0 })
 const projectForm = ref({ name: '', color: '' })
 const propertyForm = ref({ name: '', unit: '' })
 const moveDate = ref('')
@@ -45,11 +49,6 @@ const deleteMessage = ref('')
 // Computed
 const weekDays = computed(() => getWeekDays(currentWeekStart.value))
 const weekStart = computed(() => currentWeekStart.value)
-const weekEnd = computed(() => {
-  const d = new Date(currentWeekStart.value)
-  d.setDate(d.getDate() + 6)
-  return d.toISOString().split('T')[0]
-})
 
 const filteredTasks = computed(() => {
   if (selectedProject.value === 'all') return tasks.value
@@ -121,12 +120,6 @@ function formatWeekDisplay() {
   return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
 }
 
-function escapeHtml(text: string) {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
 function getProject(id: string | null) {
   return projects.value.find(p => p.id === id)
 }
@@ -178,10 +171,10 @@ function closeSidebar() {
 function openTaskModal(date: string, task?: Task) {
   if (task) {
     editingTask.value = task
-    taskForm.value = { title: task.title, projectId: task.projectId, date: task.date }
+    taskForm.value = { title: task.title, description: task.description || '', projectId: task.projectId, date: task.date }
   } else {
     editingTask.value = null
-    taskForm.value = { title: '', projectId: projects.value[0]?.id || '', date }
+    taskForm.value = { title: '', description: '', projectId: projects.value[0]?.id || '', date }
   }
   taskModal.value = true
 }
@@ -192,6 +185,7 @@ async function saveTask() {
   if (editingTask.value) {
     await api.updateTask(editingTask.value.id, {
       title: taskForm.value.title,
+      description: taskForm.value.description,
       projectId: taskForm.value.projectId,
       date: taskForm.value.date
     })
@@ -203,6 +197,7 @@ async function saveTask() {
     const task = await api.createTask({
       id: generateId(),
       title: taskForm.value.title,
+      description: taskForm.value.description,
       projectId: taskForm.value.projectId,
       date: taskForm.value.date,
       status: 'active',
@@ -258,11 +253,62 @@ async function updateTaskNotes(task: Task, notes: string) {
   task.updatedAt = Date.now()
 }
 
-async function updateTaskTitle(task: Task, title: string) {
-  if (!title.trim()) return
-  await api.updateTask(task.id, { title })
-  task.title = title
-  task.updatedAt = Date.now()
+function toggleTaskNotes(taskId: string) {
+  if (expandedNotes.value.has(taskId)) {
+    expandedNotes.value.delete(taskId)
+  } else {
+    expandedNotes.value.add(taskId)
+  }
+  // Trigger reactivity
+  expandedNotes.value = new Set(expandedNotes.value)
+}
+
+function toggleDayNotes(date: string) {
+  if (expandedDayNotes.value.has(date)) {
+    expandedDayNotes.value.delete(date)
+  } else {
+    expandedDayNotes.value.add(date)
+  }
+  // Trigger reactivity
+  expandedDayNotes.value = new Set(expandedDayNotes.value)
+}
+
+function toggleTaskMenu(taskId: string, event: MouseEvent) {
+  event.stopPropagation()
+  if (openMenuTaskId.value === taskId) {
+    openMenuTaskId.value = null
+  } else {
+    const btn = event.currentTarget as HTMLElement
+    const rect = btn.getBoundingClientRect()
+    const menuWidth = 160
+    const menuHeight = 180 // Approximate height of menu
+    
+    let left = rect.right - menuWidth
+    let top = rect.bottom + 4
+    
+    // Adjust if menu would go off right edge
+    if (left < 8) {
+      left = 8
+    }
+    // Adjust if menu would go off bottom edge
+    if (top + menuHeight > window.innerHeight - 8) {
+      top = rect.top - menuHeight - 4
+    }
+    
+    menuPosition.value = { top, left }
+    openMenuTaskId.value = taskId
+  }
+}
+
+function closeTaskMenu() {
+  openMenuTaskId.value = null
+}
+
+// Close menu when clicking outside
+function handleGlobalClick() {
+  if (openMenuTaskId.value !== null) {
+    openMenuTaskId.value = null
+  }
 }
 
 // Day notes
@@ -436,6 +482,9 @@ async function onDrop(e: DragEvent, date: string) {
 
 // Load data
 onMounted(async () => {
+  // Add global click listener to close menus
+  document.addEventListener('click', handleGlobalClick)
+  
   try {
     const state = await api.getState()
     projects.value = state.projects
@@ -599,36 +648,41 @@ onMounted(async () => {
                     </div>
                     <div class="task-content">
                       <div class="task-title">{{ task.title }}</div>
+                      <div class="task-description" v-if="task.description">{{ task.description }}</div>
                       <div class="task-project" v-if="getProject(task.projectId)">
                         <div class="task-project-dot" :style="{ background: getProject(task.projectId)!.color }"></div>
                         <span class="task-project-name">{{ getProject(task.projectId)!.name }}</span>
                       </div>
                     </div>
                     <div class="task-menu-wrapper">
-                      <button class="task-menu-btn">
+                      <button class="task-menu-btn" @click="toggleTaskMenu(task.id, $event)">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                       </button>
-                      <div class="task-menu">
+                      <div class="task-menu" :class="{ open: openMenuTaskId === task.id }" :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }" @click.stop>
                         <template v-if="task.status !== 'cancelled'">
-                          <div class="task-menu-item" @click="openTaskModal(day.date, task)">
+                          <div class="task-menu-item" @click="openTaskModal(day.date, task); closeTaskMenu()">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                             Edit
                           </div>
-                          <div class="task-menu-item" @click="openMoveModal(task)">
+                          <div class="task-menu-item" @click="toggleTaskNotes(task.id); closeTaskMenu()">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            {{ expandedNotes.has(task.id) ? 'Hide Notes' : 'Add Notes' }}
+                          </div>
+                          <div class="task-menu-item" @click="openMoveModal(task); closeTaskMenu()">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></svg>
                             Move to...
                           </div>
-                          <div class="task-menu-item danger" @click="cancelTask(task)">
+                          <div class="task-menu-item danger" @click="cancelTask(task); closeTaskMenu()">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
                             Cancel
                           </div>
                         </template>
                         <template v-else>
-                          <div class="task-menu-item" @click="restoreTask(task)">
+                          <div class="task-menu-item" @click="restoreTask(task); closeTaskMenu()">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
                             Restore
                           </div>
-                          <div class="task-menu-item danger" @click="deleteTask(task)">
+                          <div class="task-menu-item danger" @click="deleteTask(task); closeTaskMenu()">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             Delete
                           </div>
@@ -637,18 +691,12 @@ onMounted(async () => {
                     </div>
                   </div>
                   
-                  <div class="task-notes-section" v-if="task.notes || true">
-                    <div class="task-notes-toggle" @click="$refs[`notes-${task.id}`][0]?.classList.toggle('expanded')">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                      Notes
-                    </div>
-                    <div class="task-notes" :ref="`notes-${task.id}`">
-                      <textarea 
-                        :value="task.notes"
-                        @blur="updateTaskNotes(task, ($event.target as HTMLTextAreaElement).value)"
-                        placeholder="Add notes..."
-                      ></textarea>
-                    </div>
+                  <div class="task-notes" :class="{ expanded: expandedNotes.has(task.id) }">
+                    <textarea 
+                      :value="task.notes"
+                      @blur="updateTaskNotes(task, ($event.target as HTMLTextAreaElement).value)"
+                      placeholder="Add notes..."
+                    ></textarea>
                   </div>
                 </div>
               </template>
@@ -675,11 +723,11 @@ onMounted(async () => {
 
             <!-- Day Notes -->
             <div class="day-notes">
-              <div class="day-notes-toggle" @click="$refs[`dayNotes-${day.date}`][0]?.classList.toggle('expanded')">
+              <div class="day-notes-toggle" @click="toggleDayNotes(day.date)">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 Day Notes
               </div>
-              <div class="day-notes-content" :ref="`dayNotes-${day.date}`">
+              <div class="day-notes-content" :class="{ expanded: expandedDayNotes.has(day.date) }">
                 <textarea 
                   :value="getDayNote(day.date)"
                   @blur="updateDayNote(day.date, ($event.target as HTMLTextAreaElement).value)"
@@ -739,6 +787,10 @@ onMounted(async () => {
           <div class="form-group">
             <label>Task</label>
             <input v-model="taskForm.title" type="text" placeholder="What needs to be done?" required>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea v-model="taskForm.description" placeholder="Add a description..." rows="3"></textarea>
           </div>
           <div class="form-group">
             <label>Project</label>
@@ -851,7 +903,9 @@ onMounted(async () => {
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .header {
@@ -860,8 +914,7 @@ onMounted(async () => {
   padding: 16px 24px;
   display: flex;
   align-items: center;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 100;
 }
 
@@ -940,7 +993,7 @@ onMounted(async () => {
 .main-container {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Sidebar */
@@ -1112,28 +1165,30 @@ onMounted(async () => {
   padding: 24px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  height: calc(100vh - 73px);
 }
 
 .week-grid {
   display: flex;
   gap: 12px;
-  flex: 1;
+  flex-shrink: 0;
   overflow-x: auto;
-  overflow-y: hidden;
   padding-bottom: 8px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  min-height: 300px;
 }
 
 .day-column {
-  flex: 0 0 140px;
+  flex: 0 0 160px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  min-height: 400px;
+  min-height: 300px;
+  max-height: 500px;
   transition: border-color 0.15s ease;
   scroll-snap-align: start;
 }
@@ -1149,6 +1204,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .day-name {
@@ -1192,6 +1248,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
 }
 
 .task-card {
@@ -1277,6 +1334,17 @@ onMounted(async () => {
   word-break: break-word;
 }
 
+.task-description {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .task-project {
   display: flex;
   align-items: center;
@@ -1317,6 +1385,13 @@ onMounted(async () => {
   opacity: 1;
 }
 
+/* Always show menu icon on mobile */
+@media (max-width: 768px) {
+  .task-menu-btn {
+    opacity: 1;
+  }
+}
+
 .task-menu-btn:hover {
   background: var(--border);
   color: var(--text-primary);
@@ -1328,20 +1403,18 @@ onMounted(async () => {
 }
 
 .task-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
+  position: fixed;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   padding: 8px;
   min-width: 150px;
-  z-index: 50;
+  z-index: 1000;
   display: none;
 }
 
-.task-menu-wrapper:hover .task-menu {
+.task-menu.open {
   display: block;
 }
 
@@ -1374,34 +1447,10 @@ onMounted(async () => {
   color: #E74C3C;
 }
 
-.task-notes-section {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: 4px;
-}
-
-.task-notes-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-}
-
-.task-notes-toggle:hover {
-  background: var(--surface);
-}
-
-.task-notes-toggle svg {
-  width: 14px;
-  height: 14px;
-}
-
 .task-notes {
   display: none;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
   margin-top: 8px;
 }
 
@@ -1432,6 +1481,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .property-row {
@@ -1468,6 +1518,7 @@ onMounted(async () => {
 .day-notes {
   border-top: 1px solid var(--border);
   padding: 8px;
+  flex-shrink: 0;
 }
 
 .day-notes-toggle {
@@ -1702,21 +1753,22 @@ onMounted(async () => {
 
   .week-container {
     padding: 16px;
-    overflow: hidden;
+    overflow-y: auto;
     flex: 1;
-    height: 100%;
+    height: calc(100dvh - 73px);
   }
 
   .week-grid {
     gap: 8px;
     margin: 0 -16px;
     padding: 0 16px 8px 16px;
+    min-height: 250px;
   }
 
   .day-column {
-    flex: 0 0 160px;
-    min-height: 300px;
-    max-height: calc(100dvh - 180px);
+    flex: 0 0 180px;
+    min-height: 250px;
+    max-height: 400px;
     overflow-y: auto;
   }
 

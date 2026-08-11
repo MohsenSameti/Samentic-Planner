@@ -10,6 +10,7 @@ export interface Task {
   id: string;
   projectId: string;
   title: string;
+  description: string;
   date: string;
   status: 'active' | 'completed' | 'cancelled';
   notes: string;
