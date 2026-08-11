@@ -1,0 +1,15 @@
+{
+  "name": "planner-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev:backend": "cd backend && pnpm dev",
+    "dev:frontend": "cd frontend && pnpm dev",
+    "build": "cd backend && pnpm build && cd ../frontend && pnpm build",
+    "start": "cd backend && pnpm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

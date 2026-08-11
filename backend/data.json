@@ -1,0 +1,16 @@
+{
+  "projects": [
+    {
+      "id": "default",
+      "name": "General",
+      "color": "#E74C3C",
+      "createdAt": 1786396643952,
+      "updatedAt": 1786396643952
+    }
+  ],
+  "tasks": [],
+  "properties": [],
+  "propertyValues": [],
+  "dayNotes": [],
+  "weekNotes": []
+}
