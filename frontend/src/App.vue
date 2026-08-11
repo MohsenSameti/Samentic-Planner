@@ -18,7 +18,7 @@ const weekNotes = ref<WeekNote[]>([])
 
 const selectedProject = ref<string>('all')
 const currentWeekStart = ref(getWeekStart(new Date()).toISOString().split('T')[0])
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = ref(true)
 const loading = ref(true)
 
 // Modals
@@ -485,6 +485,11 @@ onMounted(async () => {
   // Add global click listener to close menus
   document.addEventListener('click', handleGlobalClick)
   
+  // Collapse sidebar on mobile by default
+  if (window.innerWidth <= 1024) {
+    sidebarCollapsed.value = true
+  }
+  
   try {
     const state = await api.getState()
     projects.value = state.projects
@@ -516,6 +521,11 @@ onMounted(async () => {
     <!-- Header -->
     <header class="header">
       <div class="header-left">
+        <!-- Mobile Sidebar Toggle -->
+        <button class="sidebar-toggle" @click="toggleSidebar" aria-label="Toggle menu">
+          <svg v-if="sidebarCollapsed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
         <div class="logo">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="6" width="26" height="23" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -595,12 +605,6 @@ onMounted(async () => {
           </div>
         </section>
       </aside>
-
-      <!-- Mobile Sidebar Toggle (always visible on mobile) -->
-      <button class="sidebar-toggle" @click="toggleSidebar" aria-label="Toggle menu">
-        <svg v-if="sidebarCollapsed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
 
       <!-- Mobile Sidebar Backdrop -->
       <div 
@@ -1013,26 +1017,26 @@ onMounted(async () => {
 }
 
 .sidebar-toggle {
-  display: none;
-  position: fixed;
-  left: 16px;
-  bottom: 16px;
-  width: 48px;
-  height: 48px;
-  background: var(--accent);
-  color: white;
+  display: flex;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  color: var(--text);
   border: none;
-  border-radius: 8px;
-  z-index: 250;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-radius: 6px;
   cursor: pointer;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg);
 }
 
 .sidebar-toggle svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .sidebar-section {
@@ -1693,12 +1697,6 @@ onMounted(async () => {
     box-shadow: 4px 0 20px rgba(0,0,0,0.15);
   }
 
-  .sidebar-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .sidebar-backdrop {
     display: block;
     height: 100dvh;
@@ -1785,10 +1783,8 @@ onMounted(async () => {
   }
 
   .sidebar-toggle {
-    width: 44px;
-    height: 44px;
-    bottom: max(16px, env(safe-area-inset-bottom));
-    left: max(16px, env(safe-area-inset-left));
+    width: 40px;
+    height: 40px;
   }
 
   .sidebar {
