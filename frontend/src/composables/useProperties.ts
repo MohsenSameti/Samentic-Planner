@@ -1,4 +1,5 @@
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { api } from '../api'
 import { generateId } from '../utils/id'
 import type { Property, PropertyValue } from '../types'
@@ -8,6 +9,20 @@ import type { Property, PropertyValue } from '../types'
  * (the per-day numbers) — they're tightly coupled and almost always
  * needed together, so they're managed in one composable rather than two.
  */
+
+/**
+ * How long to wait after the last property-value edit before firing
+ * the API call. Lower values feel snappier but emit more requests;
+ * 500ms strikes a balance for keyboard-driven numeric input.
+ */
+const PROPERTY_VALUE_DEBOUNCE_MS = 500
+
+/**
+ * Promise returned by `setPropertyValue`/`setPropertyValueImmediate`
+ * so callers can `await` the operation.
+ */
+type SetPropertyValueResult = Promise<void>
+
 export function useProperties() {
   const properties = ref<Property[]>([])
   const propertyValues = ref<PropertyValue[]>([])
@@ -65,15 +80,19 @@ export function useProperties() {
   }
 
   /**
-   * Sets a property value for a given date. `value === 0` is treated as
-   * "delete the row" — the server endpoint behaves the same way, but we
-   * splice locally so the UI updates immediately without a refetch.
+   * Core setter — performs the API call and applies the optimistic
+   * local update. Kept as a private function so the two exported
+   * variants (immediate + debounced) share exactly one code path.
+   *
+   * `value === 0` is treated as "delete the row" — the server endpoint
+   * behaves the same way, but we splice locally so the UI updates
+   * immediately without a refetch.
    */
-  const setPropertyValue = async (
+  const setPropertyValueCore = async (
     date: string,
     propertyId: string,
     value: number,
-  ): Promise<void> => {
+  ): SetPropertyValueResult => {
     await api.setPropertyValue({ propertyId, date, value })
     const idx = propertyValues.value.findIndex(
       pv => pv.date === date && pv.propertyId === propertyId,
@@ -89,6 +108,39 @@ export function useProperties() {
     }
   }
 
+  /**
+   * Immediate version — fires the API call right away. Used by code
+   * that explicitly wants to persist (e.g. unmount-safety flush).
+   */
+  const setPropertyValueImmediate = setPropertyValueCore
+
+  /**
+   * Debounced version — coalesces rapid edits (e.g. scrubbing the
+   * number input) into a single network call. We use `useDebounceFn`
+   * here, not the `utils/debounce.ts` helper, because `useDebounceFn`
+   * preserves the wrapped function's return value so callers can
+   * `await` the latest value's persistence.
+   */
+  const setPropertyValue = useDebounceFn(setPropertyValueCore, PROPERTY_VALUE_DEBOUNCE_MS)
+
+  /**
+   * Forces the pending debounced property-value updates to fire
+   * immediately. Call from `onBeforeUnmount` to avoid silently
+   * dropping the last edit when the user navigates away.
+   *
+   * `useDebounceFn` exposes `flush` directly on the returned
+   * wrapper (`CancelablePromisifyFn<T>`).
+   */
+  const flushPropertyValueUpdates = (): void => {
+    setPropertyValue.flush()
+  }
+
+  // Best-effort persistence on unmount — covers accidental navigation
+  // away while a debounced edit is still pending.
+  onBeforeUnmount(() => {
+    flushPropertyValueUpdates()
+  })
+
   return {
     properties,
     propertyValues,
@@ -97,5 +149,7 @@ export function useProperties() {
     updateProperty,
     deleteProperty,
     setPropertyValue,
+    setPropertyValueImmediate,
+    flushPropertyValueUpdates,
   }
 }

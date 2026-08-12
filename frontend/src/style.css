@@ -213,3 +213,68 @@ input, select, textarea {
 .color-option.selected {
   border-color: var(--text-primary);
 }
+
+/* ------------------------------------------------------------------ */
+/* Performance hints                                                      */
+/* ------------------------------------------------------------------ */
+/*
+ * Global renderer hints. Each rule targets a different paint /
+ * composite-work class:
+ *
+ * - `will-change` lifts a node onto its own compositor layer ahead of
+ *   an animation. Used sparingly — long-lived hints waste GPU memory.
+ * - `contain` tells the browser the subtree's layout/size/paint is
+ *   independent of the rest of the page, so re-paints don't escape
+ *   the boundary. Day columns and the sidebar get content containment.
+ * - Transitions only animate `transform` and `opacity` (GPU-friendly,
+ *   no layout / paint) — never `box-shadow`, `filter`, etc.
+ */
+
+.task-card,
+.color-option,
+.add-task-btn,
+.today-btn {
+  /* Expected to animate on hover (transform/opacity). Setting the
+   * hint here speeds up the first hover transition. */
+  will-change: transform;
+}
+
+.day-column,
+.sidebar {
+  /* `content` containment means changes inside these panels don't
+   * invalidate elements outside them — critical for the responsive
+   * sidebar slide and per-column re-renders. */
+  contain: content;
+}
+
+.task-list,
+.week-grid,
+.sidebar {
+  /* Scrolling containers. `will-change: scroll-position` is a
+   * long-lived hint (unlike the hover ones), but it does help the
+   * browser pre-paint off-screen task cards. We rely on the existing
+   * `overflow-y: auto` from the components. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * Reduced-motion: respect the OS-level preference. Disables our
+ * hover transforms and shortcuts animations to plain state flips.
+ * Without this rule, the `will-change` hints above can still trigger
+ * brief GPU work even for users who've opted out of motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .task-card,
+  .color-option,
+  .add-task-btn,
+  .today-btn {
+    will-change: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

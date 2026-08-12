@@ -76,19 +76,49 @@ const projectsMap = computed<Map<string, Project>>(
   () => new Map(props.projects.map(p => [p.id, p])),
 )
 
-/** Pre-filter tasks by the active project (memoised so columns stay stable). */
+/**
+ * Filter helper: tasks restricted to the active project.
+ *
+ * Implementation notes:
+ * - `'all'` short-circuits to the *live* `tasks` reference. Downstream
+ *   code MUST NOT mutate the result — callers should use the task
+ *   composable's `addTask` / `updateTask` paths instead.
+ * - The filter creates a new array only when `selectedProject !== 'all'`,
+ *   so when the user has "All" selected, columns see stable references
+ *   (and Vue can skip re-rendering them when unrelated state changes).
+ */
 const filteredTasks = computed<Task[]>(() => {
   if (props.selectedProject === 'all') return props.tasks
   return props.tasks.filter(t => t.projectId === props.selectedProject)
 })
 
 /**
- * Returns the tasks that fall on `date` in the visible week. We pre-filter
- * by project once (above) and slice per day so each column only sees its
- * own tasks — keeps re-renders localised.
+ * Returns the tasks that fall on `date` in the visible week.
+ *
+ * We pre-group tasks into a `Map<dateISO, Task[]>` once per `filteredTasks`
+ * change so each `DayColumn` reads from the map in O(1). Without the
+ * memoisation each `DayColumn` invocation would re-filter all tasks,
+ * turning the per-week render cost into O(days × tasks).
+ */
+const tasksByDate = computed<Map<string, Task[]>>(() => {
+  const grouped = new Map<string, Task[]>()
+  for (const task of filteredTasks.value) {
+    const bucket = grouped.get(task.date)
+    if (bucket) {
+      bucket.push(task)
+    } else {
+      grouped.set(task.date, [task])
+    }
+  }
+  return grouped
+})
+
+/**
+ * Returns the tasks that fall on `date` in the visible week. Reads from
+ * the pre-grouped map so each column lookup is constant-time.
  */
 function tasksForDay(date: string): Task[] {
-  return filteredTasks.value.filter(t => t.date === date)
+  return tasksByDate.value.get(date) ?? []
 }
 
 /** Resolves the day's note text (or '' when none stored). */

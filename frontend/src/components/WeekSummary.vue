@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Task, Property } from '../types'
 
 /** A `Property` augmented with the running sum for the visible week. */
@@ -12,31 +13,34 @@ const props = defineProps<{
 }>()
 
 /**
- * Count tasks in the visible week with a given status. We build a
- * `Set` of the week's ISO dates for O(1) membership checks instead of
- * calling `weekDateStrings.includes` per task — that turned out to be
- * the hot path in profiling.
+ * Single-pass task aggregation for the visible week.
+ *
+ * Builds a `Set` of the week's ISO dates once and tallies counts for
+ * each status in a single loop. The result is memoised — re-renders
+ * that don't change `tasks` or `weekDateStrings` read the same
+ * counters instead of rescanning the entire list three times.
  */
-function weekTasksByStatus(
-  tasks: Task[],
-  weekDateStrings: string[],
-  status: Task['status'],
-): number {
-  const set = new Set(weekDateStrings)
-  let count = 0
-  for (const t of tasks) {
-    if (set.has(t.date) && t.status === status) count++
-  }
-  return count
+interface WeekTaskCounts {
+  completed: number
+  active: number
+  cancelled: number
 }
 
-/** Bindings exposed to the template. */
-const completedCount = (): number =>
-  weekTasksByStatus(props.tasks, props.weekDateStrings, 'completed')
-const activeCount = (): number =>
-  weekTasksByStatus(props.tasks, props.weekDateStrings, 'active')
-const cancelledCount = (): number =>
-  weekTasksByStatus(props.tasks, props.weekDateStrings, 'cancelled')
+const weekTaskCounts = computed<WeekTaskCounts>(() => {
+  const weekDateSet = new Set(props.weekDateStrings)
+  const counts: WeekTaskCounts = { completed: 0, active: 0, cancelled: 0 }
+  for (const task of props.tasks) {
+    if (!weekDateSet.has(task.date)) continue
+    if (task.status === 'completed') counts.completed++
+    else if (task.status === 'cancelled') counts.cancelled++
+    else counts.active++
+  }
+  return counts
+})
+
+const completedCount = computed<number>(() => weekTaskCounts.value.completed)
+const activeCount = computed<number>(() => weekTaskCounts.value.active)
+const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
 </script>
 
 <template>
@@ -61,19 +65,19 @@ const cancelledCount = (): number =>
     <div class="summary-stats">
       <div class="stat-item">
         <div class="stat-value" style="color: var(--success)">
-          {{ completedCount() }}
+          {{ completedCount }}
         </div>
         <div class="stat-label">Completed</div>
       </div>
       <div class="stat-item">
         <div class="stat-value">
-          {{ activeCount() }}
+          {{ activeCount }}
         </div>
         <div class="stat-label">Active</div>
       </div>
       <div class="stat-item">
         <div class="stat-value" style="color: var(--muted)">
-          {{ cancelledCount() }}
+          {{ cancelledCount }}
         </div>
         <div class="stat-label">Cancelled</div>
       </div>

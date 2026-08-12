@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 import { api } from './api'
 import { useTasks } from './composables/useTasks'
 import { useProjects } from './composables/useProjects'
@@ -13,15 +13,22 @@ import Header from './components/Header.vue'
 import Sidebar from './components/Sidebar/Sidebar.vue'
 import WeekView from './components/WeekView/WeekView.vue'
 import WeekNotes from './components/Notes/WeekNotes.vue'
-import WeekSummary from './components/WeekSummary.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import ErrorDisplay from './components/common/ErrorDisplay.vue'
 
-import TaskModal from './modals/TaskModal.vue'
-import ProjectModal from './modals/ProjectModal.vue'
-import PropertyModal from './modals/PropertyModal.vue'
-import MoveModal from './modals/MoveModal.vue'
-import DeleteConfirmModal from './modals/DeleteConfirmModal.vue'
+/**
+ * Modals are loaded lazily — they're rarely open, so paying their
+ * compile + parse cost up-front is wasteful. `defineAsyncComponent`
+ * pairs with the `manualChunks` rule in `vite.config.ts` to produce
+ * a single `modals-*.js` chunk that's fetched the first time any
+ * modal opens. The naming matches the static-import shape so the
+ * template below doesn't need special handling.
+ */
+const TaskModal = defineAsyncComponent(() => import('./modals/TaskModal.vue'))
+const ProjectModal = defineAsyncComponent(() => import('./modals/ProjectModal.vue'))
+const PropertyModal = defineAsyncComponent(() => import('./modals/PropertyModal.vue'))
+const MoveModal = defineAsyncComponent(() => import('./modals/MoveModal.vue'))
+const DeleteConfirmModal = defineAsyncComponent(() => import('./modals/DeleteConfirmModal.vue'))
 
 /* ------------------------------------------------------------------ */
 /* Composables                                                          */
@@ -98,15 +105,25 @@ let pendingDelete: (() => Promise<void>) | null = null
 /* Derived state                                                         */
 /* ------------------------------------------------------------------ */
 
-/** Sum of every property over the seven days of the current week. */
+/**
+ * Sum of every property over the seven days of the current week.
+ *
+ * Single-pass aggregation: we tally every property's weekly total in
+ * one loop over `propertyValues`, then look up each property def's
+ * `name`/`unit` from the resulting map. Cost is O(V + P) instead of
+ * the previous O(V × P).
+ */
 const weeklyPropertySums = computed(() => {
   const dayStrs = new Set(weekDays.value.map(d => d.date))
-  return properties.value.map(prop => {
-    const sum = propertyValues.value
-      .filter(pv => pv.propertyId === prop.id && dayStrs.has(pv.date))
-      .reduce((acc, pv) => acc + pv.value, 0)
-    return { ...prop, sum }
-  })
+  const sums = new Map<string, number>()
+  for (const pv of propertyValues.value) {
+    if (!dayStrs.has(pv.date)) continue
+    sums.set(pv.propertyId, (sums.get(pv.propertyId) ?? 0) + pv.value)
+  }
+  return properties.value.map(prop => ({
+    ...prop,
+    sum: sums.get(prop.id) ?? 0,
+  }))
 })
 
 /** Pre-formatted week display for the header. */
@@ -295,6 +312,39 @@ async function executeDelete(): Promise<void> {
 }
 
 /* ------------------------------------------------------------------ */
+/* Lazy-loaded components                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `WeekSummary` aggregates the whole week — useful, but heavy enough
+ * that we don't want it to compete with the first paint. We mount it
+ * lazily, after `requestIdleCallback` (or `setTimeout` on browsers
+ * that lack support). The `import()` is statically analysable, so
+ * Vite emits a separate chunk for `WeekSummary.vue`.
+ */
+const WeekSummary = defineAsyncComponent(
+  () => import('./components/WeekSummary.vue'),
+)
+const showWeekSummary = ref<boolean>(false)
+
+/**
+ * Run `task` during a browser idle slot, falling back to a short
+ * `setTimeout` for environments that lack `requestIdleCallback`
+ * (Safari). The fallback is short — the goal is just to get past
+ * first paint, not to hit a specific idle frame.
+ */
+function scheduleIdle(task: () => void): void {
+  const win = window as unknown as {
+    requestIdleCallback?: (cb: () => void) => void
+  }
+  if (typeof win.requestIdleCallback === 'function') {
+    win.requestIdleCallback(() => task())
+  } else {
+    window.setTimeout(task, 150)
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Initial data load                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -330,6 +380,12 @@ onMounted(async () => {
     console.error('Failed to load data:', err)
   } finally {
     loading.value = false
+    // Wait until after the first paint to start pulling the
+    // `WeekSummary` chunk — keeps the initial render from competing
+    // with the chunk download.
+    scheduleIdle(() => {
+      showWeekSummary.value = true
+    })
   }
 })
 </script>
@@ -394,6 +450,7 @@ onMounted(async () => {
           />
 
           <WeekSummary
+            v-if="showWeekSummary"
             :tasks="tasks"
             :week-date-strings="weekDateStrings"
             :properties="weeklyPropertySums"

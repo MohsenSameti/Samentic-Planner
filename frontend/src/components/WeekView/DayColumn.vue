@@ -2,7 +2,22 @@
 import { computed } from 'vue'
 import type { Task, Project, Property, PropertyValue } from '../../types'
 import TaskCard from './TaskCard.vue'
+import VirtualList from '../common/VirtualList.vue'
 import DayNotes from '../Notes/DayNotes.vue'
+
+/**
+ * Above this many tasks in a single day column we route the list
+ * through `VirtualList`; below it we render the cards directly. The
+ * threshold guards against mounting a `ResizeObserver` per day
+ * column for typical planner usage (5–20 items per day), which would
+ * otherwise cost more than it saves.
+ */
+const VIRTUAL_LIST_THRESHOLD = 50
+
+/** Heuristic height of a single `TaskCard` — used by the virtualizer
+ *  to compute scroll offset. Slightly generous so the math doesn't
+ *  leave visible gaps if a card is a few px taller than usual. */
+const TASK_CARD_HEIGHT_PX = 80
 
 const props = defineProps<{
   date: string
@@ -126,19 +141,44 @@ const taskCount = computed(() => props.tasks.length)
     </div>
 
     <div class="task-list">
-      <TaskCard
-        v-for="task in tasks"
-        :key="task.id"
-        :task="task"
-        :project="projects.get(task.projectId) ?? null"
-        @edit="emit('edit-task', task)"
-        @move="emit('move-task', task)"
-        @toggle-status="emit('toggle-task-status', task)"
-        @cancel="emit('cancel-task', task)"
-        @restore="emit('restore-task', task)"
-        @delete="emit('delete-task', task)"
-        @update-notes="(notes) => emit('update-task-notes', task, notes)"
-      />
+      <VirtualList
+        v-if="taskCount > VIRTUAL_LIST_THRESHOLD"
+        :items="tasks"
+        :item-height="TASK_CARD_HEIGHT_PX"
+        :threshold="VIRTUAL_LIST_THRESHOLD"
+        :overscan="6"
+        v-slot="{ item }"
+      >
+        <TaskCard
+          :key="(item as Task).id"
+          :task="item as Task"
+          :project="projects.get((item as Task).projectId) ?? null"
+          @edit="emit('edit-task', item as Task)"
+          @move="emit('move-task', item as Task)"
+          @toggle-status="emit('toggle-task-status', item as Task)"
+          @cancel="emit('cancel-task', item as Task)"
+          @restore="emit('restore-task', item as Task)"
+          @delete="emit('delete-task', item as Task)"
+          @update-notes="(notes) => emit('update-task-notes', item as Task, notes)"
+        />
+      </VirtualList>
+
+      <template v-else>
+        <TaskCard
+          v-for="task in tasks"
+          :key="task.id"
+          v-memo="[task.status, projects.get(task.projectId)]"
+          :task="task"
+          :project="projects.get(task.projectId) ?? null"
+          @edit="emit('edit-task', task)"
+          @move="emit('move-task', task)"
+          @toggle-status="emit('toggle-task-status', task)"
+          @cancel="emit('cancel-task', task)"
+          @restore="emit('restore-task', task)"
+          @delete="emit('delete-task', task)"
+          @update-notes="(notes) => emit('update-task-notes', task, notes)"
+        />
+      </template>
 
       <div v-if="taskCount === 0" class="empty-state">
         <svg
