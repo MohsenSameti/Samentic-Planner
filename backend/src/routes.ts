@@ -11,6 +11,7 @@ import {
   CreatePropertyValueSchema,
   DayNoteSchema,
   WeekNoteSchema,
+  SettingsSchema,
   IdParamSchema,
 } from './validation.js';
 
@@ -249,6 +250,26 @@ export function createRouter(store: JsonStore): ExpressRouter {
 
   router.get('/state', (_req, res) => {
     res.json(store.getState());
+  });
+
+  // --- Settings ----------------------------------------------------------
+
+  router.get('/settings', (_req, res) => {
+    res.json(store.getSettings());
+  });
+
+  router.put('/settings', (req, res, next) => {
+    try {
+      const parsed = SettingsSchema.parse(req.body);
+      // `SettingsSchema` constrains `weekStart` to 0..6 at runtime,
+      // but Zod still infers a plain `number`. Narrow to `WeekStartDay`
+      // so the store receives a type-correct value.
+      const settings = parsed as { weekStart: 0 | 1 | 2 | 3 | 4 | 5 | 6 };
+      const saved = store.updateSettings(settings);
+      res.json(saved);
+    } catch (err) {
+      next(err);
+    }
   });
 
   return router;

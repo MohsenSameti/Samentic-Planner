@@ -90,6 +90,28 @@ export const WeekNoteSchema = z.object({
   note: z.string(),
 });
 
+// --- Settings ----------------------------------------------------------
+
+/**
+ * Numeric day-of-week, 0 (Sunday) .. 6 (Saturday). Matches
+ * `Date#getDay()`. Stored as a number rather than a name so the
+ * client doesn't need to maintain a parallel string→number table.
+ */
+export const WeekStartDaySchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(6);
+
+/**
+ * Settings body for PUT /settings. All fields are required so a
+ * partial update can't accidentally leave the client/server out of
+ * sync on defaults.
+ */
+export const SettingsSchema = z.object({
+  weekStart: WeekStartDaySchema,
+});
+
 // --- ID param ----------------------------------------------------------
 // Used for any `/:id` style route. Centralized so the length check isn't
 // repeated in every handler.

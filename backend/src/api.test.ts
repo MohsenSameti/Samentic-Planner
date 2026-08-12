@@ -358,7 +358,7 @@ describe('API: full state', () => {
     cleanupApp(store, tmpDir)
   })
 
-  it('GET /api/state returns all six collections', async () => {
+  it('GET /api/state returns all seven collections', async () => {
     const res = await request(app).get('/api/state')
     expect(res.status).toBe(200)
     expect(res.body).toHaveProperty('projects')
@@ -367,6 +367,7 @@ describe('API: full state', () => {
     expect(res.body).toHaveProperty('propertyValues')
     expect(res.body).toHaveProperty('dayNotes')
     expect(res.body).toHaveProperty('weekNotes')
+    expect(res.body).toHaveProperty('settings')
   })
 
   it('GET /api/state reflects subsequent writes', async () => {
@@ -376,6 +377,53 @@ describe('API: full state', () => {
     const res = await request(app).get('/api/state')
     // The default 'General' plus the one we just added.
     expect(res.body.projects).toHaveLength(2)
+  })
+})
+
+describe('API: settings', () => {
+  let app: express.Express
+  let store: JsonStore
+  let tmpDir: string
+
+  beforeEach(() => {
+    ;({ app, store, tmpDir } = buildApp())
+  })
+
+  afterEach(() => {
+    cleanupApp(store, tmpDir)
+  })
+
+  it('GET /api/settings returns the default weekStart (Saturday)', async () => {
+    const res = await request(app).get('/api/settings')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ weekStart: 6 })
+  })
+
+  it('PUT /api/settings updates the weekStart', async () => {
+    const res = await request(app)
+      .put('/api/settings')
+      .send({ weekStart: 1 })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ weekStart: 1 })
+
+    // Confirm the change is visible to subsequent reads.
+    const get = await request(app).get('/api/settings')
+    expect(get.body).toEqual({ weekStart: 1 })
+  })
+
+  it('PUT /api/settings rejects out-of-range weekStart', async () => {
+    const res = await request(app)
+      .put('/api/settings')
+      .send({ weekStart: 7 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Validation failed')
+  })
+
+  it('PUT /api/settings rejects missing weekStart', async () => {
+    const res = await request(app)
+      .put('/api/settings')
+      .send({})
+    expect(res.status).toBe(400)
   })
 })
 

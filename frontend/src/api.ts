@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Project, Task, Property, PropertyValue, DayNote, WeekNote, State } from './types'
+import type { Project, Task, Property, PropertyValue, DayNote, WeekNote, Settings, State } from './types'
 
 const API = '/api'
 
@@ -173,4 +173,9 @@ export const api = {
 
   // Full State
   getState: () => call<State>('/state'),
+
+  // Settings
+  getSettings: () => call<Settings>('/settings'),
+  updateSettings: (settings: Settings) =>
+    call<Settings>('/settings', { method: 'PUT', body: JSON.stringify(settings) }),
 }

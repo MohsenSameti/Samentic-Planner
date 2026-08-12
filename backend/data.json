@@ -57,5 +57,8 @@
   "properties": [],
   "propertyValues": [],
   "dayNotes": [],
-  "weekNotes": []
+  "weekNotes": [],
+  "settings": {
+    "weekStart": 6
+  }
 }

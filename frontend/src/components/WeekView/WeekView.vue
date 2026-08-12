@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Task, Project, Property, PropertyValue, DayNote } from '../../types'
+import type {
+  Task,
+  Project,
+  Property,
+  PropertyValue,
+  DayNote,
+} from '../../types'
+import { fromLocalISODate, toLocalISODate } from '../../utils/date'
 import DayColumn from './DayColumn.vue'
 
 const props = defineProps<{
-  /** ISO date (`YYYY-MM-DD`) of the Monday of the displayed week. */
+  /** ISO date (`YYYY-MM-DD`) of the first day of the displayed week. */
   currentWeekStart: string
   /** All tasks in the system. Filtered to the visible week + project here. */
   tasks: Task[]
@@ -44,8 +51,8 @@ const emit = defineEmits<{
 
 /**
  * Seven `WeekDay`-shaped entries, derived once per `currentWeekStart`
- * change. Stable references mean columns don't re-render when only the
- * task collection updates.
+ * or `weekStart` change. Stable references mean columns don't
+ * re-render when only the task collection updates.
  */
 interface DayCell {
   date: string
@@ -56,13 +63,13 @@ interface DayCell {
 
 const weekDays = computed<DayCell[]>(() => {
   const days: DayCell[] = []
-  const start = new Date(props.currentWeekStart)
+  const start = fromLocalISODate(props.currentWeekStart)
   const today = new Date().toDateString()
   for (let i = 0; i < 7; i++) {
     const d = new Date(start)
     d.setDate(d.getDate() + i)
     days.push({
-      date: d.toISOString().split('T')[0],
+      date: toLocalISODate(d),
       name: d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
       isToday: d.toDateString() === today,

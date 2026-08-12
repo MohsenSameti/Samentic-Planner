@@ -123,6 +123,12 @@ describe('JsonStore', () => {
       expect(state.propertyValues).toBeDefined()
       expect(state.dayNotes).toBeDefined()
       expect(state.weekNotes).toBeDefined()
+      expect(state.settings).toBeDefined()
+    })
+
+    it('seeds default settings (Saturday as week start)', () => {
+      const settings = store.getSettings()
+      expect(settings.weekStart).toBe(6)
     })
 
     it('persists the default state to disk immediately on construction', () => {
@@ -356,6 +362,27 @@ describe('JsonStore', () => {
   })
 
   // -----------------------------------------------------------------
+  // Settings
+  // -----------------------------------------------------------------
+
+  describe('settings', () => {
+    it('returns the persisted settings object', () => {
+      expect(store.getSettings()).toEqual({ weekStart: 6 })
+    })
+
+    it('updates settings and persists the change', () => {
+      const updated = store.updateSettings({ weekStart: 1 })
+      expect(updated).toEqual({ weekStart: 1 })
+      expect(store.getSettings()).toEqual({ weekStart: 1 })
+      // The update is debounced; advance the timer and read back from
+      // disk to confirm the write landed.
+      vi.advanceTimersByTime(1000)
+      const onDisk = JSON.parse(readFileSync(storePath, 'utf-8')) as State
+      expect(onDisk.settings.weekStart).toBe(1)
+    })
+  })
+
+  // -----------------------------------------------------------------
   // Persistence / debounce
   // -----------------------------------------------------------------
 
@@ -440,6 +467,32 @@ describe('JsonStore', () => {
       // Falls back to the default seeded state.
       expect(bad.getProjects().map(p => p.id)).toEqual(['default'])
       bad.shutdown()
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('seeds default settings for legacy data files missing the field', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'planner-legacy-'))
+      const legacyPath = join(dir, 'data.json')
+      // Pre-`settings` shape: same collections but no `settings` key.
+      writeFileSync(
+        legacyPath,
+        JSON.stringify({
+          projects: [],
+          tasks: [],
+          properties: [],
+          propertyValues: [],
+          dayNotes: [],
+          weekNotes: [],
+        })
+      )
+      const migrated = new JsonStore({ storePath: legacyPath })
+      // Migration should have run and the in-memory state carries the
+      // default settings.
+      expect(migrated.getSettings()).toEqual({ weekStart: 6 })
+      migrated.shutdown()
+      // The migrated file should now also contain settings on disk.
+      const onDisk = JSON.parse(readFileSync(legacyPath, 'utf-8')) as State
+      expect(onDisk.settings).toEqual({ weekStart: 6 })
       rmSync(dir, { recursive: true, force: true })
     })
   })

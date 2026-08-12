@@ -14,7 +14,9 @@ import type {
   PropertyValue,
   DayNote,
   WeekNote,
+  Settings,
   State,
+  WeekStartDay,
 } from './types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -107,6 +109,22 @@ function isWeekNote(obj: unknown): obj is WeekNote {
   return typeof n.weekStart === 'string' && typeof n.note === 'string';
 }
 
+/**
+ * Validates a `Settings` object during the read-path schema check.
+ * Matches the runtime contract enforced on the write path by
+ * `SettingsSchema` in `validation.ts`.
+ */
+function isSettings(obj: unknown): obj is Settings {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const s = obj as Settings;
+  return (
+    typeof s.weekStart === 'number' &&
+    Number.isInteger(s.weekStart) &&
+    s.weekStart >= 0 &&
+    s.weekStart <= 6
+  );
+}
+
 function isState(obj: unknown): obj is State {
   if (typeof obj !== 'object' || obj === null) return false;
   const s = obj as State;
@@ -122,7 +140,8 @@ function isState(obj: unknown): obj is State {
     Array.isArray(s.dayNotes) &&
     s.dayNotes.every(isDayNote) &&
     Array.isArray(s.weekNotes) &&
-    s.weekNotes.every(isWeekNote)
+    s.weekNotes.every(isWeekNote) &&
+    isSettings(s.settings)
   );
 }
 
@@ -191,6 +210,23 @@ export class JsonStore {
         err
       );
       return createDefaultState();
+    }
+
+    // Migration: data files written before `settings` was introduced
+    // (pre-Saturday-default rollout) lack the field. Seed the default
+    // and persist so the next read sees a fully-formed State.
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !('settings' in (parsed as Record<string, unknown>))
+    ) {
+      const seeded = { ...(parsed as Record<string, unknown>), settings: createDefaultSettings() }
+      console.warn(
+        `[store] ${this.storePath} is missing \`settings\`; seeded defaults ` +
+          'and persisted.'
+      )
+      this.writeAtomic(seeded as unknown as State)
+      parsed = seeded
     }
 
     if (!isState(parsed)) {
@@ -290,8 +326,25 @@ export class JsonStore {
   public getWeekNotes(): WeekNote[] {
     return this.data.weekNotes;
   }
+  public getSettings(): Settings {
+    return this.data.settings;
+  }
   public getState(): State {
     return this.data;
+  }
+
+  // --- Settings --------------------------------------------------------
+
+  /**
+   * Replace the persisted settings wholesale. Validation happens on the
+   * route side via `SettingsSchema`; here we just trust the input and
+   * persist. Returns the new settings object so the caller can echo it
+   * back in the response.
+   */
+  public updateSettings(settings: Settings): Settings {
+    this.data.settings = { ...settings };
+    this.scheduleSave();
+    return this.data.settings;
   }
 
   // --- Projects --------------------------------------------------------
@@ -441,6 +494,14 @@ export class JsonStore {
   }
 }
 
+/**
+ * Default user-facing settings. `weekStart: 6` picks Saturday so a
+ * weekend-heavy week starts on the first day of the weekend.
+ */
+function createDefaultSettings(): Settings {
+  return { weekStart: 6 as WeekStartDay };
+}
+
 function createDefaultState(): State {
   const now = Date.now();
   return {
@@ -458,6 +519,7 @@ function createDefaultState(): State {
     propertyValues: [],
     dayNotes: [],
     weekNotes: [],
+    settings: createDefaultSettings(),
   };
 }
 

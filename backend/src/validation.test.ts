@@ -16,6 +16,7 @@ import {
   CreatePropertyValueSchema,
   DayNoteSchema,
   WeekNoteSchema,
+  SettingsSchema,
   IdParamSchema,
 } from './validation.js'
 
@@ -227,5 +228,35 @@ describe('IdParamSchema', () => {
 
   it('rejects an empty id', () => {
     expect(() => IdParamSchema.parse({ id: '' })).toThrow()
+  })
+})
+
+describe('SettingsSchema', () => {
+  it('accepts a valid weekStart value', () => {
+    const result = SettingsSchema.parse({ weekStart: 1 })
+    expect(result.weekStart).toBe(1)
+  })
+
+  it('accepts every numeric day-of-week (0..6)', () => {
+    for (let day = 0; day <= 6; day++) {
+      const result = SettingsSchema.parse({ weekStart: day })
+      expect(result.weekStart).toBe(day)
+    }
+  })
+
+  it('rejects negative weekStart values', () => {
+    expect(() => SettingsSchema.parse({ weekStart: -1 })).toThrow()
+  })
+
+  it('rejects weekStart values above 6', () => {
+    expect(() => SettingsSchema.parse({ weekStart: 7 })).toThrow()
+  })
+
+  it('rejects non-integer weekStart values', () => {
+    expect(() => SettingsSchema.parse({ weekStart: 1.5 })).toThrow()
+  })
+
+  it('rejects a missing weekStart', () => {
+    expect(() => SettingsSchema.parse({})).toThrow()
   })
 })

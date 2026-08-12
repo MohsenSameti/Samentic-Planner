@@ -1,9 +1,40 @@
+import type { WeekStartDay } from '../types'
+
 /**
  * Date helpers used by the week-view navigation and headers.
  *
  * Kept pure (no Vue reactivity) so they can be reused inside composables,
  * computeds, and tests without dragging the reactivity system along.
  */
+
+/**
+ * Format a `Date` as an ISO calendar date (`YYYY-MM-DD`) using its
+ * **local** day/month/year — not UTC. Necessary because
+ * `Date#toISOString()` is timezone-relative and would shift the date
+ * by ±1 day for users east or west of UTC, breaking the "this string
+ * is the calendar date the user picked" invariant.
+ */
+export function toLocalISODate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Parse an ISO calendar date (`YYYY-MM-DD`) as **local** midnight. The
+ * default `new Date('2024-01-01')` parses as UTC midnight per the ES
+ * spec, which would also shift by ±1 day outside UTC. We want the
+ * parsed `Date` to represent the same calendar day in the user's
+ * timezone.
+ */
+export function fromLocalISODate(iso: string): Date {
+  const parts = iso.split('-')
+  const y = Number(parts[0])
+  const m = Number(parts[1])
+  const d = Number(parts[2])
+  return new Date(y, m - 1, d)
+}
 
 /** A single day cell in the week grid. */
 export interface WeekDay {
@@ -17,35 +48,52 @@ export interface WeekDay {
   isToday: boolean
 }
 
+/** Default week start — Saturday — when the persisted setting is
+ *  missing or invalid. Matches the backend's default. */
+export const DEFAULT_WEEK_START: WeekStartDay = 6
+
 /**
- * Returns the Monday of the week containing `date` at local midnight.
- * Sunday is treated as the *last* day of the previous week (ISO 8601).
+ * Returns the first day of the week containing `date`, at local
+ * midnight. `weekStart` picks which day is the start: `0` = Sunday,
+ * `1` = Monday, ..., `6` = Saturday. The math `(day - weekStart + 7)
+ * % 7` works for every value, so callers can pick any week convention
+ * (Mon-start, Sun-start, Sat-start) without branching.
  */
-export function getWeekStart(date: Date): Date {
+export function getWeekStart(date: Date, weekStart: WeekStartDay = DEFAULT_WEEK_START): Date {
   const d = new Date(date)
   const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
+  const diff = (day - weekStart + 7) % 7
+  d.setDate(d.getDate() - diff)
   d.setHours(0, 0, 0, 0)
   return d
 }
 
 /**
- * Produces seven `WeekDay` entries starting from `weekStartStr`. `weekStartStr`
- * is an ISO date (`YYYY-MM-DD`); it is parsed in the local timezone, not UTC,
- * because the planner is week-of-the-calendar-day based.
+ * Produces seven `WeekDay` entries starting from the week containing
+ * `weekStartStr`. `weekStartStr` is an ISO date (`YYYY-MM-DD`); it is
+ * parsed in the local timezone, not UTC, because the planner is
+ * week-of-the-calendar-day based. The first entry is always
+ * `weekStart` (e.g. Saturday when `weekStart === 6`).
  */
-export function getWeekDays(weekStartStr: string): WeekDay[] {
+export function getWeekDays(
+  weekStartStr: string,
+  weekStart: WeekStartDay = DEFAULT_WEEK_START,
+): WeekDay[] {
   const days: WeekDay[] = []
-  const start = new Date(weekStartStr)
+  const start = fromLocalISODate(weekStartStr)
+  // Defensive: if the stored value happens to be off-week due to a
+  // setting change that happened while a different week was visible,
+  // snap back to the actual week-start for the current setting.
+  const normalized = getWeekStart(start, weekStart)
+  const today = new Date().toDateString()
   for (let i = 0; i < 7; i++) {
-    const d = new Date(start)
+    const d = new Date(normalized)
     d.setDate(d.getDate() + i)
     days.push({
-      date: d.toISOString().split('T')[0],
+      date: toLocalISODate(d),
       name: d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
-      isToday: d.toDateString() === new Date().toDateString(),
+      isToday: d.toDateString() === today,
     })
   }
   return days
@@ -53,19 +101,47 @@ export function getWeekDays(weekStartStr: string): WeekDay[] {
 
 /**
  * Human-readable header for the week navigation, e.g. `Mar 4 - 10, 2024`.
- * Crosses months without doubling the year string.
+ * Crosses months without doubling the year string; cross-year weeks
+ * show the year on both ends so the date range is unambiguous.
+ *
+ * The function takes the ISO date of the first day of the displayed
+ * week (`weekStartStr`); the end is always +6 days regardless of which
+ * day the week starts on, so the signature doesn't need a
+ * `weekStart` parameter.
  */
 export function formatWeekDisplay(weekStartStr: string): string {
-  const start = new Date(weekStartStr)
+  const start = fromLocalISODate(weekStartStr)
   const end = new Date(start)
   end.setDate(end.getDate() + 6)
 
   const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
   const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
-  const year = start.getFullYear()
+  const startYear = start.getFullYear()
+  const endYear = end.getFullYear()
 
-  if (startMonth === endMonth) {
-    return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${year}`
+  // Same month: collapse into "Mon D - D, YYYY".
+  if (startMonth === endMonth && startYear === endYear) {
+    return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${startYear}`
   }
-  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
+  // Same year, different months: "Mon D - Mon D, YYYY".
+  if (startYear === endYear) {
+    return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${startYear}`
+  }
+  // Cross-year: include the year on both ends so the range is unambiguous.
+  return `${startMonth} ${start.getDate()}, ${startYear} - ${endMonth} ${end.getDate()}, ${endYear}`
 }
+
+/**
+ * Stable, user-visible labels for the seven possible week-start days.
+ * Indexed by `WeekStartDay` so callers can do
+ * `WEEKDAY_LABELS[weekStart]`.
+ */
+export const WEEKDAY_LABELS: readonly string[] = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const

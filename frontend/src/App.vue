@@ -6,8 +6,8 @@ import { useProjects } from './composables/useProjects'
 import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
 import { useWeekNavigation } from './composables/useWeekNavigation'
-import { formatWeekDisplay } from './utils/date'
-import type { Task, Project, Property } from './types'
+import { DEFAULT_WEEK_START, formatWeekDisplay } from './utils/date'
+import type { Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
 import Sidebar from './components/Sidebar/Sidebar.vue'
@@ -31,6 +31,22 @@ const MoveModal = defineAsyncComponent(() => import('./modals/MoveModal.vue'))
 const DeleteConfirmModal = defineAsyncComponent(() => import('./modals/DeleteConfirmModal.vue'))
 
 /* ------------------------------------------------------------------ */
+/* Settings (week start)                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The persisted start-of-week setting. Owned here because it's the
+ * source of truth that the week navigation watches. `useWeekNavigation`
+ * receives this ref and re-anchors `currentWeekStart` whenever the user
+ * picks a different day.
+ *
+ * Seeded with the frontend's default so the first paint uses the same
+ * convention as the backend default; the server value (loaded via
+ * `api.getState()`) overwrites it once the data arrives.
+ */
+const weekStart = ref<WeekStartDay>(DEFAULT_WEEK_START)
+
+/* ------------------------------------------------------------------ */
 /* Composables                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -39,7 +55,7 @@ const {
   weekDays,
   navigateWeek,
   goToToday,
-} = useWeekNavigation()
+} = useWeekNavigation(weekStart)
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
 // `load*` function, but `App.vue` uses `api.getState()` for the initial
@@ -149,6 +165,25 @@ function toggleSidebar(): void {
 
 function closeSidebar(): void {
   sidebarCollapsed.value = true
+}
+
+/**
+ * Persist a new start-of-week setting and reflect it locally so the
+ * week view re-anchors immediately. The local update happens first so
+ * the UI doesn't lag behind the network round-trip; the PUT is
+ * fire-and-forget — a failed write leaves the local setting in place
+ * and surfaces the error through `apiError` (handled in `api.ts`).
+ */
+async function changeWeekStart(day: WeekStartDay): Promise<void> {
+  const previous = weekStart.value
+  weekStart.value = day
+  try {
+    await api.updateSettings({ weekStart: day })
+  } catch {
+    // `api.ts` already populated `apiError`. Revert the local setting
+    // so the UI matches what's on disk on the next reload.
+    weekStart.value = previous
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,6 +398,9 @@ onMounted(async () => {
     propertyValues.value = state.propertyValues
     dayNotes.value = state.dayNotes
     weekNotes.value = state.weekNotes
+    // Adopt the persisted week-start. The composable's `watch` on
+    // `weekStart` will re-anchor `currentWeekStart` automatically.
+    weekStart.value = state.settings.weekStart
 
     // Seed an empty board with a default project so the user has
     // somewhere to attach the first task.
@@ -410,9 +448,11 @@ onMounted(async () => {
           :tasks="tasks"
           :selected-project="selectedProject"
           :weekly-property-sums="weeklyPropertySums"
+          :week-start="weekStart"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
           @add-property="openPropertyModal()"
+          @change-week-start="changeWeekStart"
         />
 
         <div

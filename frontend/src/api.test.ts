@@ -14,6 +14,7 @@ import type {
   Property,
   DayNote,
   WeekNote,
+  Settings,
   State,
 } from './types/index.js'
 
@@ -164,6 +165,7 @@ describe('api', () => {
         propertyValues: [],
         dayNotes: [],
         weekNotes: [],
+        settings: { weekStart: 6 },
       }
       const fetchSpy = vi
         .fn()
@@ -249,6 +251,32 @@ describe('api', () => {
       await api.setDayNote({ date: '2024-01-01', note: 'x' })
       await api.setWeekNote({ weekStart: '2024-01-01', note: 'y' })
       expect(fetchSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('exposes settings read/write', async () => {
+      const settings: Settings = { weekStart: 1 }
+      const fetchSpy = vi.fn().mockImplementation((input, init) => {
+        const url = String(input)
+        const method = (init as RequestInit | undefined)?.method ?? 'GET'
+        if (url === '/api/settings' && method === 'GET') {
+          return Promise.resolve(jsonResponse(settings))
+        }
+        if (url === '/api/settings' && method === 'PUT') {
+          return Promise.resolve(jsonResponse(settings))
+        }
+        return Promise.reject(new Error('Unexpected call: ' + url + ' ' + method))
+      })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const read = await api.getSettings()
+      expect(read).toEqual(settings)
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('/api/settings')
+
+      const updated = await api.updateSettings({ weekStart: 6 })
+      expect(updated).toEqual(settings)
+      const [, putInit] = fetchSpy.mock.calls[1]!
+      expect(putInit?.method).toBe('PUT')
+      expect(JSON.parse(putInit?.body as string)).toEqual({ weekStart: 6 })
     })
   })
 })

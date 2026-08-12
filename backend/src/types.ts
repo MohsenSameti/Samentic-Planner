@@ -43,6 +43,24 @@ export interface WeekNote {
   note: string;
 }
 
+/**
+ * Numeric day-of-week matching `Date#getDay()`: 0 = Sunday, ..., 6 =
+ * Saturday. Stored as a number (not a string) so the value sorts
+ * numerically and the type system keeps callers honest about the
+ * valid range.
+ */
+export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * User-facing settings. Kept as a single object so new fields can be
+ * added without churning the route surface — callers always PUT the
+ * whole `Settings` (or a partial via a future PATCH if needed).
+ */
+export interface Settings {
+  /** Which day the week starts on. Default: Saturday (6). */
+  weekStart: WeekStartDay;
+}
+
 export interface State {
   projects: Project[];
   tasks: Task[];
@@ -50,4 +68,5 @@ export interface State {
   propertyValues: PropertyValue[];
   dayNotes: DayNote[];
   weekNotes: WeekNote[];
+  settings: Settings;
 }
