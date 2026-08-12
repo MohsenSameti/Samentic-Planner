@@ -7,7 +7,12 @@
     "dev:backend": "cd backend && pnpm dev",
     "dev:frontend": "cd frontend && pnpm dev",
     "build": "cd backend && pnpm build && cd ../frontend && pnpm build",
-    "start": "cd backend && pnpm start"
+    "start": "cd backend && pnpm start",
+    "test": "pnpm --recursive test",
+    "test:backend": "cd backend && pnpm test",
+    "test:frontend": "cd frontend && pnpm test",
+    "test:watch": "cd frontend && pnpm test:watch",
+    "test:coverage": "pnpm --recursive test:coverage"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

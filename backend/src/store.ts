@@ -20,11 +20,9 @@ import type {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const STORE_PATH = join(__dirname, '..', 'data.json');
-// Used for atomic writes: write to `tmp` first, then rename to the real
-// path. `rename` is atomic on POSIX filesystems, so readers always see
-// either the old or the new file, never a partial write.
-const STORE_TMP_PATH = `${STORE_PATH}.tmp`;
+/** Production store location — `backend/data.json`, relative to the
+ *  compiled `dist/` directory. */
+const DEFAULT_STORE_PATH = join(__dirname, '..', 'data.json');
 
 // Reuse `State` from types.ts as the single source of truth for the store
 // shape. Aliased as `Store` so call sites stay unchanged.
@@ -156,15 +154,25 @@ export class JsonStore {
   private data: State;
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private unsavedChanges = 0;
+  /** Absolute path to the JSON file backing this store. Configurable
+   *  per-instance so tests can point at a temp file. */
+  private readonly storePath: string;
 
-  constructor() {
+  constructor(options?: { storePath?: string }) {
+    this.storePath = options?.storePath ?? DEFAULT_STORE_PATH;
     this.data = this.loadFromDisk();
+  }
+
+  /** Path to the temp file used for atomic writes. Derived from
+   *  `storePath` so it tracks the configured location. */
+  private get storeTmpPath(): string {
+    return `${this.storePath}.tmp`;
   }
 
   // --- Lifecycle -------------------------------------------------------
 
   private loadFromDisk(): State {
-    if (!existsSync(STORE_PATH)) {
+    if (!existsSync(this.storePath)) {
       const fresh = createDefaultState();
       // Persist the default so subsequent reads see a real file rather
       // than re-creating it on every restart.
@@ -174,10 +182,10 @@ export class JsonStore {
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(readFileSync(STORE_PATH, 'utf-8'));
+      parsed = JSON.parse(readFileSync(this.storePath, 'utf-8'));
     } catch (err) {
       console.error(
-        `[store] Failed to parse ${STORE_PATH}; falling back to an empty ` +
+        `[store] Failed to parse ${this.storePath}; falling back to an empty ` +
           'in-memory state. The on-disk file is untouched and may be ' +
           'recoverable manually. Error:',
         err
@@ -191,7 +199,7 @@ export class JsonStore {
       // schema migrates) this path becomes a hard error. See plan
       // `13-data-validation.md` for the strict-validation migration.
       console.warn(
-        `[store] ${STORE_PATH} does not match the expected schema. ` +
+        `[store] ${this.storePath} does not match the expected schema. ` +
           'Read-path validation failed; using data as-is.'
       );
     }
@@ -244,14 +252,14 @@ export class JsonStore {
 
   private writeAtomic(state: State): void {
     try {
-      writeFileSync(STORE_TMP_PATH, JSON.stringify(state, null, 2));
-      renameSync(STORE_TMP_PATH, STORE_PATH);
+      writeFileSync(this.storeTmpPath, JSON.stringify(state, null, 2));
+      renameSync(this.storeTmpPath, this.storePath);
     } catch (err) {
       console.error('[store] Failed to persist data:', err);
       // Best-effort cleanup of an orphan temp file so it doesn't pile up
       // if rename never completed.
       try {
-        if (existsSync(STORE_TMP_PATH)) unlinkSync(STORE_TMP_PATH);
+        if (existsSync(this.storeTmpPath)) unlinkSync(this.storeTmpPath);
       } catch {
         // Ignore secondary failure; the primary error is already logged.
       }
