@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiError } from '../api'
+import { apiError } from '../../api'
 
 /**
  * Toast-style notification that surfaces the most recent `apiError`.
