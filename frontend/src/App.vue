@@ -7,7 +7,7 @@ import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
 import { useWeekNavigation } from './composables/useWeekNavigation'
 import { DEFAULT_WEEK_START, formatWeekDisplay } from './utils/date'
-import type { Task, Project, Property, WeekStartDay } from './types'
+import type { Calendar, Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
 import Sidebar from './components/Sidebar/Sidebar.vue'
@@ -31,7 +31,7 @@ const MoveModal = defineAsyncComponent(() => import('./modals/MoveModal.vue'))
 const DeleteConfirmModal = defineAsyncComponent(() => import('./modals/DeleteConfirmModal.vue'))
 
 /* ------------------------------------------------------------------ */
-/* Settings (week start)                                                 */
+/* Settings (week start, calendar)                                       */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -46,6 +46,15 @@ const DeleteConfirmModal = defineAsyncComponent(() => import('./modals/DeleteCon
  */
 const weekStart = ref<WeekStartDay>(DEFAULT_WEEK_START)
 
+/**
+ * The persisted calendar preference. Owned here so the week
+ * navigation, the header, and the day columns can all react to a
+ * single source of truth. Switching calendars is purely a display
+ * concern — storage stays Gregorian ISO. Seeded with the
+ * frontend's default to match the backend.
+ */
+const calendar = ref<Calendar>('gregorian')
+
 /* ------------------------------------------------------------------ */
 /* Composables                                                          */
 /* ------------------------------------------------------------------ */
@@ -55,7 +64,7 @@ const {
   weekDays,
   navigateWeek,
   goToToday,
-} = useWeekNavigation(weekStart)
+} = useWeekNavigation(weekStart, calendar)
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
 // `load*` function, but `App.vue` uses `api.getState()` for the initial
@@ -142,9 +151,11 @@ const weeklyPropertySums = computed(() => {
   }))
 })
 
-/** Pre-formatted week display for the header. */
+/** Pre-formatted week display for the header. Honours the selected
+ *  calendar — Jalali labels and day numbers when `calendar.value ===
+ *  'jalali'`, Gregorian otherwise. */
 const weekDisplay = computed<string>(() =>
-  formatWeekDisplay(currentWeekStart.value),
+  formatWeekDisplay(currentWeekStart.value, calendar.value),
 )
 
 /** ISO dates for the visible week — used by `WeekSummary`. */
@@ -178,11 +189,28 @@ async function changeWeekStart(day: WeekStartDay): Promise<void> {
   const previous = weekStart.value
   weekStart.value = day
   try {
-    await api.updateSettings({ weekStart: day })
+    await api.updateSettings({ weekStart: day, calendar: calendar.value })
   } catch {
     // `api.ts` already populated `apiError`. Revert the local setting
     // so the UI matches what's on disk on the next reload.
     weekStart.value = previous
+  }
+}
+
+/**
+ * Persist a new calendar preference and reflect it locally so the
+ * header / day columns repaint immediately. Mirrors `changeWeekStart`:
+ * local update first, then the PUT, revert on failure.
+ */
+async function changeCalendar(c: Calendar): Promise<void> {
+  const previous = calendar.value
+  calendar.value = c
+  try {
+    await api.updateSettings({ weekStart: weekStart.value, calendar: c })
+  } catch {
+    // `api.ts` already populated `apiError`. Revert the local setting
+    // so the UI matches what's on disk on the next reload.
+    calendar.value = previous
   }
 }
 
@@ -401,6 +429,7 @@ onMounted(async () => {
     // Adopt the persisted week-start. The composable's `watch` on
     // `weekStart` will re-anchor `currentWeekStart` automatically.
     weekStart.value = state.settings.weekStart
+    calendar.value = state.settings.calendar
 
     // Seed an empty board with a default project so the user has
     // somewhere to attach the first task.
@@ -449,10 +478,12 @@ onMounted(async () => {
           :selected-project="selectedProject"
           :weekly-property-sums="weeklyPropertySums"
           :week-start="weekStart"
+          :calendar="calendar"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
           @add-property="openPropertyModal()"
           @change-week-start="changeWeekStart"
+          @change-calendar="changeCalendar"
         />
 
         <div
@@ -470,6 +501,7 @@ onMounted(async () => {
             :property-values="propertyValues"
             :day-notes="dayNotes"
             :selected-project="selectedProject"
+            :calendar="calendar"
             @add-task="openTaskModal"
             @edit-task="handleEditTask"
             @move-task="handleMoveTask"
@@ -503,6 +535,7 @@ onMounted(async () => {
         :task="editingTask"
         :projects="projects"
         :date="taskModalDate"
+        :calendar="calendar"
         @close="taskModalOpen = false"
         @save="saveTask"
       />
@@ -526,6 +559,7 @@ onMounted(async () => {
       <MoveModal
         :show="moveModalOpen"
         :task="movingTask"
+        :calendar="calendar"
         @close="moveModalOpen = false"
         @move="executeMove"
       />

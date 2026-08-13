@@ -1,4 +1,8 @@
-import type { WeekStartDay } from '../types'
+import type { Calendar, WeekStartDay } from '../types'
+import {
+  JALALI_MONTH_LABELS,
+  toJalaliYMD,
+} from './jalali'
 
 /**
  * Date helpers used by the week-view navigation and headers.
@@ -46,6 +50,16 @@ export interface WeekDay {
   dayNum: number
   /** True when this calendar day is today (local timezone). */
   isToday: boolean
+  /**
+   * Jalali day-of-month. Only populated when the user has selected
+   * the Jalali calendar; otherwise `undefined`.
+   */
+  dayNumJalali?: number
+  /**
+   * Jalali month label (e.g. "Far"). Only populated when the user
+   * has selected the Jalali calendar; otherwise `undefined`.
+   */
+  monthLabelJalali?: string
 }
 
 /** Default week start — Saturday — when the persisted setting is
@@ -74,10 +88,16 @@ export function getWeekStart(date: Date, weekStart: WeekStartDay = DEFAULT_WEEK_
  * parsed in the local timezone, not UTC, because the planner is
  * week-of-the-calendar-day based. The first entry is always
  * `weekStart` (e.g. Saturday when `weekStart === 6`).
+ *
+ * When `calendar === 'jalali'`, each entry is enriched with
+ * `dayNumJalali` and `monthLabelJalali`. The `date` field stays
+ * Gregorian ISO (the canonical key for storage, navigation, and
+ * grouping).
  */
 export function getWeekDays(
   weekStartStr: string,
   weekStart: WeekStartDay = DEFAULT_WEEK_START,
+  calendar: Calendar = 'gregorian',
 ): WeekDay[] {
   const days: WeekDay[] = []
   const start = fromLocalISODate(weekStartStr)
@@ -89,12 +109,23 @@ export function getWeekDays(
   for (let i = 0; i < 7; i++) {
     const d = new Date(normalized)
     d.setDate(d.getDate() + i)
-    days.push({
-      date: toLocalISODate(d),
+    const gregIso = toLocalISODate(d)
+    const entry: WeekDay = {
+      date: gregIso,
       name: d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
       isToday: d.toDateString() === today,
-    })
+    }
+    if (calendar === 'jalali') {
+      const j = toJalaliYMD(gregIso)
+      entry.dayNumJalali = j.jd
+      // `JALALI_MONTH_LABELS` is indexed by `jm - 1`; default to an
+      // empty string for an out-of-range month (should never happen
+      // for valid dates, but the type system requires a fallback).
+      const labelIdx = j.jm - 1
+      entry.monthLabelJalali = JALALI_MONTH_LABELS[labelIdx] ?? ''
+    }
+    days.push(entry)
   }
   return days
 }
@@ -108,11 +139,40 @@ export function getWeekDays(
  * week (`weekStartStr`); the end is always +6 days regardless of which
  * day the week starts on, so the signature doesn't need a
  * `weekStart` parameter.
+ *
+ * When `calendar === 'jalali'`, the format uses Jalali month labels
+ * and day-of-month numbers but keeps the same cross-month / cross-year
+ * logic. The `gregIso` parameter is still the Gregorian ISO of the
+ * week start — the glyphs are just translated for display.
  */
-export function formatWeekDisplay(weekStartStr: string): string {
+export function formatWeekDisplay(
+  weekStartStr: string,
+  calendar: Calendar = 'gregorian',
+): string {
   const start = fromLocalISODate(weekStartStr)
   const end = new Date(start)
   end.setDate(end.getDate() + 6)
+
+  if (calendar === 'jalali') {
+    const jStart = toJalaliYMD(weekStartStr)
+    const endIso = toLocalISODate(end)
+    const jEnd = toJalaliYMD(endIso)
+    const startLabel = JALALI_MONTH_LABELS[jStart.jm - 1] ?? ''
+    const endLabel = JALALI_MONTH_LABELS[jEnd.jm - 1] ?? ''
+    const startYear = jStart.jy
+    const endYear = jEnd.jy
+
+    // Same month: collapse into "Mon D - D, YYYY".
+    if (jStart.jm === jEnd.jm && startYear === endYear) {
+      return `${startLabel} ${jStart.jd} - ${jEnd.jd}, ${startYear}`
+    }
+    // Same year, different months: "Mon D - Mon D, YYYY".
+    if (startYear === endYear) {
+      return `${startLabel} ${jStart.jd} - ${endLabel} ${jEnd.jd}, ${startYear}`
+    }
+    // Cross-year: include the year on both ends so the range is unambiguous.
+    return `${startLabel} ${jStart.jd}, ${startYear} - ${endLabel} ${jEnd.jd}, ${endYear}`
+  }
 
   const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
   const endMonth = end.toLocaleDateString('en-US', { month: 'short' })

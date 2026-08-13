@@ -104,12 +104,21 @@ export const WeekStartDaySchema = z
   .max(6);
 
 /**
+ * Supported calendar systems. Mirrored on the frontend in
+ * `types/index.ts` so the wire format stays in lockstep. Adding a
+ * new calendar (e.g. Hijri) is a one-line change here plus the
+ * same literal-union update on the frontend.
+ */
+export const CalendarSchema = z.enum(['gregorian', 'jalali']);
+
+/**
  * Settings body for PUT /settings. All fields are required so a
  * partial update can't accidentally leave the client/server out of
  * sync on defaults.
  */
 export const SettingsSchema = z.object({
   weekStart: WeekStartDaySchema,
+  calendar: CalendarSchema,
 });
 
 // --- ID param ----------------------------------------------------------

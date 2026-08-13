@@ -32,6 +32,19 @@ const props = defineProps<{
   propertyValues: PropertyValue[]
   /** Current day-note text (or '' if none). */
   dayNoteValue: string
+  /**
+   * Jalali day-of-month. Provided when the UI is in Jalali mode;
+   * `undefined` for Gregorian. When present, takes precedence over
+   * `dayNum` in the rendered header.
+   */
+  dayNumJalali?: number
+  /**
+   * Jalali month label (e.g. "Far"). Provided when the UI is in Jalali
+   * mode; `undefined` for Gregorian. Currently unused at the header
+   * (the day number is the dominant visual), but exposed so a future
+   * iteration can render the month label inline.
+   */
+  monthLabelJalali?: string
 }>()
 
 /**
@@ -116,7 +129,7 @@ const taskCount = computed(() => props.tasks.length)
     <div class="day-header">
       <div>
         <div class="day-name">{{ dayName }}</div>
-        <div class="day-date">{{ dayNum }}</div>
+        <div class="day-date">{{ dayNumJalali ?? dayNum }}</div>
       </div>
       <button
         class="add-task-btn"

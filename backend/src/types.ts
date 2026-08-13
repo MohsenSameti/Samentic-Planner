@@ -52,6 +52,13 @@ export interface WeekNote {
 export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
+ * Which calendar the UI renders. Storage is always Gregorian ISO
+ * (`YYYY-MM-DD`); the choice only affects display on the frontend.
+ * Mirrored on the server so the `Settings` round-trip is symmetric.
+ */
+export type Calendar = 'gregorian' | 'jalali';
+
+/**
  * User-facing settings. Kept as a single object so new fields can be
  * added without churning the route surface — callers always PUT the
  * whole `Settings` (or a partial via a future PATCH if needed).
@@ -59,6 +66,8 @@ export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export interface Settings {
   /** Which day the week starts on. Default: Saturday (6). */
   weekStart: WeekStartDay;
+  /** Which calendar the UI should render. Default: 'gregorian'. */
+  calendar: Calendar;
 }
 
 export interface State {

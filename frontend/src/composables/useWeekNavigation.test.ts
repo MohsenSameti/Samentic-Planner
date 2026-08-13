@@ -11,7 +11,7 @@ import { ref } from 'vue'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWeekNavigation } from './useWeekNavigation.js'
-import type { WeekStartDay } from '../types/index.js'
+import type { Calendar, WeekStartDay } from '../types/index.js'
 
 /**
  * The clock is pinned to Wednesday 2024-01-03. For each week-start
@@ -178,6 +178,53 @@ describe('useWeekNavigation', () => {
     it('weekStart computed is the same as currentWeekStart', () => {
       const { currentWeekStart, weekStart } = useWeekNavigation(ref(1))
       expect(weekStart.value).toBe(currentWeekStart.value)
+    })
+
+    it('weekDays does not include Jalali fields when calendar is Gregorian', () => {
+      const { weekDays } = useWeekNavigation(ref(6), ref<Calendar>('gregorian'))
+      for (const d of weekDays.value) {
+        expect(d.dayNumJalali).toBeUndefined()
+        expect(d.monthLabelJalali).toBeUndefined()
+      }
+    })
+
+    it('weekDays includes Jalali fields when calendar is Jalali', () => {
+      const { weekDays } = useWeekNavigation(ref(6), ref<Calendar>('jalali'))
+      // The Saturday-start week containing 2024-01-03 (Wed) is
+      // 2023-12-30 .. 2024-01-05. 2024-01-03 falls on Jalali
+      // 1402-10-13 (Dey 13).
+      const wed = weekDays.value.find(d => d.date === '2024-01-03')
+      expect(wed?.dayNumJalali).toBe(13)
+      expect(wed?.monthLabelJalali).toBe('Dey')
+    })
+
+    it('re-derives weekDays when the calendar ref changes', async () => {
+      const calRef = ref<Calendar>('gregorian')
+      const { weekDays } = useWeekNavigation(ref(6), calRef)
+      expect(weekDays.value[0]?.dayNumJalali).toBeUndefined()
+
+      calRef.value = 'jalali'
+      await nextTick()
+      expect(weekDays.value[0]?.dayNumJalali).toBeDefined()
+      expect(weekDays.value[0]?.monthLabelJalali).toBeDefined()
+    })
+
+    it('clamps an out-of-range calendar value to the default', async () => {
+      const bad = ref<Calendar>('X' as unknown as Calendar)
+      const { weekDays } = useWeekNavigation(ref(6), bad)
+      // Falls back to Gregorian — no Jalali fields.
+      expect(weekDays.value[0]?.dayNumJalali).toBeUndefined()
+    })
+
+    it('does not re-anchor currentWeekStart when calendar changes', async () => {
+      const calRef = ref<Calendar>('gregorian')
+      const { currentWeekStart } = useWeekNavigation(ref(1), calRef)
+      const before = currentWeekStart.value
+
+      calRef.value = 'jalali'
+      await nextTick()
+      // Calendar is display-only — switching it shouldn't move the week.
+      expect(currentWeekStart.value).toBe(before)
     })
   })
 })

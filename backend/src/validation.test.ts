@@ -233,30 +233,49 @@ describe('IdParamSchema', () => {
 
 describe('SettingsSchema', () => {
   it('accepts a valid weekStart value', () => {
-    const result = SettingsSchema.parse({ weekStart: 1 })
+    const result = SettingsSchema.parse({ weekStart: 1, calendar: 'gregorian' })
     expect(result.weekStart).toBe(1)
+    expect(result.calendar).toBe('gregorian')
   })
 
   it('accepts every numeric day-of-week (0..6)', () => {
     for (let day = 0; day <= 6; day++) {
-      const result = SettingsSchema.parse({ weekStart: day })
+      const result = SettingsSchema.parse({ weekStart: day, calendar: 'gregorian' })
       expect(result.weekStart).toBe(day)
     }
   })
 
   it('rejects negative weekStart values', () => {
-    expect(() => SettingsSchema.parse({ weekStart: -1 })).toThrow()
+    expect(() => SettingsSchema.parse({ weekStart: -1, calendar: 'gregorian' })).toThrow()
   })
 
   it('rejects weekStart values above 6', () => {
-    expect(() => SettingsSchema.parse({ weekStart: 7 })).toThrow()
+    expect(() => SettingsSchema.parse({ weekStart: 7, calendar: 'gregorian' })).toThrow()
   })
 
   it('rejects non-integer weekStart values', () => {
-    expect(() => SettingsSchema.parse({ weekStart: 1.5 })).toThrow()
+    expect(() => SettingsSchema.parse({ weekStart: 1.5, calendar: 'gregorian' })).toThrow()
   })
 
   it('rejects a missing weekStart', () => {
-    expect(() => SettingsSchema.parse({})).toThrow()
+    expect(() => SettingsSchema.parse({ calendar: 'gregorian' })).toThrow()
+  })
+
+  it('accepts calendar: "gregorian"', () => {
+    const result = SettingsSchema.parse({ weekStart: 6, calendar: 'gregorian' })
+    expect(result.calendar).toBe('gregorian')
+  })
+
+  it('accepts calendar: "jalali"', () => {
+    const result = SettingsSchema.parse({ weekStart: 6, calendar: 'jalali' })
+    expect(result.calendar).toBe('jalali')
+  })
+
+  it('rejects an out-of-range calendar value', () => {
+    expect(() => SettingsSchema.parse({ weekStart: 6, calendar: 'X' })).toThrow()
+  })
+
+  it('rejects a missing calendar', () => {
+    expect(() => SettingsSchema.parse({ weekStart: 6 })).toThrow()
   })
 })

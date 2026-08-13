@@ -165,7 +165,7 @@ describe('api', () => {
         propertyValues: [],
         dayNotes: [],
         weekNotes: [],
-        settings: { weekStart: 6 },
+        settings: { weekStart: 6, calendar: 'gregorian' },
       }
       const fetchSpy = vi
         .fn()
@@ -254,7 +254,7 @@ describe('api', () => {
     })
 
     it('exposes settings read/write', async () => {
-      const settings: Settings = { weekStart: 1 }
+      const settings: Settings = { weekStart: 1, calendar: 'gregorian' }
       const fetchSpy = vi.fn().mockImplementation((input, init) => {
         const url = String(input)
         const method = (init as RequestInit | undefined)?.method ?? 'GET'
@@ -272,11 +272,11 @@ describe('api', () => {
       expect(read).toEqual(settings)
       expect(fetchSpy.mock.calls[0]?.[0]).toBe('/api/settings')
 
-      const updated = await api.updateSettings({ weekStart: 6 })
+      const updated = await api.updateSettings({ weekStart: 6, calendar: 'gregorian' })
       expect(updated).toEqual(settings)
       const [, putInit] = fetchSpy.mock.calls[1]!
       expect(putInit?.method).toBe('PUT')
-      expect(JSON.parse(putInit?.body as string)).toEqual({ weekStart: 6 })
+      expect(JSON.parse(putInit?.body as string)).toEqual({ weekStart: 6, calendar: 'gregorian' })
     })
   })
 })

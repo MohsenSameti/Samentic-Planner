@@ -15,7 +15,10 @@
       "projectId": "default",
       "date": "2026-08-11",
       "status": "active",
-      "notes": ""
+      "notes": "",
+      "description": "",
+      "createdAt": 1786574065771,
+      "updatedAt": 1786574065771
     },
     {
       "id": "msopm1k7ligo69seou",
@@ -24,7 +27,9 @@
       "projectId": "default",
       "date": "2026-08-11",
       "status": "active",
-      "notes": ""
+      "notes": "",
+      "createdAt": 1786574065771,
+      "updatedAt": 1786574065771
     },
     {
       "id": "msopm5kycq7vzrdx6f",
@@ -33,7 +38,9 @@
       "projectId": "default",
       "date": "2026-08-11",
       "status": "active",
-      "notes": ""
+      "notes": "",
+      "createdAt": 1786574065771,
+      "updatedAt": 1786574065771
     },
     {
       "id": "msopm9m9xyaonpa2an",
@@ -42,7 +49,9 @@
       "projectId": "default",
       "date": "2026-08-11",
       "status": "active",
-      "notes": ""
+      "notes": "",
+      "createdAt": 1786574065771,
+      "updatedAt": 1786574065771
     },
     {
       "id": "msoqrcc4enq9nq8f2ku",
@@ -51,7 +60,9 @@
       "projectId": "default",
       "date": "2026-08-11",
       "status": "active",
-      "notes": ""
+      "notes": "",
+      "createdAt": 1786574065771,
+      "updatedAt": 1786574065771
     }
   ],
   "properties": [],
@@ -59,6 +70,7 @@
   "dayNotes": [],
   "weekNotes": [],
   "settings": {
-    "weekStart": 6
+    "weekStart": 6,
+    "calendar": "jalali"
   }
 }

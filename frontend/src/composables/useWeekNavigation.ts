@@ -7,7 +7,7 @@ import {
   toLocalISODate,
   type WeekDay,
 } from '../utils/date'
-import type { WeekStartDay } from '../types'
+import type { Calendar, WeekStartDay } from '../types'
 
 /**
  * Normalise a `WeekStartDay` value into the 0..6 range, falling back
@@ -24,6 +24,15 @@ function clampWeekStart(value: WeekStartDay): WeekStartDay {
 }
 
 /**
+ * Normalise a `Calendar` value into the literal union, falling back
+ * to the default for anything out of range. Mirrors the
+ * `clampWeekStart` defence-in-depth pattern.
+ */
+function clampCalendar(value: Calendar): Calendar {
+  return value === 'jalali' ? 'jalali' : 'gregorian'
+}
+
+/**
  * Manages the currently-viewed week and exposes derived state and
  * navigation actions. Kept separate from the entity composables so the
  * navigation logic can be unit-tested without any API involvement.
@@ -32,17 +41,22 @@ function clampWeekStart(value: WeekStartDay): WeekStartDay {
  * comparison is stable and serialization-friendly, and it's the same
  * shape the rest of the codebase already uses for dates.
  *
- * `weekStart` is sourced from a `Ref<WeekStartDay>` so changes
- * (typically the user picking a new start-of-week in settings) flow
- * through automatically. When the setting changes, the composable
- * re-anchors `currentWeekStart` to today so the user doesn't see a
- * week that was valid under the old convention but is off-by-N-days
- * under the new one.
+ * `weekStart` and `calendar` are sourced from `Ref`s so changes
+ * (typically the user picking a new value in settings) flow through
+ * automatically. When `weekStart` changes, the composable re-anchors
+ * `currentWeekStart` to today so the user doesn't see a week that was
+ * valid under the old convention but is off-by-N-days under the new
+ * one. `calendar` is purely display-only — switching calendars doesn't
+ * move the user to a different week.
  */
-export function useWeekNavigation(weekStart: Ref<WeekStartDay> = ref(DEFAULT_WEEK_START)) {
+export function useWeekNavigation(
+  weekStart: Ref<WeekStartDay> = ref(DEFAULT_WEEK_START),
+  calendar: Ref<Calendar> = ref<Calendar>('gregorian'),
+) {
   // Snapshot the (clamped) value once at construction; the watcher
   // below re-clamps on every update.
   const safeWeekStart = computed<WeekStartDay>(() => clampWeekStart(weekStart.value))
+  const safeCalendar = computed<Calendar>(() => clampCalendar(calendar.value))
 
   const currentWeekStart = ref<string>(
     toLocalISODate(getWeekStart(new Date(), safeWeekStart.value)),
@@ -58,10 +72,11 @@ export function useWeekNavigation(weekStart: Ref<WeekStartDay> = ref(DEFAULT_WEE
     currentWeekStart.value = toLocalISODate(getWeekStart(new Date(), next))
   })
 
-  /** Seven `WeekDay` entries for the current week. Re-derives when the week
-   *  or the week-start setting changes. */
+  /** Seven `WeekDay` entries for the current week. Re-derives when the
+   *  week, the week-start setting, or the calendar changes. The
+   *  `date` field stays Gregorian ISO regardless of calendar. */
   const weekDays = computed<WeekDay[]>(() =>
-    getWeekDays(currentWeekStart.value, safeWeekStart.value),
+    getWeekDays(currentWeekStart.value, safeWeekStart.value, safeCalendar.value),
   )
 
   /** ISO date string of the current week's first day. */

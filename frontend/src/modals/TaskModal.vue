@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import Modal from '../components/common/Modal.vue'
-import type { Task, Project } from '../types'
+import JalaliDatePicker from '../components/common/JalaliDatePicker.vue'
+import type { Calendar, Task, Project } from '../types'
 
 const props = defineProps<{
   show: boolean
@@ -10,6 +11,8 @@ const props = defineProps<{
   projects: Project[]
   /** Default date for new tasks. Ignored when `task` is set. */
   date: string
+  /** Which calendar to render in the date field. */
+  calendar: Calendar
 }>()
 
 const emit = defineEmits<{
@@ -67,6 +70,16 @@ function onSubmit(): void {
     date: form.value.date,
   })
 }
+
+/**
+ * Handler for the Jalali picker's `update` event. Stores the
+ * Gregorian ISO date string in the form state. The picker is the
+ * only module that produces Jalali Y/M/D triples for output — here
+ * we just receive the canonical Gregorian ISO and forward it.
+ */
+function onPickDate(value: string): void {
+  form.value.date = value
+}
 </script>
 
 <template>
@@ -102,6 +115,23 @@ function onSubmit(): void {
             {{ p.name }}
           </option>
         </select>
+      </div>
+      <div class="form-group">
+        <label id="task-date-label">Date</label>
+        <JalaliDatePicker
+          v-if="calendar === 'jalali'"
+          :value="form.date"
+          :aria-labelledby="'task-date-label'"
+          @update="onPickDate"
+        />
+        <input
+          v-else
+          id="task-date"
+          v-model="form.date"
+          type="date"
+          required
+          aria-labelledby="task-date-label"
+        />
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>

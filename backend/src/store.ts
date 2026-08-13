@@ -17,6 +17,7 @@ import type {
   Settings,
   State,
   WeekStartDay,
+  Calendar,
 } from './types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -121,7 +122,8 @@ function isSettings(obj: unknown): obj is Settings {
     typeof s.weekStart === 'number' &&
     Number.isInteger(s.weekStart) &&
     s.weekStart >= 0 &&
-    s.weekStart <= 6
+    s.weekStart <= 6 &&
+    (s.calendar === 'gregorian' || s.calendar === 'jalali')
   );
 }
 
@@ -227,6 +229,48 @@ export class JsonStore {
       )
       this.writeAtomic(seeded as unknown as State)
       parsed = seeded
+    }
+
+    // Migration: data files written before `calendar` was added to
+    // `Settings` (pre-Jalali-rollout) carry no `calendar` key. Fill
+    // it in-memory so callers see a fully-formed `Settings` object
+    // without a hand-edit. We do NOT write back to disk — the
+    // migration is persisted on the next `PUT /settings`.
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'settings' in (parsed as Record<string, unknown>)
+    ) {
+      const settings = (parsed as { settings: Record<string, unknown> }).settings
+      if (settings && typeof settings === 'object' && !('calendar' in settings)) {
+        settings.calendar = DEFAULT_CALENDAR
+      }
+    }
+
+    // Migration: pre-schema-strictness `data.json` files can have
+    // tasks missing `description`, `createdAt`, or `updatedAt`. The
+    // strict `isTask` guard would otherwise reject the whole state
+    // and log a "does not match the expected schema" warning. Patch
+    // the missing fields in-memory so the rest of the app sees a
+    // fully-typed `State`. In-memory only — the migration is
+    // persisted on the next mutation.
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      Array.isArray((parsed as { tasks?: unknown }).tasks)
+    ) {
+      const now = Date.now()
+      for (const task of (parsed as { tasks: Record<string, unknown>[] }).tasks) {
+        if (typeof task.description !== 'string') {
+          task.description = ''
+        }
+        if (typeof task.createdAt !== 'number') {
+          task.createdAt = now
+        }
+        if (typeof task.updatedAt !== 'number') {
+          task.updatedAt = now
+        }
+      }
     }
 
     if (!isState(parsed)) {
@@ -495,11 +539,20 @@ export class JsonStore {
 }
 
 /**
+ * Default calendar. Mirrored on the frontend (`Calendar` default) so
+ * the two halves stay in lockstep when no explicit `calendar` key
+ * has been persisted yet.
+ */
+const DEFAULT_CALENDAR: Calendar = 'gregorian'
+
+/**
  * Default user-facing settings. `weekStart: 6` picks Saturday so a
  * weekend-heavy week starts on the first day of the weekend.
+ * `calendar: 'gregorian'` keeps the existing wire format for users
+ * who never touch the new setting.
  */
 function createDefaultSettings(): Settings {
-  return { weekStart: 6 as WeekStartDay };
+  return { weekStart: 6 as WeekStartDay, calendar: DEFAULT_CALENDAR };
 }
 
 function createDefaultState(): State {

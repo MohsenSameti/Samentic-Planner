@@ -51,6 +51,18 @@ export interface WeekNote {
 export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 /**
+ * Which calendar the UI renders. Storage is always Gregorian ISO
+ * (`YYYY-MM-DD`); the choice only affects display (date headers,
+ * day-of-month numbers, the `TaskModal` date picker).
+ *
+ * - `'gregorian'` — the default; no conversion happens.
+ * - `'jalali'` — Persian/Jalali. Dates are converted for display and
+ *   the date picker switches to a Jalali grid, but the wire format
+ *   stays Gregorian.
+ */
+export type Calendar = 'gregorian' | 'jalali'
+
+/**
  * User-facing settings. The full object is the unit of write — the
  * PUT endpoint replaces the persisted settings wholesale, which is
  * fine because the set of keys is small and known.
@@ -58,6 +70,8 @@ export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6
 export interface Settings {
   /** Which day the week starts on. Default: Saturday (6). */
   weekStart: WeekStartDay
+  /** Which calendar to render. Default: 'gregorian'. */
+  calendar: Calendar
 }
 
 export interface State {

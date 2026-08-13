@@ -396,25 +396,25 @@ describe('API: settings', () => {
   it('GET /api/settings returns the default weekStart (Saturday)', async () => {
     const res = await request(app).get('/api/settings')
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ weekStart: 6 })
+    expect(res.body).toEqual({ weekStart: 6, calendar: 'gregorian' })
   })
 
   it('PUT /api/settings updates the weekStart', async () => {
     const res = await request(app)
       .put('/api/settings')
-      .send({ weekStart: 1 })
+      .send({ weekStart: 1, calendar: 'gregorian' })
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ weekStart: 1 })
+    expect(res.body).toEqual({ weekStart: 1, calendar: 'gregorian' })
 
     // Confirm the change is visible to subsequent reads.
     const get = await request(app).get('/api/settings')
-    expect(get.body).toEqual({ weekStart: 1 })
+    expect(get.body).toEqual({ weekStart: 1, calendar: 'gregorian' })
   })
 
   it('PUT /api/settings rejects out-of-range weekStart', async () => {
     const res = await request(app)
       .put('/api/settings')
-      .send({ weekStart: 7 })
+      .send({ weekStart: 7, calendar: 'gregorian' })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('Validation failed')
   })
@@ -422,8 +422,24 @@ describe('API: settings', () => {
   it('PUT /api/settings rejects missing weekStart', async () => {
     const res = await request(app)
       .put('/api/settings')
-      .send({})
+      .send({ calendar: 'gregorian' })
     expect(res.status).toBe(400)
+  })
+
+  it('PUT /api/settings accepts calendar: "jalali"', async () => {
+    const res = await request(app)
+      .put('/api/settings')
+      .send({ weekStart: 6, calendar: 'jalali' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ weekStart: 6, calendar: 'jalali' })
+  })
+
+  it('PUT /api/settings rejects an out-of-range calendar value', async () => {
+    const res = await request(app)
+      .put('/api/settings')
+      .send({ weekStart: 6, calendar: 'X' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Validation failed')
   })
 })
 

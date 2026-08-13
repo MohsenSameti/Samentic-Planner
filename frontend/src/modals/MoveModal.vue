@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import Modal from '../components/common/Modal.vue'
-import type { Task } from '../types'
+import JalaliDatePicker from '../components/common/JalaliDatePicker.vue'
+import type { Calendar, Task } from '../types'
 
 const props = defineProps<{
   show: boolean
   task: Task | null
+  /**
+   * Which calendar to render in the date field. The prop is only
+   * consumed in the template (the `v-if` swap between the native
+   * `<input type="date">` and `<JalaliDatePicker>`); the script's
+   * `onPickDate` is calendar-agnostic because both controls emit
+   * the same Gregorian ISO shape.
+   */
+  calendar: Calendar
 }>()
 
 const emit = defineEmits<{
@@ -28,14 +37,36 @@ function onSubmit(): void {
   if (!props.task) return
   emit('move', props.task, moveDate.value)
 }
+
+/**
+ * Handler for the Jalali picker's `update` event. The picker emits
+ * a Gregorian ISO string, which we store directly in `moveDate` —
+ * the same shape `<input type="date">` produces.
+ */
+function onPickDate(value: string): void {
+  moveDate.value = value
+}
 </script>
 
 <template>
   <Modal :show="show" title="Move Task" @close="emit('close')">
     <form @submit.prevent="onSubmit">
       <div class="form-group">
-        <label for="move-date">Move to</label>
-        <input id="move-date" v-model="moveDate" type="date" required />
+        <label id="move-date-label">Move to</label>
+        <JalaliDatePicker
+          v-if="calendar === 'jalali'"
+          :value="moveDate"
+          aria-labelledby="move-date-label"
+          @update="onPickDate"
+        />
+        <input
+          v-else
+          id="move-date"
+          v-model="moveDate"
+          type="date"
+          required
+          aria-labelledby="move-date-label"
+        />
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>

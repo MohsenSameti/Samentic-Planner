@@ -6,8 +6,10 @@ import type {
   Property,
   PropertyValue,
   DayNote,
+  Calendar,
 } from '../../types'
 import { fromLocalISODate, toLocalISODate } from '../../utils/date'
+import { toJalaliYMD, JALALI_MONTH_LABELS } from '../../utils/jalali'
 import DayColumn from './DayColumn.vue'
 
 const props = defineProps<{
@@ -22,6 +24,9 @@ const props = defineProps<{
   dayNotes: DayNote[]
   /** 'all' or a project id; tasks outside the selected project are hidden. */
   selectedProject: string
+  /** Which calendar the UI renders. Affects display only — storage
+   *  stays Gregorian ISO. */
+  calendar: Calendar
 }>()
 
 /**
@@ -51,7 +56,7 @@ const emit = defineEmits<{
 
 /**
  * Seven `WeekDay`-shaped entries, derived once per `currentWeekStart`
- * or `weekStart` change. Stable references mean columns don't
+ * or `calendar` change. Stable references mean columns don't
  * re-render when only the task collection updates.
  */
 interface DayCell {
@@ -59,6 +64,8 @@ interface DayCell {
   name: string
   dayNum: number
   isToday: boolean
+  dayNumJalali?: number
+  monthLabelJalali?: string
 }
 
 const weekDays = computed<DayCell[]>(() => {
@@ -68,12 +75,19 @@ const weekDays = computed<DayCell[]>(() => {
   for (let i = 0; i < 7; i++) {
     const d = new Date(start)
     d.setDate(d.getDate() + i)
-    days.push({
-      date: toLocalISODate(d),
+    const gregIso = toLocalISODate(d)
+    const entry: DayCell = {
+      date: gregIso,
       name: d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
       isToday: d.toDateString() === today,
-    })
+    }
+    if (props.calendar === 'jalali') {
+      const j = toJalaliYMD(gregIso)
+      entry.dayNumJalali = j.jd
+      entry.monthLabelJalali = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
+    }
+    days.push(entry)
   }
   return days
 })
@@ -147,6 +161,8 @@ function noteForDay(date: string): string {
       :date="day.date"
       :day-name="day.name"
       :day-num="day.dayNum"
+      :day-num-jalali="day.dayNumJalali"
+      :month-label-jalali="day.monthLabelJalali"
       :is-today="day.isToday"
       :tasks="tasksForDay(day.date)"
       :projects="projectsMap"

@@ -13,7 +13,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import WeekView from './WeekView.vue'
-import type { Project, Task, Property } from '../../types/index.js'
+import type { Calendar, Project, Task, Property } from '../../types/index.js'
 
 const now = Date.now()
 
@@ -53,6 +53,7 @@ const baseProps = {
   propertyValues: [],
   dayNotes: [],
   selectedProject: 'all',
+  calendar: 'gregorian' as Calendar,
 }
 
 describe('WeekView', () => {
@@ -185,6 +186,25 @@ describe('WeekView', () => {
       expect(cols[2]?.props('dayNoteValue')).toBe('middle of week')
       // Other columns get an empty string fallback.
       expect(cols[0]?.props('dayNoteValue')).toBe('')
+    })
+
+    it('passes Jalali day-num and month-label when calendar is jalali', () => {
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, calendar: 'jalali' as Calendar },
+      })
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      // 2024-01-01 (Mon) is Dey 11, 1402.
+      expect(cols[0]?.props('dayNumJalali')).toBe(11)
+      expect(cols[0]?.props('monthLabelJalali')).toBe('Dey')
+    })
+
+    it('omits Jalali fields when calendar is gregorian', () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      for (const col of cols) {
+        expect(col.props('dayNumJalali')).toBeUndefined()
+        expect(col.props('monthLabelJalali')).toBeUndefined()
+      }
     })
   })
 })

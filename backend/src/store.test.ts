@@ -131,6 +131,11 @@ describe('JsonStore', () => {
       expect(settings.weekStart).toBe(6)
     })
 
+    it('seeds default calendar (gregorian)', () => {
+      const settings = store.getSettings()
+      expect(settings.calendar).toBe('gregorian')
+    })
+
     it('persists the default state to disk immediately on construction', () => {
       // Skip the timer — the file should already exist because
       // `loadFromDisk` writes the default synchronously when none
@@ -367,18 +372,26 @@ describe('JsonStore', () => {
 
   describe('settings', () => {
     it('returns the persisted settings object', () => {
-      expect(store.getSettings()).toEqual({ weekStart: 6 })
+      expect(store.getSettings()).toEqual({ weekStart: 6, calendar: 'gregorian' })
     })
 
     it('updates settings and persists the change', () => {
-      const updated = store.updateSettings({ weekStart: 1 })
-      expect(updated).toEqual({ weekStart: 1 })
-      expect(store.getSettings()).toEqual({ weekStart: 1 })
+      const updated = store.updateSettings({ weekStart: 1, calendar: 'jalali' })
+      expect(updated).toEqual({ weekStart: 1, calendar: 'jalali' })
+      expect(store.getSettings()).toEqual({ weekStart: 1, calendar: 'jalali' })
       // The update is debounced; advance the timer and read back from
       // disk to confirm the write landed.
       vi.advanceTimersByTime(1000)
       const onDisk = JSON.parse(readFileSync(storePath, 'utf-8')) as State
       expect(onDisk.settings.weekStart).toBe(1)
+      expect(onDisk.settings.calendar).toBe('jalali')
+    })
+
+    it('round-trips a calendar change (gregorian ↔ jalali)', () => {
+      const updated = store.updateSettings({ weekStart: 6, calendar: 'jalali' })
+      expect(updated.calendar).toBe('jalali')
+      const reverted = store.updateSettings({ weekStart: 6, calendar: 'gregorian' })
+      expect(reverted.calendar).toBe('gregorian')
     })
   })
 
@@ -488,11 +501,85 @@ describe('JsonStore', () => {
       const migrated = new JsonStore({ storePath: legacyPath })
       // Migration should have run and the in-memory state carries the
       // default settings.
-      expect(migrated.getSettings()).toEqual({ weekStart: 6 })
+      expect(migrated.getSettings()).toEqual({ weekStart: 6, calendar: 'gregorian' })
       migrated.shutdown()
       // The migrated file should now also contain settings on disk.
       const onDisk = JSON.parse(readFileSync(legacyPath, 'utf-8')) as State
-      expect(onDisk.settings).toEqual({ weekStart: 6 })
+      expect(onDisk.settings).toEqual({ weekStart: 6, calendar: 'gregorian' })
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('in-memory migrates settings for pre-Jalali data files missing the calendar field', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'planner-pre-jalali-'))
+      const preJalaliPath = join(dir, 'data.json')
+      // Settings exists but lacks the `calendar` key — the post-rollout
+      // shape that pre-Jalali installs would persist.
+      writeFileSync(
+        preJalaliPath,
+        JSON.stringify({
+          projects: [],
+          tasks: [],
+          properties: [],
+          propertyValues: [],
+          dayNotes: [],
+          weekNotes: [],
+          settings: { weekStart: 6 },
+        })
+      )
+      const migrated = new JsonStore({ storePath: preJalaliPath })
+      // The in-memory settings should be fully populated with the
+      // default calendar even though the file is missing the key.
+      expect(migrated.getSettings()).toEqual({ weekStart: 6, calendar: 'gregorian' })
+      // The migration is in-memory only — the on-disk file is left
+      // untouched (per the plan's "don't write back to disk" rule).
+      const onDisk = JSON.parse(readFileSync(preJalaliPath, 'utf-8')) as State
+      expect((onDisk.settings as { calendar?: string }).calendar).toBeUndefined()
+      migrated.shutdown()
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('in-memory migrates tasks missing description/createdAt/updatedAt', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'planner-pre-timestamps-'))
+      const preTimestampsPath = join(dir, 'data.json')
+      // Tasks written before the schema gained the
+      // `description`/`createdAt`/`updatedAt` fields lack those
+      // keys. The in-memory migration should fill them in.
+      writeFileSync(
+        preTimestampsPath,
+        JSON.stringify({
+          projects: [{ id: 'p1', name: 'P', color: '#FFF', createdAt: 1, updatedAt: 1 }],
+          tasks: [
+            // Missing everything except the original columns.
+            { id: 't1', projectId: 'p1', title: 'A', date: '2024-01-01', status: 'active', notes: '' },
+            // Has description but no timestamps.
+            { id: 't2', projectId: 'p1', title: 'B', description: 'd', date: '2024-01-02', status: 'active', notes: '' },
+          ],
+          properties: [],
+          propertyValues: [],
+          dayNotes: [],
+          weekNotes: [],
+          settings: { weekStart: 6, calendar: 'gregorian' },
+        })
+      )
+      const migrated = new JsonStore({ storePath: preTimestampsPath })
+      const tasks = migrated.getTasks()
+      expect(tasks).toHaveLength(2)
+      // Task 1: description was missing, timestamps were missing.
+      const t1 = tasks.find(t => t.id === 't1')
+      expect(t1?.description).toBe('')
+      expect(typeof t1?.createdAt).toBe('number')
+      expect(typeof t1?.updatedAt).toBe('number')
+      // Task 2: had description, timestamps were missing.
+      const t2 = tasks.find(t => t.id === 't2')
+      expect(t2?.description).toBe('d')
+      expect(typeof t2?.createdAt).toBe('number')
+      expect(typeof t2?.updatedAt).toBe('number')
+      // The migration is in-memory only.
+      const onDisk = JSON.parse(readFileSync(preTimestampsPath, 'utf-8')) as State
+      const onDiskT1 = onDisk.tasks.find(t => t.id === 't1')
+      expect((onDiskT1 as { description?: string }).description).toBeUndefined()
+      expect((onDiskT1 as { createdAt?: number }).createdAt).toBeUndefined()
+      migrated.shutdown()
       rmSync(dir, { recursive: true, force: true })
     })
   })

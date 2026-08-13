@@ -264,7 +264,7 @@ export function createRouter(store: JsonStore): ExpressRouter {
       // `SettingsSchema` constrains `weekStart` to 0..6 at runtime,
       // but Zod still infers a plain `number`. Narrow to `WeekStartDay`
       // so the store receives a type-correct value.
-      const settings = parsed as { weekStart: 0 | 1 | 2 | 3 | 4 | 5 | 6 };
+      const settings = parsed as { weekStart: 0 | 1 | 2 | 3 | 4 | 5 | 6; calendar: 'gregorian' | 'jalali' };
       const saved = store.updateSettings(settings);
       res.json(saved);
     } catch (err) {

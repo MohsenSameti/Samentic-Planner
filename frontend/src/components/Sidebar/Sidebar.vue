@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Project, Property, Task, WeekStartDay } from '../../types'
+import type { Calendar, Project, Property, Task, WeekStartDay } from '../../types'
 import ProjectList from './ProjectList.vue'
 import PropertiesSection from './PropertiesSection.vue'
 import SettingsSection from './SettingsSection.vue'
@@ -20,6 +20,8 @@ const props = defineProps<{
   weeklyPropertySums: PropertyWithSum[]
   /** Current start-of-week setting (0=Sunday..6=Saturday). */
   weekStart: WeekStartDay
+  /** Current calendar preference. */
+  calendar: Calendar
   /**
    * When `true`, the sidebar is visually collapsed (width: 0 on desktop,
    * slid off-screen on mobile) but stays in the DOM so the transition
@@ -33,6 +35,7 @@ const emit = defineEmits<{
   (e: 'add-project'): void
   (e: 'add-property'): void
   (e: 'change-week-start', day: WeekStartDay): void
+  (e: 'change-calendar', c: Calendar): void
 }>()
 
 /**
@@ -87,7 +90,9 @@ const totalActiveTasks = computed<number>(() =>
       <h3>Settings</h3>
       <SettingsSection
         :week-start="weekStart"
+        :calendar="calendar"
         @change-week-start="(day) => emit('change-week-start', day)"
+        @change-calendar="(c) => emit('change-calendar', c)"
       />
     </section>
   </aside>
