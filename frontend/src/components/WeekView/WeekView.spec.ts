@@ -11,6 +11,7 @@
  * event-forwarding path, and the day-cell derivation.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import WeekView from './WeekView.vue'
 import type { Calendar, Project, Task, Property } from '../../types/index.js'
@@ -205,6 +206,154 @@ describe('WeekView', () => {
         expect(col.props('dayNumJalali')).toBeUndefined()
         expect(col.props('monthLabelJalali')).toBeUndefined()
       }
+    })
+  })
+
+  describe('auto-scroll to today', () => {
+    /**
+     * Replace `scrollIntoView` on every element with a spy. happy-dom
+     * ships a no-op implementation; we want to count and assert on
+     * the calls so we know our scroll logic fires (and fires on the
+     * right element).
+     *
+     * Spy is set up per-test so cleanup is automatic when the test
+     * finishes — `vi.restoreAllMocks()` in the global `afterEach`
+     * also covers it as a safety net.
+     */
+    let scrollSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
+    })
+
+    /**
+     * Helper: drain the microtask queue twice. Our `onMounted`
+     * callback schedules `nextTick().then(scrollTodayIntoView)`,
+     * which runs as a post-flush microtask *after* the test's
+     * `await nextTick()` resolves. A second `nextTick` resolves
+     * that follow-up microtask, so the scroll has already fired by
+     * the time we assert.
+     */
+    async function settle(): Promise<void> {
+      await nextTick()
+      await nextTick()
+    }
+
+    it('scrolls today into view on initial mount when today is in the week', async () => {
+      // Outer beforeEach pins "today" to Mon 2024-01-01 — index 0 of
+      // the Mon-start week. Should snap to `start` (no-op scroll
+      // because today is already at the left edge).
+      mount(WeekView, { props: baseProps })
+      await settle()
+
+      // The spy captured exactly one call — the today column.
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      const [options] = scrollSpy.mock.calls[0] ?? []
+      expect(options).toMatchObject({ inline: 'start', block: 'nearest' })
+    })
+
+    it('scrolls today to `start` when today is mid-week (index 4, Friday)', async () => {
+      // Pin "today" to Fri 2024-01-05 (index 4, below the
+      // `SCROLL_NEAREST_THRESHOLD` of 5). Should snap to start.
+      vi.setSystemTime(new Date('2024-01-05T12:00:00Z'))
+      mount(WeekView, { props: baseProps })
+      await settle()
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      const [options] = scrollSpy.mock.calls[0] ?? []
+      expect(options).toMatchObject({ inline: 'start', block: 'nearest' })
+    })
+
+    it('uses `nearest` when today is in the last two days of the week', async () => {
+      // Pin "today" to Sat 2024-01-06 (index 5). At or beyond the
+      // nearest-threshold of 5, so we don't try to scroll past the
+      // container's max scroll position.
+      vi.setSystemTime(new Date('2024-01-06T12:00:00Z'))
+      mount(WeekView, { props: baseProps })
+      await settle()
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      const [options] = scrollSpy.mock.calls[0] ?? []
+      expect(options).toMatchObject({ inline: 'nearest', block: 'nearest' })
+    })
+
+    it('also uses `nearest` on the last day of the week (Sunday)', async () => {
+      // Today = Sun 2024-01-07 (index 6), the last cell.
+      vi.setSystemTime(new Date('2024-01-07T12:00:00Z'))
+      mount(WeekView, { props: baseProps })
+      await settle()
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      const [options] = scrollSpy.mock.calls[0] ?? []
+      expect(options).toMatchObject({ inline: 'nearest', block: 'nearest' })
+    })
+
+    it('does not call scrollIntoView when today is not in the visible week', async () => {
+      // Navigate to a week a year in the future — today is not in
+      // this week, so the scroll logic short-circuits entirely.
+      mount(WeekView, {
+        props: { ...baseProps, currentWeekStart: '2025-01-06' },
+      })
+      await settle()
+
+      expect(scrollSpy).not.toHaveBeenCalled()
+    })
+
+    it('scrolls the element that actually carries the `.today` class', async () => {
+      // Pin to Wed 2024-01-03 (index 2). The third `DayColumn` is
+      // the only one carrying `.today`; the spy was called on that
+      // element (preserved via `this`-binding, exposed as
+      // `mock.contexts[i]`).
+      vi.setSystemTime(new Date('2024-01-03T12:00:00Z'))
+      const wrapper = mount(WeekView, { props: baseProps })
+      await settle()
+
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      const wednesday = cols[2]
+      expect(wednesday.props('isToday')).toBe(true)
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      const context = scrollSpy.mock.contexts[0] as HTMLElement
+      // The element that had `.today` at the time the scroll fired
+      // is the Wed column's root div (the one mounted by
+      // `DayColumn`).
+      expect(context.classList.contains('today')).toBe(true)
+      // And it must NOT be the Mon or Sun column's root.
+      expect(cols[0].element).not.toBe(context)
+      expect(cols[6]?.element).not.toBe(context)
+    })
+
+    it('re-scrolls to today when navigating back from a different week', async () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      await settle()
+      const initialCalls = scrollSpy.mock.calls.length
+      expect(initialCalls).toBe(1)
+
+      // Navigate forward one week — today is still Jan 1, but the
+      // visible week is Jan 8..14. No scroll.
+      await wrapper.setProps({ currentWeekStart: '2024-01-08' })
+      await settle()
+      expect(scrollSpy.mock.calls.length).toBe(initialCalls)
+
+      // Navigate back to today's week — scroll fires again.
+      await wrapper.setProps({ currentWeekStart: '2024-01-01' })
+      await settle()
+      expect(scrollSpy.mock.calls.length).toBeGreaterThan(initialCalls)
+    })
+
+    it('does not scroll when navigating between weeks that do not contain today', async () => {
+      // Start in a future week (no today), navigate to an even
+      // further future week. Neither week contains today, so the
+      // scroll watcher never fires.
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, currentWeekStart: '2025-01-06' },
+      })
+      await settle()
+      expect(scrollSpy).not.toHaveBeenCalled()
+
+      await wrapper.setProps({ currentWeekStart: '2025-01-13' })
+      await settle()
+      expect(scrollSpy).not.toHaveBeenCalled()
     })
   })
 })

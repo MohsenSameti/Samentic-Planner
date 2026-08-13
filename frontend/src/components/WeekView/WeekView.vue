@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type {
   Task,
   Project,
@@ -146,10 +146,129 @@ function tasksForDay(date: string): Task[] {
 function noteForDay(date: string): string {
   return props.dayNotes.find(d => d.date === date)?.note ?? ''
 }
+
+/* ------------------------------------------------------------------ */
+/* Auto-scroll to "today" on page load                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ref to the scrollable week-grid container. Used to query for the
+ * `.day-column.today` element and call `scrollIntoView` on it, so the
+ * browser does the math against the container's actual scrollable
+ * width (taking mobile padding, gap, and `overflow-x` clipping into
+ * account).
+ */
+const weekGridRef = ref<HTMLDivElement | null>(null)
+
+/**
+ * Index of a day cell from the end at which we stop trying to snap
+ * today to the start of the viewport.
+ *
+ * When today is at index 5 or 6 (the last two days of the week),
+ * snapping to `start` would push the scroll container to its maximum
+ * position and leave 1-2 empty column widths of dead space on the
+ * right. In that range we use `scrollIntoView({ inline: 'nearest' })`
+ * so the today column is visible without that trailing gap.
+ */
+const SCROLL_NEAREST_THRESHOLD = 5
+
+/**
+ * True iff the current local-time "now" falls inside the displayed
+ * week. Computed synchronously from `props.currentWeekStart`, so it
+ * doesn't depend on the `DayColumn` v-for being rendered. That makes
+ * it usable as a watch source — the watcher only fires when the week
+ * prop transitions into or out of today, never on unrelated task /
+ * project mutations.
+ */
+function isTodayInVisibleWeek(): boolean {
+  const start = fromLocalISODate(props.currentWeekStart)
+  // Exclusive upper bound: the next week's first day is the upper
+  // boundary, so we add 7 days from start and use `<` rather than
+  // building `end = start + 6` and matching a `Date#toDateString`
+  // string (which is unreliable near midnight).
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  const now = new Date()
+  return now >= start && now < end
+}
+
+/**
+ * Locate today's column inside the grid and scroll it into view.
+ * Snaps today to the left edge when it has room to do so; falls back
+ * to `'nearest'` for the last 1-2 days to avoid an empty viewport.
+ *
+ * Implementation notes:
+ *
+ * - We delegate to `Element#scrollIntoView` so the browser handles the
+ *   container boundary, padding, and `overflow-x: hidden` clipping
+ *   for us. We don't try to compute `scrollLeft` ourselves because
+ *   the gap between columns differs between mobile and desktop.
+ * - The grid uses `scroll-snap-type: x mandatory` and each column
+ *   declares `scroll-snap-align: start`. The browser's scroll handler
+ *   already snaps the column to the nearest snap point after our
+ *   scroll request, so we get perfect day-aligned positioning without
+ *   any additional logic.
+ * - `behavior: 'auto'` (default) keeps the scroll instant on first
+ *   paint. A smooth animation here would conflict with the
+ *   `scroll-behavior` CSS and produce a visible jump on page load.
+ */
+function scrollTodayIntoView(): void {
+  const container = weekGridRef.value
+  if (!container) return
+
+  // Locate today by class first, then resolve its column index. The
+  // index is what drives the snap-to-start vs `'nearest'` decision,
+  // so computing it separately keeps the logic clear and avoids
+  // closure-mutation narrowing pitfalls (`let` variables mutated
+  // inside a `forEach` callback don't track cleanly through TS).
+  const todayEl = container.querySelector<HTMLElement>('.day-column.today')
+  if (!todayEl) return
+
+  const columns = container.querySelectorAll<HTMLElement>('.day-column')
+  const todayIndex = Array.from(columns).indexOf(todayEl)
+  if (todayIndex < 0) return
+
+  const snapToStart = todayIndex < SCROLL_NEAREST_THRESHOLD
+  todayEl.scrollIntoView({
+    inline: snapToStart ? 'start' : 'nearest',
+    block: 'nearest',
+  })
+}
+
+/**
+ * Handle the initial page-load case: scroll today into view once the
+ * grid is mounted. We don't need a watch with `immediate: true` here
+ * because `onMounted` fires after the first DOM render — by that
+ * point, `weekGridRef.value` is set and the `.today` column exists.
+ */
+onMounted(() => {
+  if (!isTodayInVisibleWeek()) return
+  // `nextTick` waits one extra microtask so any in-flight child
+  // updates from `App.vue`'s data-load path have settled before we
+  // query the DOM. Mirrors the watch branch below.
+  nextTick().then(scrollTodayIntoView)
+})
+
+/**
+ * Re-scroll whenever the parent navigates to a week containing today
+ * (e.g. when the user clicks the header's "Today" button). When the
+ * parent navigates to a week that doesn't contain today, the
+ * `isTodayInVisibleWeek()` guard short-circuits and we leave the
+ * scroll position alone — the user is intentionally looking at a
+ * different week.
+ */
+watch(
+  () => props.currentWeekStart,
+  async () => {
+    if (!isTodayInVisibleWeek()) return
+    await nextTick()
+    scrollTodayIntoView()
+  },
+)
 </script>
 
 <template>
-  <div class="week-grid">
+  <div ref="weekGridRef" class="week-grid">
     <!--
       `DayColumn` instances are keyed by date so Vue re-mounts them on
       week changes. This guarantees the internal `dayNotesExpanded`
