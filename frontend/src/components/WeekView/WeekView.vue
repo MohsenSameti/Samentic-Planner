@@ -194,12 +194,14 @@ function noteForDay(date: string): string {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   min-height: 300px;
+  margin-top: 24px;
 }
 
 @media (max-width: 768px) {
   .week-grid {
     gap: 8px;
     margin: 0 -16px;
+    margin-top: 24px;
     padding: 0 16px 8px 16px;
     min-height: 250px;
   }

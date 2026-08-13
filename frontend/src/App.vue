@@ -10,6 +10,7 @@ import { DEFAULT_WEEK_START, formatWeekDisplay } from './utils/date'
 import type { Calendar, Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
+import WeekNavigation from './components/WeekNavigation.vue'
 import Sidebar from './components/Sidebar/Sidebar.vue'
 import WeekView from './components/WeekView/WeekView.vue'
 import WeekNotes from './components/Notes/WeekNotes.vue'
@@ -461,11 +462,8 @@ onMounted(async () => {
   <ErrorBoundary>
     <div v-if="!loading" class="app">
       <Header
-        :week-display="weekDisplay"
         :sidebar-collapsed="sidebarCollapsed"
         @toggle-sidebar="toggleSidebar"
-        @prev-week="navigateWeek(-1)"
-        @next-week="navigateWeek(1)"
         @go-today="goToToday"
       />
 
@@ -493,6 +491,12 @@ onMounted(async () => {
         ></div>
 
         <main class="week-container">
+          <WeekNavigation
+            :week-display="weekDisplay"
+            @prev-week="navigateWeek(-1)"
+            @next-week="navigateWeek(1)"
+          />
+
           <WeekView
             :current-week-start="currentWeekStart"
             :tasks="tasks"
