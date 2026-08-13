@@ -2,6 +2,8 @@
 - If `any` seems necessary, stop and ask the user first, stating why no other type works.
 - Prefer `unknown` + narrowing over `any`.
 
+- this project is responsive. so every ui change needs to consider mobile, tablet, desktop, etc.
+
 ## Testing
 
 - `pnpm test` runs the full backend + frontend suite (241 tests across 17 files).
