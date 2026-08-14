@@ -3,6 +3,7 @@
 - Prefer `unknown` + narrowing over `any`.
 
 - this project is responsive. so every ui change needs to consider mobile, tablet, desktop, etc.
+- whenever you are asked to improve something or add/implement sth. you are to create a plan using create-plan then proceed.
 
 ## Testing
 
