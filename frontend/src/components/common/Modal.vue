@@ -26,11 +26,19 @@ function handleKeydown(e: KeyboardEvent): void {
 }
 
 /**
- * Close-on-backdrop-click handler. Same `show` gate reasoning as above.
- * The `modalRef.contains` check ensures clicks *inside* the dialog box
- * don't trigger a close.
+ * Close-on-outside-interaction handler. Listens for `mousedown` rather
+ * than `click` deliberately: a real user's press on the element that
+ * *opens* the modal fires `mousedown` first (while the modal is still
+ * closed) and only then the `click` that sets `show=true`. If we
+ * listened for `click` here, the opening click would bubble up to
+ * `document` after `show` had already flipped to `true`, and the
+ * handler would immediately close the modal it just opened (the button
+ * receives focus during the click, so the prop update is applied before
+ * the event finishes bubbling). `mousedown` also fires on touch (as a
+ * synthetic event before the tap's `click`), so this stays correct on
+ * mobile. Same `show` gate reasoning as the Escape handler above.
  */
-function handleDocumentClick(e: MouseEvent): void {
+function handleDocumentMouseDown(e: MouseEvent): void {
   if (!props.show) return
   if (modalRef.value && !modalRef.value.contains(e.target as Node)) {
     emit('close')
@@ -39,12 +47,12 @@ function handleDocumentClick(e: MouseEvent): void {
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown)
-  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('mousedown', handleDocumentMouseDown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
-  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('mousedown', handleDocumentMouseDown)
 })
 </script>
 
