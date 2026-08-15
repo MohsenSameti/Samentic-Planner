@@ -12,9 +12,10 @@ import type { Calendar, WeekStartDay } from '../types'
 /**
  * Normalise a `WeekStartDay` value into the 0..6 range, falling back
  * to the default for anything out of range. Defence-in-depth for the
- * case where `data.json` is hand-edited into an invalid state — the
- * backend's write-path validation keeps valid data in, but a stray
- * edit shouldn't break navigation.
+ * case where the SQLite store contains an invalid persisted value
+ * (e.g. left over from a schema migration) — the backend's
+ * write-path validation keeps valid data in, but a stray value
+ * shouldn't break navigation.
  */
 function clampWeekStart(value: WeekStartDay): WeekStartDay {
   if (!Number.isInteger(value) || value < 0 || value > 6) {

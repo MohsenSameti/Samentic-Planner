@@ -94,10 +94,9 @@ describe('useWeekNavigation', () => {
     })
 
     it('clamps out-of-range weekStart values back to the default', async () => {
-      // Simulate a hand-edited data.json that ended up with a value
-      // outside 0..6 (e.g. due to schema drift). The composable
-      // should fall back to the default rather than compute nonsense
-      // dates.
+      // Simulate an invalid persisted value that ended up outside 0..6
+      // (e.g. from a schema-drift migration). The composable should
+      // fall back to the default rather than compute nonsense dates.
       const bad = ref<WeekStartDay>(99 as unknown as WeekStartDay)
       const { weekDays, weekStart } = useWeekNavigation(bad)
       // `weekStart` in the return shape aliases `currentWeekStart`,

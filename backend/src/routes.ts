@@ -1,5 +1,5 @@
 import { Router, type Router as ExpressRouter } from 'express';
-import { JsonStore, store as defaultStore } from './store.js';
+import { DbStore, store as defaultStore } from './db/store.js';
 import { ApiError } from './middleware.js';
 import {
   CreateProjectSchema,
@@ -16,13 +16,13 @@ import {
 } from './validation.js';
 
 /**
- * Build an Express router backed by the given `JsonStore` instance.
+ * Build an Express router backed by the given `DbStore` instance.
  *
  * Exists as a factory so tests can mount the API against a per-test
- * temp-file store. Production callers (see `index.ts`) wire it up
- * against the singleton via the default export below.
+ * in-memory (or temp-file) store. Production callers (see `index.ts`)
+ * wire it up against the singleton via the default export below.
  */
-export function createRouter(store: JsonStore): ExpressRouter {
+export function createRouter(store: DbStore): ExpressRouter {
   // Explicit `ExpressRouter` annotation works around a TS2742 portability
   // warning that arises from the inferred type referencing internal
   // `@types/express-serve-static-core` paths.
@@ -289,7 +289,7 @@ function generateId(): string {
 
 /**
  * Default export wires the router up to the module-singleton store
- * (the same instance `store.ts` registers SIGINT/SIGTERM handlers
+ * (the same instance `db/store.ts` registers SIGINT/SIGTERM handlers
  * on). Tests should use `createRouter(testStore)` instead.
  */
 export default createRouter(defaultStore);

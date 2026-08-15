@@ -7,12 +7,13 @@
 
 ## Testing
 
-- `pnpm test` runs the full backend + frontend suite (241 tests across 17 files).
+- `pnpm test` runs the full backend + frontend suite (375 tests across 25 files).
 - `pnpm test:backend` / `pnpm test:frontend` run a single workspace.
 - `pnpm test:watch` runs the frontend suite in watch mode.
 - `pnpm test:coverage` reports coverage (no threshold gates — report-only).
-- Backend: Vitest + `supertest` for the Express API. `JsonStore` is
-  constructed per-test with a temp file via `new JsonStore({ storePath })`.
+- Backend: Vitest + `supertest` for the Express API. `DbStore` is
+  constructed per-test with an in-memory SQLite DB via
+  `new DbStore({ dbPath: ':memory:' })`.
 - Frontend: Vitest + `@vue/test-utils` + `happy-dom`. Component
   tests live next to the source as `*.spec.ts`; pure-function and
   composable tests live as `*.test.ts`.

@@ -1,21 +1,17 @@
 /**
- * Unit tests for the `JsonStore` class.
+ * Unit tests for the `DbStore` class.
  *
- * Each test creates a fresh `JsonStore` pointing at a per-test temp
- * file so the on-disk state is fully isolated. The temp files live
- * under `os.tmpdir()/planner-store-tests/` and are cleaned up in
- * `afterEach`.
+ * Each test creates a fresh `DbStore` backed by an in-memory
+ * SQLite DB (`:memory:`). Tests are fully isolated — no temp
+ * files, no shared state, no cleanup beyond `store.shutdown()`.
  *
- * Tests focus on observable behaviour of the in-memory state plus the
- * debounced write boundary (we use `vi.useFakeTimers()` to advance
- * the debounce window deterministically rather than waiting for real
- * time).
+ * Tests focus on the observable behaviour of the store: read
+ * APIs return the expected rows after writes; mutations are
+ * visible to subsequent reads without debouncing; upsert and
+ * cascade semantics match the pre-refactor JSON contract.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { JsonStore } from './store.js'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { DbStore } from './db/store.js'
 import type {
   Project,
   Task,
@@ -23,7 +19,6 @@ import type {
   PropertyValue,
   DayNote,
   WeekNote,
-  State,
 } from './types.js'
 
 /**
@@ -68,29 +63,18 @@ function makeProperty(overrides: Partial<Property> & { id: string; name: string 
   }
 }
 
-describe('JsonStore', () => {
-  let tmpDir: string
-  let storePath: string
-  let store: JsonStore
+describe('DbStore', () => {
+  let store: DbStore
 
   beforeEach(() => {
-    // Fake timers so the debounced save fires deterministically when
-    // we explicitly `vi.advanceTimersByTime(...)` — without this the
-    // test would either race the real timer or take 1s each.
-    vi.useFakeTimers()
-    tmpDir = mkdtempSync(join(tmpdir(), 'planner-store-tests-'))
-    storePath = join(tmpDir, 'data.json')
-    store = new JsonStore({ storePath })
+    // `:memory:` gives a fresh DB per test. `DbStore` runs
+    // migrations on construction so the schema is in place
+    // before the seed runs.
+    store = new DbStore({ dbPath: ':memory:' })
   })
 
   afterEach(() => {
-    // `shutdown()` is sync, so it cancels any pending debounce and
-    // flushes. After that, the temp dir is safe to delete.
     store.shutdown()
-    vi.useRealTimers()
-    if (existsSync(tmpDir)) {
-      rmSync(tmpDir, { recursive: true, force: true })
-    }
   })
 
   // -----------------------------------------------------------------
@@ -98,9 +82,7 @@ describe('JsonStore', () => {
   // -----------------------------------------------------------------
 
   describe('initial state', () => {
-    it('seeds a default "General" project when the file does not exist', () => {
-      // The constructor writes the default state to disk on first
-      // run; reading it back should show the seeded project.
+    it('seeds a default "General" project when the DB is empty', () => {
       const projects = store.getProjects()
       expect(projects).toHaveLength(1)
       expect(projects[0]?.name).toBe('General')
@@ -136,13 +118,15 @@ describe('JsonStore', () => {
       expect(settings.calendar).toBe('gregorian')
     })
 
-    it('persists the default state to disk immediately on construction', () => {
-      // Skip the timer — the file should already exist because
-      // `loadFromDisk` writes the default synchronously when none
-      // exists.
-      expect(existsSync(storePath)).toBe(true)
-      const parsed = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(parsed.projects).toHaveLength(1)
+    it('mutations are visible to subsequent reads without debouncing', () => {
+      // The previous JSON store had a 1s debounce + a sync
+      // flush on overflow. SQLite has neither: each write is
+      // immediately durable. We assert the simpler contract
+      // here so a future regression to in-memory-only state
+      // would fail loudly.
+      const project = makeProject({ id: 'p1', name: 'A' })
+      store.addProject(project)
+      expect(store.getProjects()).toContainEqual(project)
     })
   })
 
@@ -173,8 +157,6 @@ describe('JsonStore', () => {
     })
 
     it('deletes an existing project', () => {
-      // The default 'General' project is seeded on construction, so we
-      // add one more, delete it, and expect only the default to remain.
       store.addProject(makeProject({ id: 'p1', name: 'Test' }))
       const lengthBefore = store.getProjects().length
       expect(store.deleteProject('p1')).toBe(true)
@@ -257,11 +239,12 @@ describe('JsonStore', () => {
 
     it('deletes an existing property and cascades to its values', () => {
       store.addProperty(makeProperty({ id: 'pr1', name: 'Hours', unit: 'h' }))
+      store.addProperty(makeProperty({ id: 'other', name: 'Other', unit: '' }))
       store.setPropertyValue({ id: 'pv1', propertyId: 'pr1', date: '2024-01-01', value: 5 })
       store.setPropertyValue({ id: 'pv2', propertyId: 'pr1', date: '2024-01-02', value: 3 })
       store.setPropertyValue({ id: 'pv3', propertyId: 'other', date: '2024-01-01', value: 1 })
       expect(store.deleteProperty('pr1')).toBe(true)
-      expect(store.getProperties()).toHaveLength(0)
+      expect(store.getProperties()).toHaveLength(1)
       const remaining = store.getPropertyValues()
       expect(remaining.map(v => v.id)).toEqual(['pv3'])
     })
@@ -375,16 +358,10 @@ describe('JsonStore', () => {
       expect(store.getSettings()).toEqual({ weekStart: 6, calendar: 'gregorian' })
     })
 
-    it('updates settings and persists the change', () => {
+    it('updates settings and returns the new value', () => {
       const updated = store.updateSettings({ weekStart: 1, calendar: 'jalali' })
       expect(updated).toEqual({ weekStart: 1, calendar: 'jalali' })
       expect(store.getSettings()).toEqual({ weekStart: 1, calendar: 'jalali' })
-      // The update is debounced; advance the timer and read back from
-      // disk to confirm the write landed.
-      vi.advanceTimersByTime(1000)
-      const onDisk = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(onDisk.settings.weekStart).toBe(1)
-      expect(onDisk.settings.calendar).toBe('jalali')
     })
 
     it('round-trips a calendar change (gregorian ↔ jalali)', () => {
@@ -392,195 +369,6 @@ describe('JsonStore', () => {
       expect(updated.calendar).toBe('jalali')
       const reverted = store.updateSettings({ weekStart: 6, calendar: 'gregorian' })
       expect(reverted.calendar).toBe('gregorian')
-    })
-  })
-
-  // -----------------------------------------------------------------
-  // Persistence / debounce
-  // -----------------------------------------------------------------
-
-  describe('persistence', () => {
-    it('does not write synchronously for a single mutation', () => {
-      store.addProject(makeProject({ id: 'p1', name: 'A' }))
-      // `vi.advanceTimersByTime` with no args would be 0; we use the
-      // simpler `vi.getTimerCount()` to check the timer exists.
-      expect(vi.getTimerCount()).toBeGreaterThan(0)
-    })
-
-    it('flushes pending writes after the debounce window elapses', () => {
-      store.addProject(makeProject({ id: 'p1', name: 'A' }))
-      // Advance just before the window — file should not exist.
-      vi.advanceTimersByTime(999)
-      // The constructor wrote the default state, so the file *does*
-      // exist; the test is whether the *new* project is in it.
-      const beforeTimer = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(beforeTimer.projects.map(p => p.id)).not.toContain('p1')
-
-      // Advance past the debounce window.
-      vi.advanceTimersByTime(2)
-      const afterTimer = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(afterTimer.projects.map(p => p.id)).toContain('p1')
-    })
-
-    it('coalesces multiple mutations within the debounce window into a single write', () => {
-      store.addProject(makeProject({ id: 'p1', name: 'A' }))
-      store.addTask(makeTask({ id: 't1', projectId: 'p1', title: 'A', date: '2024-01-01' }))
-      store.addProperty(makeProperty({ id: 'pr1', name: 'H' }))
-
-      vi.advanceTimersByTime(1000)
-      const written = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(written.projects.map(p => p.id)).toContain('p1')
-      expect(written.tasks.map(t => t.id)).toContain('t1')
-      expect(written.properties.map(p => p.id)).toContain('pr1')
-    })
-
-    it('flushes synchronously once MAX_UNSAVED_CHANGES is reached', () => {
-      // MAX_UNSAVED_CHANGES is 10; we send 10 mutations and expect
-      // the file to be written before the debounce timer fires.
-      for (let i = 0; i < 10; i++) {
-        store.addProject(makeProject({ id: `p${i}`, name: `P${i}` }))
-      }
-      // No timer advance — the cap should have triggered a sync flush.
-      const written = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(written.projects.length).toBe(11) // 1 default + 10
-    })
-
-    it('shutdown() flushes any pending writes immediately', () => {
-      store.addProject(makeProject({ id: 'p1', name: 'A' }))
-      // We intentionally do NOT advance the debounce. `shutdown` is
-      // the contract: "everything I have in memory is on disk after
-      // this returns."
-      store.shutdown()
-      const written = JSON.parse(readFileSync(storePath, 'utf-8')) as State
-      expect(written.projects.map(p => p.id)).toContain('p1')
-    })
-
-    it('survives a reload — a new JsonStore reads back the previous state', () => {
-      store.addProject(makeProject({ id: 'p1', name: 'A' }))
-      store.shutdown() // ensures the writes hit disk
-
-      const reloaded = new JsonStore({ storePath })
-      const projects = reloaded.getProjects()
-      // Default project + the one we added.
-      expect(projects.map(p => p.id)).toContain('p1')
-      reloaded.shutdown()
-    })
-  })
-
-  // -----------------------------------------------------------------
-  // Read-path validation
-  // -----------------------------------------------------------------
-
-  describe('read-path validation', () => {
-    it('falls back to defaults when the on-disk JSON is malformed', () => {
-      const dir = mkdtempSync(join(tmpdir(), 'planner-bad-'))
-      const badPath = join(dir, 'data.json')
-      writeFileSync(badPath, '{ not json')
-      const bad = new JsonStore({ storePath: badPath })
-      // Falls back to the default seeded state.
-      expect(bad.getProjects().map(p => p.id)).toEqual(['default'])
-      bad.shutdown()
-      rmSync(dir, { recursive: true, force: true })
-    })
-
-    it('seeds default settings for legacy data files missing the field', () => {
-      const dir = mkdtempSync(join(tmpdir(), 'planner-legacy-'))
-      const legacyPath = join(dir, 'data.json')
-      // Pre-`settings` shape: same collections but no `settings` key.
-      writeFileSync(
-        legacyPath,
-        JSON.stringify({
-          projects: [],
-          tasks: [],
-          properties: [],
-          propertyValues: [],
-          dayNotes: [],
-          weekNotes: [],
-        })
-      )
-      const migrated = new JsonStore({ storePath: legacyPath })
-      // Migration should have run and the in-memory state carries the
-      // default settings.
-      expect(migrated.getSettings()).toEqual({ weekStart: 6, calendar: 'gregorian' })
-      migrated.shutdown()
-      // The migrated file should now also contain settings on disk.
-      const onDisk = JSON.parse(readFileSync(legacyPath, 'utf-8')) as State
-      expect(onDisk.settings).toEqual({ weekStart: 6, calendar: 'gregorian' })
-      rmSync(dir, { recursive: true, force: true })
-    })
-
-    it('in-memory migrates settings for pre-Jalali data files missing the calendar field', () => {
-      const dir = mkdtempSync(join(tmpdir(), 'planner-pre-jalali-'))
-      const preJalaliPath = join(dir, 'data.json')
-      // Settings exists but lacks the `calendar` key — the post-rollout
-      // shape that pre-Jalali installs would persist.
-      writeFileSync(
-        preJalaliPath,
-        JSON.stringify({
-          projects: [],
-          tasks: [],
-          properties: [],
-          propertyValues: [],
-          dayNotes: [],
-          weekNotes: [],
-          settings: { weekStart: 6 },
-        })
-      )
-      const migrated = new JsonStore({ storePath: preJalaliPath })
-      // The in-memory settings should be fully populated with the
-      // default calendar even though the file is missing the key.
-      expect(migrated.getSettings()).toEqual({ weekStart: 6, calendar: 'gregorian' })
-      // The migration is in-memory only — the on-disk file is left
-      // untouched (per the plan's "don't write back to disk" rule).
-      const onDisk = JSON.parse(readFileSync(preJalaliPath, 'utf-8')) as State
-      expect((onDisk.settings as { calendar?: string }).calendar).toBeUndefined()
-      migrated.shutdown()
-      rmSync(dir, { recursive: true, force: true })
-    })
-
-    it('in-memory migrates tasks missing description/createdAt/updatedAt', () => {
-      const dir = mkdtempSync(join(tmpdir(), 'planner-pre-timestamps-'))
-      const preTimestampsPath = join(dir, 'data.json')
-      // Tasks written before the schema gained the
-      // `description`/`createdAt`/`updatedAt` fields lack those
-      // keys. The in-memory migration should fill them in.
-      writeFileSync(
-        preTimestampsPath,
-        JSON.stringify({
-          projects: [{ id: 'p1', name: 'P', color: '#FFF', createdAt: 1, updatedAt: 1 }],
-          tasks: [
-            // Missing everything except the original columns.
-            { id: 't1', projectId: 'p1', title: 'A', date: '2024-01-01', status: 'active', notes: '' },
-            // Has description but no timestamps.
-            { id: 't2', projectId: 'p1', title: 'B', description: 'd', date: '2024-01-02', status: 'active', notes: '' },
-          ],
-          properties: [],
-          propertyValues: [],
-          dayNotes: [],
-          weekNotes: [],
-          settings: { weekStart: 6, calendar: 'gregorian' },
-        })
-      )
-      const migrated = new JsonStore({ storePath: preTimestampsPath })
-      const tasks = migrated.getTasks()
-      expect(tasks).toHaveLength(2)
-      // Task 1: description was missing, timestamps were missing.
-      const t1 = tasks.find(t => t.id === 't1')
-      expect(t1?.description).toBe('')
-      expect(typeof t1?.createdAt).toBe('number')
-      expect(typeof t1?.updatedAt).toBe('number')
-      // Task 2: had description, timestamps were missing.
-      const t2 = tasks.find(t => t.id === 't2')
-      expect(t2?.description).toBe('d')
-      expect(typeof t2?.createdAt).toBe('number')
-      expect(typeof t2?.updatedAt).toBe('number')
-      // The migration is in-memory only.
-      const onDisk = JSON.parse(readFileSync(preTimestampsPath, 'utf-8')) as State
-      const onDiskT1 = onDisk.tasks.find(t => t.id === 't1')
-      expect((onDiskT1 as { description?: string }).description).toBeUndefined()
-      expect((onDiskT1 as { createdAt?: number }).createdAt).toBeUndefined()
-      migrated.shutdown()
-      rmSync(dir, { recursive: true, force: true })
     })
   })
 })

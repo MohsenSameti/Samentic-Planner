@@ -1,33 +1,33 @@
 /**
  * End-to-end tests for the Express API surface.
  *
- * Each test mounts a fresh `JsonStore` (pointed at a temp file) and a
- * fresh Express app wired up with the production middleware stack
- * (CORS, JSON parsing, error handler). `supertest` drives HTTP
- * requests in-process — no real socket, no port binding.
+ * Each test mounts a fresh `DbStore` (backed by an in-memory
+ * SQLite DB) and a fresh Express app wired up with the
+ * production middleware stack (CORS, JSON parsing, error
+ * handler). `supertest` drives HTTP requests in-process — no
+ * real socket, no port binding, no temp file cleanup.
  *
- * The temp store is shut down in `afterEach` so pending debounced
- * writes never leak past a test boundary.
+ * The store is shut down in `afterEach` for API symmetry with
+ * the pre-refactor test harness.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync, existsSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
 import express from 'express'
 import cors from 'cors'
 import request from 'supertest'
-import { JsonStore } from './store.js'
+import { DbStore } from './db/store.js'
 import { createRouter } from './routes.js'
 import { errorHandler, notFoundHandler } from './middleware.js'
 
 /**
- * Build a fresh `JsonStore` and an Express app wired to it. Caller
- * owns the returned values; `cleanupApp` releases them.
+ * Build a fresh `DbStore` (in-memory) and an Express app wired
+ * to it. Caller owns the returned values; `cleanupApp` releases
+ * them.
  */
-function buildApp(): { app: express.Express; store: JsonStore; tmpDir: string } {
-  const tmpDir = mkdtempSync(join(tmpdir(), 'planner-api-tests-'))
-  const storePath = join(tmpDir, 'data.json')
-  const store = new JsonStore({ storePath })
+function buildApp(): { app: express.Express; store: DbStore } {
+  // `:memory:` gives a fresh DB per test. `DbStore` runs
+  // migrations on construction so the schema is in place
+  // before the seed runs.
+  const store = new DbStore({ dbPath: ':memory:' })
 
   const app = express()
   app.use(cors())
@@ -36,27 +36,23 @@ function buildApp(): { app: express.Express; store: JsonStore; tmpDir: string } 
   app.use(notFoundHandler)
   app.use(errorHandler)
 
-  return { app, store, tmpDir }
+  return { app, store }
 }
 
-function cleanupApp(store: JsonStore, tmpDir: string): void {
+function cleanupApp(store: DbStore): void {
   store.shutdown()
-  if (existsSync(tmpDir)) {
-    rmSync(tmpDir, { recursive: true, force: true })
-  }
 }
 
 describe('API: projects', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('GET /api/projects returns the seeded default project', async () => {
@@ -127,15 +123,14 @@ describe('API: projects', () => {
 
 describe('API: tasks', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   const validTask = {
@@ -205,15 +200,14 @@ describe('API: tasks', () => {
 
 describe('API: properties', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('POST /api/properties creates a property', async () => {
@@ -242,12 +236,11 @@ describe('API: properties', () => {
 
 describe('API: property values', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
   let propertyId: string
 
   beforeEach(async () => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
     const created = await request(app)
       .post('/api/properties')
       .send({ name: 'Hours', unit: 'h' })
@@ -255,7 +248,7 @@ describe('API: property values', () => {
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('POST /api/property-values upserts a value', async () => {
@@ -299,15 +292,14 @@ describe('API: property values', () => {
 
 describe('API: notes', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('POST /api/day-notes upserts a day note', async () => {
@@ -347,15 +339,14 @@ describe('API: notes', () => {
 
 describe('API: full state', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('GET /api/state returns all seven collections', async () => {
@@ -382,15 +373,14 @@ describe('API: full state', () => {
 
 describe('API: settings', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('GET /api/settings returns the default weekStart (Saturday)', async () => {
@@ -445,15 +435,14 @@ describe('API: settings', () => {
 
 describe('API: error handling', () => {
   let app: express.Express
-  let store: JsonStore
-  let tmpDir: string
+  let store: DbStore
 
   beforeEach(() => {
-    ;({ app, store, tmpDir } = buildApp())
+    ;({ app, store } = buildApp())
   })
 
   afterEach(() => {
-    cleanupApp(store, tmpDir)
+    cleanupApp(store)
   })
 
   it('returns 400 for malformed JSON body', async () => {

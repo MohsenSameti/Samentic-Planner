@@ -9,7 +9,7 @@ A focused, productivity-oriented weekly planner that treats planning as a ritual
 ### Backend
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript
-- **Data Storage**: JSON file-based persistence
+- **Data Storage**: SQLite (via `better-sqlite3` + Drizzle ORM); location configured via `DATABASE_URL` in `.env`
 - **Server**: `tsx` for development, compiled for production
 
 ### Frontend
@@ -25,8 +25,11 @@ planner/
 │   ├── src/
 │   │   ├── index.ts   # Server entry point
 │   │   ├── routes.ts  # API endpoints
-│   │   └── store.ts   # JSON file storage
-│   └── data.json      # Persistent storage
+│   │   ├── db/        # Drizzle schema, client, store, migrations
+│   │   └── ...
+│   ├── data/          # SQLite database file (gitignored)
+│   ├── drizzle.config.ts
+│   └── .env.example
 ├── frontend/          # Vue.js SPA
 │   ├── src/
 │   │   ├── App.vue    # Main component
@@ -180,3 +183,37 @@ pnpm dev:frontend # http://localhost:5173
 pnpm build
 pnpm start  # Backend only
 ```
+
+## Backend Configuration
+
+The backend reads `DATABASE_URL` from `backend/.env` (copy
+`backend/.env.example` to get started). Accepted values:
+
+- `:memory:`                  — in-memory (tests).
+- `./data/planner.db`         — relative path (default).
+- `/abs/path/to/planner.db`   — absolute path.
+- `file:./data/planner.db`    — Drizzle's `file:` convention.
+
+After editing `backend/src/db/schema.ts`, regenerate the
+migration with `pnpm --filter planner-backend db:generate`.
+
+### Termux notes
+
+`better-sqlite3` builds from source on Termux because no
+Android prebuilt binary is shipped. node-gyp on Android fails
+to evaluate `<(android_ndk_path)` in Node's bundled
+`common.gypi`; the fix is to define an empty override in
+`~/.gyp/include.gypi`:
+
+```json
+{
+  "variables": {
+    "android_ndk_path%": ""
+  }
+}
+```
+
+`pnpm` is also configured (via `pnpm.onlyBuiltDependencies` in
+`backend/package.json`) to auto-run the build script for
+`better-sqlite3`, so `pnpm install` will rebuild the native
+binding on every fresh checkout.
