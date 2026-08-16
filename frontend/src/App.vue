@@ -65,6 +65,7 @@ const {
   weekDays,
   navigateWeek,
   goToToday,
+  goToTodayTrigger,
 } = useWeekNavigation(weekStart, calendar)
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
@@ -506,6 +507,7 @@ onMounted(async () => {
             :day-notes="dayNotes"
             :selected-project="selectedProject"
             :calendar="calendar"
+            :go-to-today-trigger="goToTodayTrigger"
             @add-task="openTaskModal"
             @edit-task="handleEditTask"
             @move-task="handleMoveTask"

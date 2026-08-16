@@ -55,6 +55,10 @@ const baseProps = {
   dayNotes: [],
   selectedProject: 'all',
   calendar: 'gregorian' as Calendar,
+  // `0` is the initial value the composable assigns; the watcher
+  // treats it as a "no-trigger-yet" sentinel so the only mount-time
+  // scroll comes from the `onMounted` hook.
+  goToTodayTrigger: 0,
 }
 
 describe('WeekView', () => {
@@ -354,6 +358,135 @@ describe('WeekView', () => {
       await wrapper.setProps({ currentWeekStart: '2025-01-13' })
       await settle()
       expect(scrollSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('goToTodayTrigger (Toolbar Today button)', () => {
+    /**
+     * The regression test for the mobile bug: when the user is
+     * already in today's week, clicking Today should still scroll
+     * today's column into view. The `currentWeekStart` watcher
+     * can't handle this case because Vue watchers don't fire when
+     * the value is unchanged. The trigger watcher must.
+     */
+    let scrollSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
+    })
+
+    async function settle(): Promise<void> {
+      await nextTick()
+      await nextTick()
+    }
+
+    it('scrolls today into view when the trigger fires inside today\'s week', async () => {
+      // Today is pinned to Mon 2024-01-01 (index 0). The visible
+      // week is already today's week, so `currentWeekStart` does
+      // NOT change when we increment the trigger — only the trigger
+      // changes.
+      const wrapper = mount(WeekView, { props: baseProps })
+      await settle()
+      const initialCalls = scrollSpy.mock.calls.length
+      expect(initialCalls).toBe(1) // mount-time scroll
+
+      await wrapper.setProps({ goToTodayTrigger: 1 })
+      await settle()
+
+      // The trigger watcher fired and scrolled.
+      expect(scrollSpy.mock.calls.length).toBeGreaterThan(initialCalls)
+      const [options] = scrollSpy.mock.calls.at(-1) ?? []
+      expect(options).toMatchObject({ inline: 'start', block: 'nearest' })
+    })
+
+    it('does not scroll when the trigger sits at its initial value of 0', async () => {
+      // Mounting with `goToTodayTrigger: 0` (the composable's
+      // initial value) should not double-scroll: the trigger watcher
+      // must skip the `n === 0` sentinel so the mount-time scroll
+      // remains the only initial scroll.
+      mount(WeekView, { props: baseProps })
+      await settle()
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1) // the onMounted scroll
+    })
+
+    it('does not scroll when the trigger fires but today is not in the visible week', async () => {
+      // Defensive: today is not in the visible week, so even if the
+      // trigger is incremented, the watcher must short-circuit. In
+      // practice `goToToday` always makes the week contain today,
+      // but the guard keeps the watcher safe if the trigger is ever
+      // wired to anything else.
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, currentWeekStart: '2025-01-06' },
+      })
+      await settle()
+      expect(scrollSpy).not.toHaveBeenCalled()
+
+      await wrapper.setProps({ goToTodayTrigger: 1 })
+      await settle()
+      expect(scrollSpy).not.toHaveBeenCalled()
+    })
+
+    it('scrolls to today when the trigger fires from a different week', async () => {
+      // Cross-week case: the user clicks Today from a different
+      // week. Both `currentWeekStart` and `goToTodayTrigger` change
+      // in the same flush — the assertion is that *at least one*
+      // scroll happened, so the today column is visible after the
+      // day-change. (A duplicate scroll is harmless; see the
+      // WeekView docstring.)
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, currentWeekStart: '2025-01-06' },
+      })
+      await settle()
+      expect(scrollSpy).not.toHaveBeenCalled()
+
+      await wrapper.setProps({
+        currentWeekStart: '2024-01-01',
+        goToTodayTrigger: 1,
+      })
+      await settle()
+
+      expect(scrollSpy.mock.calls.length).toBeGreaterThan(0)
+      const [options] = scrollSpy.mock.calls.at(-1) ?? []
+      expect(options).toMatchObject({ inline: 'start', block: 'nearest' })
+    })
+
+    it('fires a scroll on each subsequent trigger increment', async () => {
+      // The Today button can be tapped multiple times. Each tap
+      // should fire a scroll, even between taps the user doesn't
+      // navigate weeks. This covers the "user scrolled away, taps
+      // Today, scrolls, scrolls again, taps Today again" flow.
+      const wrapper = mount(WeekView, { props: baseProps })
+      await settle()
+      const initialCalls = scrollSpy.mock.calls.length
+
+      await wrapper.setProps({ goToTodayTrigger: 1 })
+      await settle()
+      const afterFirst = scrollSpy.mock.calls.length
+      expect(afterFirst).toBeGreaterThan(initialCalls)
+
+      await wrapper.setProps({ goToTodayTrigger: 2 })
+      await settle()
+      expect(scrollSpy.mock.calls.length).toBeGreaterThan(afterFirst)
+    })
+
+    it('snaps today to `nearest` when the trigger fires and today is in the last two days', async () => {
+      // Today pinned to Sat 2024-01-06 (index 5). The trigger
+      // fires while today is in the visible week — the watcher's
+      // snap-to-start vs `nearest` decision should match what's
+      // already in `scrollTodayIntoView`.
+      vi.setSystemTime(new Date('2024-01-06T12:00:00Z'))
+      const wrapper = mount(WeekView, { props: baseProps })
+      await settle()
+      const initialCalls = scrollSpy.mock.calls.length
+
+      await wrapper.setProps({ goToTodayTrigger: 1 })
+      await settle()
+
+      const triggerScrollCall = scrollSpy.mock.calls.length
+      expect(triggerScrollCall).toBeGreaterThan(initialCalls)
+      const [options] = scrollSpy.mock.calls.at(-1) ?? []
+      expect(options).toMatchObject({ inline: 'nearest', block: 'nearest' })
     })
   })
 })

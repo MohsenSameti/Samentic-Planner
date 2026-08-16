@@ -65,6 +65,9 @@ const Harness = defineComponent({
         dayNotes: [],
         selectedProject: 'all',
         calendar: this.calendar,
+        // `0` is the composable's initial value; the trigger watcher
+        // skips it so no scroll fires on mount.
+        goToTodayTrigger: 0,
         // No-op handlers for events we don't exercise here.
         onAddTask: () => {},
         onUpdateDayNote: () => {},
@@ -153,6 +156,9 @@ describe('Calendar toggle (SettingsSection → WeekView)', () => {
             dayNotes: [],
             selectedProject: 'all',
             calendar: this.calendar,
+            // `0` is the composable's initial value; the trigger
+            // watcher skips it so no scroll fires on mount.
+            goToTodayTrigger: 0,
             onAddTask: () => {},
             onUpdateDayNote: () => {},
             onUpdatePropertyValue: () => {},
