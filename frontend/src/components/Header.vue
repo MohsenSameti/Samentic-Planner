@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+
 defineProps<{
   /** Whether the sidebar is currently collapsed (controls the hamburger/X icon). */
   sidebarCollapsed: boolean
@@ -7,7 +9,70 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-sidebar'): void
   (e: 'go-today'): void
+  (e: 'logout'): void
+  /** Fired when the user picks "Change password" from the settings menu. */
+  (e: 'change-password'): void
 }>()
+
+/** Whether the gear-icon settings dropdown is currently open. */
+const menuOpen = ref<boolean>(false)
+
+/** Template refs for the outside-click detection. */
+const menuRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
+
+/**
+ * Close-on-outside-click handler. `mousedown` (not `click`) is used
+ * deliberately — same reasoning as the modal: a click on the gear
+ * trigger fires `mousedown` first, then `click`, and `show` flips
+ * between them. Listening for `click` would cause the opening click
+ * to bubble to `document` and close the menu it just opened. Touch
+ * devices fire synthetic `mousedown` before `click`, so this stays
+ * correct on mobile.
+ */
+function handleDocumentMouseDown(e: MouseEvent): void {
+  if (!menuOpen.value) return
+  const target = e.target as Node
+  if (menuRef.value && menuRef.value.contains(target)) return
+  if (triggerRef.value && triggerRef.value.contains(target)) return
+  menuOpen.value = false
+}
+
+/**
+ * Escape closes the menu when it's open. The `menuOpen` gate avoids
+ * stealing Escape from other modals (which have their own handlers).
+ */
+function handleKeydown(e: KeyboardEvent): void {
+  if (menuOpen.value && e.key === 'Escape') {
+    menuOpen.value = false
+  }
+}
+
+function toggleMenu(): void {
+  menuOpen.value = !menuOpen.value
+}
+
+/**
+ * Close the menu first, then emit `change-password` so the parent can
+ * open the modal. Using `nextTick` ensures the menu's `v-if` removal
+ * has settled before the modal opens — without it, the menu and modal
+ * can briefly overlap and the outside-click handler can fire.
+ */
+async function handleChangePasswordClick(): Promise<void> {
+  menuOpen.value = false
+  await nextTick()
+  emit('change-password')
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('mousedown', handleDocumentMouseDown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('mousedown', handleDocumentMouseDown)
+})
 </script>
 
 <template>
@@ -59,7 +124,77 @@ const emit = defineEmits<{
         <h1>Planner</h1>
       </div>
     </div>
-    <button class="today-btn" type="button" @click="emit('go-today')">Today</button>
+    <div class="header-right">
+      <button class="today-btn" type="button" @click="emit('go-today')">Today</button>
+
+      <!-- Settings menu: gear button + dropdown. -->
+      <div class="settings-wrapper">
+        <button
+          ref="triggerRef"
+          class="settings-btn"
+          type="button"
+          aria-label="Settings"
+          title="Settings"
+          aria-haspopup="menu"
+          :aria-expanded="menuOpen"
+          @click="toggleMenu"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+        <ul
+          v-if="menuOpen"
+          ref="menuRef"
+          class="settings-menu"
+          role="menu"
+        >
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              class="settings-menu-item"
+              @click="handleChangePasswordClick"
+            >
+              Change password
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <button
+        class="logout-btn"
+        type="button"
+        aria-label="Log out"
+        title="Log out"
+        @click="emit('logout')"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      </button>
+    </div>
   </header>
 </template>
 
@@ -118,6 +253,115 @@ const emit = defineEmits<{
   outline-offset: 2px;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logout-btn {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logout-btn:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.logout-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.logout-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Settings (gear) button + dropdown ------------------------------------- */
+
+.settings-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.settings-btn {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settings-btn:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.settings-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.settings-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 200;
+}
+
+.settings-menu-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.settings-menu-item:hover {
+  background: var(--bg);
+}
+
+.settings-menu-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Existing sidebar-toggle styles kept below for parity. */
+
 .sidebar-toggle {
   display: flex;
   width: 40px;
@@ -171,6 +415,12 @@ const emit = defineEmits<{
     padding: 6px 12px;
     font-size: 0.8rem;
     white-space: nowrap;
+  }
+
+  /* Keep the dropdown anchored to the right edge so it never
+     overflows the viewport on narrow screens. */
+  .settings-menu {
+    right: 0;
   }
 }
 </style>
