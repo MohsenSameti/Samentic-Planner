@@ -163,6 +163,57 @@ describe('useWeekNavigation', () => {
     })
   })
 
+  describe('goToTodayTrigger', () => {
+    it('starts at 0', () => {
+      const { goToTodayTrigger } = useWeekNavigation(ref(1))
+      expect(goToTodayTrigger.value).toBe(0)
+    })
+
+    it('increments by exactly one on each goToToday call', () => {
+      const { goToTodayTrigger, goToToday } = useWeekNavigation(ref(1))
+      expect(goToTodayTrigger.value).toBe(0)
+      goToToday()
+      expect(goToTodayTrigger.value).toBe(1)
+      goToToday()
+      expect(goToTodayTrigger.value).toBe(2)
+      goToToday()
+      expect(goToTodayTrigger.value).toBe(3)
+    })
+
+    it('increments even when the week is already the current week', () => {
+      // The regression we care about: in today's week, the user
+      // clicks Today. `currentWeekStart` is unchanged, but the
+      // trigger must still fire so `WeekView` can scroll today into
+      // view (e.g. after the user scrolled the grid horizontally on
+      // mobile).
+      const { currentWeekStart, goToTodayTrigger, goToToday } =
+        useWeekNavigation(ref(1))
+      const before = currentWeekStart.value
+      goToToday()
+      expect(currentWeekStart.value).toBe(before)
+      expect(goToTodayTrigger.value).toBe(1)
+    })
+
+    it('does not increment on navigateWeek', () => {
+      const { goToTodayTrigger, navigateWeek } = useWeekNavigation(ref(1))
+      navigateWeek(1)
+      navigateWeek(-3)
+      expect(goToTodayTrigger.value).toBe(0)
+    })
+
+    it('does not increment when the weekStart setting changes', async () => {
+      // Re-anchoring `currentWeekStart` due to the user changing
+      // the week-start setting is a different code path from
+      // `goToToday`; the trigger should stay at 0 so consumers
+      // don't mistake a setting change for a Today click.
+      const weekStartRef = ref<WeekStartDay>(1)
+      const { goToTodayTrigger } = useWeekNavigation(weekStartRef)
+      weekStartRef.value = 6
+      await nextTick()
+      expect(goToTodayTrigger.value).toBe(0)
+    })
+  })
+
   describe('derived state', () => {
     it('weekDays updates when currentWeekStart changes', () => {
       const { weekDays, navigateWeek } = useWeekNavigation(ref(1))

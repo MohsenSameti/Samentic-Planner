@@ -27,6 +27,16 @@ const props = defineProps<{
   /** Which calendar the UI renders. Affects display only — storage
    *  stays Gregorian ISO. */
   calendar: Calendar
+  /**
+   * Monotonic counter incremented by `useWeekNavigation` on every
+   * `goToToday()` call. Watched so the today column scrolls into
+   * view even when the user clicks Today from inside today's week
+   * (in which case `currentWeekStart` is unchanged and the watcher
+   * on that prop wouldn't fire). Initial value `0` is the
+   * "no-trigger-yet" sentinel; the watcher skips it so it doesn't
+   * double-scroll on mount (the `onMounted` hook handles that).
+   */
+  goToTodayTrigger: number
 }>()
 
 /**
@@ -260,6 +270,36 @@ onMounted(() => {
 watch(
   () => props.currentWeekStart,
   async () => {
+    if (!isTodayInVisibleWeek()) return
+    await nextTick()
+    scrollTodayIntoView()
+  },
+)
+
+/**
+ * Re-scroll whenever the user explicitly clicks Today, including the
+ * case where they're already in today's week. The watch on
+ * `currentWeekStart` above can't handle that case because Vue
+ * watchers don't fire when the value is unchanged — the most common
+ * manifestation is on mobile, where the seven-column grid overflows
+ * horizontally and the user scrolls today offscreen, then taps the
+ * toolbar's Today button expecting to be returned to today.
+ *
+ * The `n === 0` guard skips the initial value so mount-time scroll
+ * is handled once by `onMounted` rather than twice.
+ *
+ * When the user clicks Today from a *different* week, this watcher
+ * and the `currentWeekStart` watcher both fire — that's a duplicate
+ * `scrollIntoView` call, but `scrollIntoView` is idempotent and the
+ * scroll is instant (no `behavior: 'smooth'`), so there's no
+ * visible flicker. Keeping both watchers means the prev/next path
+ * (no Today click) still triggers the scroll without the trigger
+ * having to be involved.
+ */
+watch(
+  () => props.goToTodayTrigger,
+  async (n) => {
+    if (n === 0) return
     if (!isTodayInVisibleWeek()) return
     await nextTick()
     scrollTodayIntoView()

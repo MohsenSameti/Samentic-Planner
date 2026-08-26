@@ -7,7 +7,16 @@
  * HTTP error, network failure) and assert on the wrapper's behaviour.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, apiError, isLoading } from './api.js'
+import {
+  api,
+  apiError,
+  isLoading,
+  onUnauthorized,
+  _clearUnauthorizedCallbacks,
+  setSuccessMessage,
+  successMessage,
+  _clearSuccessMessage,
+} from './api.js'
 import type {
   Project,
   Task,
@@ -35,10 +44,16 @@ describe('api', () => {
   beforeEach(() => {
     apiError.value = null
     isLoading.value = false
+    _clearUnauthorizedCallbacks()
+    _clearSuccessMessage()
+    vi.useRealTimers()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    _clearUnauthorizedCallbacks()
+    _clearSuccessMessage()
+    vi.useRealTimers()
   })
 
   describe('happy path', () => {
@@ -134,6 +149,49 @@ describe('api', () => {
       // TypeError so callers can still see the underlying cause).
       await expect(api.getTasks()).rejects.toThrow()
       expect(apiError.value).toMatch(/Network error/i)
+    })
+
+    it('does not retry 4xx client errors (exactly one fetch call)', async () => {
+      // 401 from a failed login is deterministic — retrying would
+      // delay the inline error by ~3s and re-fire onUnauthorized.
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Invalid password', 401)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.login('wrong')).rejects.toThrow('Invalid password')
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not retry other 4xx statuses either', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Validation failed', 400)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.setup('short')).rejects.toThrow('Validation failed')
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('still retries 5xx server errors', async () => {
+      // Each attempt needs a fresh Response (single-read body), and a
+      // 1s backoff sits between attempts — fake the timers so the test
+      // stays fast while still proving more than one call happens.
+      vi.useFakeTimers()
+      try {
+        const fetchSpy = vi
+          .fn()
+          .mockImplementation(() => Promise.resolve(errorResponse('Server error', 500)))
+        vi.stubGlobal('fetch', fetchSpy)
+
+        const pending = expect(api.getTasks()).rejects.toThrow('Server error')
+        // Advance past all MAX_RETRIES backoff delays.
+        await vi.advanceTimersByTimeAsync(10_000)
+        await pending
+        expect(fetchSpy.mock.calls.length).toBeGreaterThan(1)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 
@@ -277,6 +335,313 @@ describe('api', () => {
       const [, putInit] = fetchSpy.mock.calls[1]!
       expect(putInit?.method).toBe('PUT')
       expect(JSON.parse(putInit?.body as string)).toEqual({ weekStart: 6, calendar: 'gregorian' })
+    })
+  })
+
+  describe('auth endpoints', () => {
+    it('api.authStatus hits /api/auth/status', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(jsonResponse({ setupRequired: false })))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await api.authStatus()
+      expect(fetchSpy).toHaveBeenCalledWith('/api/auth/status', expect.any(Object))
+    })
+
+    it('api.login hits /api/auth/login with password in body', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(jsonResponse({ success: true })))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await api.login('secret123')
+      expect(fetchSpy).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ password: 'secret123' }),
+      }))
+    })
+
+    it('api.logout hits /api/auth/logout', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(jsonResponse({ success: true })))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await api.logout()
+      expect(fetchSpy).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({
+        method: 'POST',
+      }))
+    })
+
+    it('api.setup hits /api/auth/setup with password in body', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(jsonResponse({ success: true })))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await api.setup('password123')
+      expect(fetchSpy).toHaveBeenCalledWith('/api/auth/setup', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ password: 'password123' }),
+      }))
+    })
+
+    it('api.changePassword hits /api/auth/change-password with correct body', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(jsonResponse({ success: true })))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await api.changePassword({ currentPassword: 'old', newPassword: 'newpassword123' })
+      expect(fetchSpy).toHaveBeenCalledWith('/api/auth/change-password', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ currentPassword: 'old', newPassword: 'newpassword123' }),
+      }))
+    })
+  })
+
+  describe('auth endpoints bypass apiError', () => {
+    it('api.login does not set apiError on 401', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Incorrect password', 401)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.login('wrong')).rejects.toThrow('Incorrect password')
+      // Auth errors should not set apiError (they surface inline)
+      expect(apiError.value).toBe(null)
+    })
+
+    it('api.login does not set apiError on 500', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Internal error', 500)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.login('secret')).rejects.toThrow('Internal error')
+      expect(apiError.value).toBe(null)
+    })
+
+    it('api.logout does not set apiError on failure', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Server error', 500)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.logout()).rejects.toThrow('Server error')
+      expect(apiError.value).toBe(null)
+    })
+
+    it('api.setup does not set apiError on failure', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Password too weak', 400)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.setup('short')).rejects.toThrow('Password too weak')
+      expect(apiError.value).toBe(null)
+    })
+
+    it('api.authStatus does not set apiError on failure', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Server error', 500)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.authStatus()).rejects.toThrow('Server error')
+      expect(apiError.value).toBe(null)
+    })
+
+    it('api.changePassword does not set apiError on failure', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Wrong current password', 400)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.changePassword({ currentPassword: 'wrong', newPassword: 'newpassword123' }))
+        .rejects.toThrow('Wrong current password')
+      expect(apiError.value).toBe(null)
+    })
+  })
+
+  describe('non-auth endpoints still set apiError on failure', () => {
+    it('api.getTasks sets apiError on 500', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Database error', 500)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.getTasks()).rejects.toThrow('Database error')
+      expect(apiError.value).toBe('Database error')
+    })
+  })
+
+  describe('onUnauthorized callback', () => {
+    // Helper to create a fetch mock that always returns 401.
+    // Returns a FRESH response each time because happy-dom Response body
+    // can only be read once.
+    const alwaysUnauthorized = (): typeof vi.fn =>
+      vi.fn().mockImplementation(() => Promise.resolve(errorResponse('Unauthorized', 401)))
+
+    it('401 fires onUnauthorized callbacks before throwing', async () => {
+      const fetchSpy = alwaysUnauthorized()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const callback = vi.fn()
+      const unsubscribe = onUnauthorized(callback)
+
+      await expect(api.getTasks()).rejects.toThrow('Unauthorized')
+      // Callback fires on every 401 (initial + retries that all return 401)
+      expect(callback).toHaveBeenCalled()
+      expect(callback.mock.calls.length).toBeGreaterThan(0)
+
+      // Clean up
+      unsubscribe()
+    })
+
+    it('throwing onUnauthorized callback does not prevent other callbacks', async () => {
+      const fetchSpy = alwaysUnauthorized()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const callback1 = vi.fn(() => { throw new Error('callback1 failed') })
+      const callback2 = vi.fn()
+      const callback3 = vi.fn(() => { throw new Error('callback3 failed') })
+
+      const unsub1 = onUnauthorized(callback1)
+      const unsub2 = onUnauthorized(callback2)
+      const unsub3 = onUnauthorized(callback3)
+
+      await expect(api.getTasks()).rejects.toThrow('Unauthorized')
+      // All registered callbacks should have been called at least once
+      // (each callback called once per 401 response across retries)
+      expect(callback1).toHaveBeenCalled()
+      expect(callback2).toHaveBeenCalled()
+      expect(callback3).toHaveBeenCalled()
+
+      // Clean up
+      unsub1()
+      unsub2()
+      unsub3()
+    })
+
+    it('onUnauthorized returns an unsubscribe function', async () => {
+      const callback = vi.fn()
+      const unsubscribe = onUnauthorized(callback)
+
+      // Verify the callback fires on 401
+      const fetchSpy = alwaysUnauthorized()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(api.getTasks()).rejects.toThrow('Unauthorized')
+      expect(callback).toHaveBeenCalled()
+
+      // Call unsubscribe
+      const result = unsubscribe()
+      expect(typeof result).toBe('undefined') // unsubscribe returns void
+
+      // Verify callback was removed by calling unsubscribe again (should be no-op)
+      // This confirms the unsubscribe function works
+      expect(unsubscribe()).toBeUndefined()
+    })
+
+    it('multiple callbacks all fire on a single 401', async () => {
+      const fetchSpy = alwaysUnauthorized()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const callback1 = vi.fn()
+      const callback2 = vi.fn()
+      const callback3 = vi.fn()
+
+      const unsub1 = onUnauthorized(callback1)
+      const unsub2 = onUnauthorized(callback2)
+      const unsub3 = onUnauthorized(callback3)
+
+      await expect(api.getTasks()).rejects.toThrow('Unauthorized')
+      // All callbacks should have been called at least once
+      expect(callback1).toHaveBeenCalled()
+      expect(callback2).toHaveBeenCalled()
+      expect(callback3).toHaveBeenCalled()
+
+      // Clean up
+      unsub1()
+      unsub2()
+      unsub3()
+    })
+
+    it('non-401 errors do not fire onUnauthorized callbacks', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Bad request', 400)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const callback = vi.fn()
+      const unsubscribe = onUnauthorized(callback)
+
+      await expect(api.getTasks()).rejects.toThrow('Bad request')
+      expect(callback).not.toHaveBeenCalled()
+
+      // Clean up
+      unsubscribe()
+    })
+
+    it('500 errors do not fire onUnauthorized callbacks', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(errorResponse('Server error', 500)))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const callback = vi.fn()
+      const unsubscribe = onUnauthorized(callback)
+
+      await expect(api.getTasks()).rejects.toThrow('Server error')
+      expect(callback).not.toHaveBeenCalled()
+
+      // Clean up
+      unsubscribe()
+    })
+  })
+
+  describe('successMessage toast', () => {
+    it('setSuccessMessage sets the ref and auto-clears after the dismiss timer', () => {
+      vi.useFakeTimers()
+      expect(successMessage.value).toBe(null)
+
+      setSuccessMessage('Password changed successfully.')
+      expect(successMessage.value).toBe('Password changed successfully.')
+
+      // Advance past the 3s dismiss window.
+      vi.advanceTimersByTime(3000)
+      expect(successMessage.value).toBe(null)
+    })
+
+    it('a second setSuccessMessage call within the dismiss window replaces the message and resets the timer', () => {
+      vi.useFakeTimers()
+      setSuccessMessage('First message')
+      // Part-way through the window.
+      vi.advanceTimersByTime(1000)
+
+      setSuccessMessage('Second message')
+      expect(successMessage.value).toBe('Second message')
+
+      // The original timer would have fired at 3000ms; with the reset,
+      // it should now fire at 1000 + 3000 = 4000ms.
+      vi.advanceTimersByTime(2999)
+      expect(successMessage.value).toBe('Second message')
+      vi.advanceTimersByTime(1)
+      expect(successMessage.value).toBe(null)
+    })
+
+    it('_clearSuccessMessage cancels the pending timer and clears the ref', () => {
+      vi.useFakeTimers()
+      setSuccessMessage('Toast')
+      expect(successMessage.value).toBe('Toast')
+
+      _clearSuccessMessage()
+      // Advance well past the dismiss window — the cleared timer must
+      // not fire and resurrect the message.
+      vi.advanceTimersByTime(10000)
+      expect(successMessage.value).toBe(null)
     })
   })
 })

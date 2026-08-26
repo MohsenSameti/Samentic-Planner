@@ -104,6 +104,10 @@ export const settings = sqliteTable('settings', {
   id: integer('id').primaryKey().default(1),
   weekStart: integer('week_start').notNull(),
   calendar: text('calendar', { enum: ['gregorian', 'jalali'] }).notNull(),
+  /** Bcrypt hash of the user's password. `NULL` means no password
+   *  has been set yet (first-run / setup mode). Never exposed
+   *  via the public API. */
+  passwordHash: text('password_hash'),
   /** Sentinel column updated on every settings write. Lets us
    *  detect drift between the on-disk row and the in-process
    *  store without a separate `version` table. Not exposed via

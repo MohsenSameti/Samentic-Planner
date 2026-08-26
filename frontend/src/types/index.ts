@@ -83,3 +83,13 @@ export interface State {
   weekNotes: WeekNote[]
   settings: Settings
 }
+
+// Auth types
+export interface AuthStatus {
+  setupRequired: boolean
+}
+
+export interface AuthChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+}

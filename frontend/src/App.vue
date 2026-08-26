@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
-import { api } from './api'
+import { ref, computed, defineAsyncComponent, onMounted, watch } from 'vue'
+import { api, setSuccessMessage } from './api'
+import { useAuth } from './composables/useAuth'
 import { useTasks } from './composables/useTasks'
 import { useProjects } from './composables/useProjects'
 import { useProperties } from './composables/useProperties'
@@ -10,12 +11,15 @@ import { DEFAULT_WEEK_START, formatWeekDisplay } from './utils/date'
 import type { Calendar, Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
+import LoginPage from './components/LoginPage.vue'
+import SetupWizard from './components/SetupWizard.vue'
 import WeekNavigation from './components/WeekNavigation.vue'
 import Sidebar from './components/Sidebar/Sidebar.vue'
 import WeekView from './components/WeekView/WeekView.vue'
 import WeekNotes from './components/Notes/WeekNotes.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import ErrorDisplay from './components/common/ErrorDisplay.vue'
+import SuccessDisplay from './components/common/SuccessDisplay.vue'
 
 /**
  * Modals are loaded lazily — they're rarely open, so paying their
@@ -30,6 +34,9 @@ const ProjectModal = defineAsyncComponent(() => import('./modals/ProjectModal.vu
 const PropertyModal = defineAsyncComponent(() => import('./modals/PropertyModal.vue'))
 const MoveModal = defineAsyncComponent(() => import('./modals/MoveModal.vue'))
 const DeleteConfirmModal = defineAsyncComponent(() => import('./modals/DeleteConfirmModal.vue'))
+const ChangePasswordModal = defineAsyncComponent(
+  () => import('./modals/ChangePasswordModal.vue'),
+)
 
 /* ------------------------------------------------------------------ */
 /* Settings (week start, calendar)                                       */
@@ -65,6 +72,7 @@ const {
   weekDays,
   navigateWeek,
   goToToday,
+  goToTodayTrigger,
 } = useWeekNavigation(weekStart, calendar)
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
@@ -97,9 +105,29 @@ const { dayNotes, weekNotes, setDayNote, setWeekNote } = useNotes()
 /* Local UI state                                                       */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Auth state (singleton accessed via useAuth)                           */
+/* ------------------------------------------------------------------ */
+
+const auth = useAuth()
+
+/* ------------------------------------------------------------------ */
+/* Local UI state                                                       */
+/* ------------------------------------------------------------------ */
+
 const selectedProject = ref<string>('all')
 const sidebarCollapsed = ref<boolean>(true)
-const loading = ref<boolean>(true)
+
+/** True while the initial data fetch is in flight (after auth resolves). */
+const dataLoading = ref<boolean>(false)
+
+/**
+ * Guards the data-load watcher from re-running on subsequent
+ * `isAuthenticated` flips (e.g. session-expired 401 → re-login).
+ * Set to `true` **before** the async load so rapid auth flips can't
+ * trigger a second load.
+ */
+const dataLoaded = ref<boolean>(false)
 
 /* ------------------------------------------------------------------ */
 /* Modal state (per plan: modals & currently-edited entities live here) */
@@ -120,6 +148,8 @@ const movingTask = ref<Task | null>(null)
 
 const deleteModalOpen = ref<boolean>(false)
 const deleteMessage = ref<string>('')
+
+const changePasswordModalOpen = ref<boolean>(false)
 /**
  * The async delete action to run when the user confirms. Stored as a
  * closure rather than a discriminated union because both delete paths
@@ -409,17 +439,18 @@ function scheduleIdle(task: () => void): void {
 }
 
 /* ------------------------------------------------------------------ */
-/* Initial data load                                                      */
+/* Initial data load (triggered after auth resolves)                     */
 /* ------------------------------------------------------------------ */
 
-onMounted(async () => {
-  // Collapse sidebar on small viewports by default — most users will
-  // not need it visible when they first open the app on mobile.
-  sidebarCollapsed.value = window.innerWidth <= 1024
-
+/**
+ * Fetch the full app state. Called once, after `isAuthenticated` flips
+ * to `true`. Uses the same one-round-trip `api.getState()` pattern as
+ * before; the `dataLoaded` guard prevents re-runs on session expiry /
+ * re-login cycles.
+ */
+async function loadData(): Promise<void> {
+  dataLoading.value = true
   try {
-    // One round-trip instead of six — `getState` returns the entire
-    // graph in a single payload.
     const state = await api.getState()
     projects.value = state.projects
     tasks.value = state.tasks
@@ -447,7 +478,7 @@ onMounted(async () => {
     // eslint-disable-next-line no-console
     console.error('Failed to load data:', err)
   } finally {
-    loading.value = false
+    dataLoading.value = false
     // Wait until after the first paint to start pulling the
     // `WeekSummary` chunk — keeps the initial render from competing
     // with the chunk download.
@@ -455,16 +486,104 @@ onMounted(async () => {
       showWeekSummary.value = true
     })
   }
+}
+
+/**
+ * Watch `isAuthenticated` and kick off the data fetch once the user
+ * is authenticated. `dataLoaded` is set **before** the async work
+ * so rapid auth flips don't trigger duplicate loads.
+ */
+watch(
+  () => auth.isAuthenticated,
+  async (isAuth) => {
+    if (isAuth && !dataLoaded.value) {
+      dataLoaded.value = true
+      await loadData()
+    }
+  },
+  { immediate: true },
+)
+
+/* ------------------------------------------------------------------ */
+/* Browser-only UI setup                                                  */
+/* ------------------------------------------------------------------ */
+
+onMounted(() => {
+  // Collapse sidebar on small viewports by default — most users will
+  // not need it visible when they first open the app on mobile.
+  sidebarCollapsed.value = window.innerWidth <= 1024
 })
+
+async function handleLogout(): Promise<void> {
+  try {
+    await auth.logout()
+  } catch {
+    // Silent: session might already be dead on the server,
+    // but the local auth state flip still triggers the route
+    // guard swap back to LoginPage.
+  }
+}
+
+/**
+ * Open the Change Password modal in response to the Header's settings
+ * menu. The change-password endpoint does NOT invalidate the session,
+ * so we leave the auth state untouched — the modal just closes and
+ * the success toast confirms the change.
+ */
+function openChangePasswordModal(): void {
+  changePasswordModalOpen.value = true
+}
+
+function closeChangePasswordModal(): void {
+  changePasswordModalOpen.value = false
+}
+
+/**
+ * Called by the modal after a successful password change. We close
+ * the modal and surface a transient success toast. The success toast
+ * is owned by `SuccessDisplay.vue` watching `successMessage` in
+ * `api.ts` — auto-dismisses after a few seconds.
+ */
+function handlePasswordChanged(): void {
+  changePasswordModalOpen.value = false
+  setSuccessMessage('Password changed successfully.')
+}
 </script>
 
 <template>
   <ErrorBoundary>
-    <div v-if="!loading" class="app">
+    <!-- 1. Auth check failed -->
+    <div v-if="auth.error !== null" class="loading">
+      <p>Couldn't reach server.</p>
+      <button class="btn btn-primary" type="button" @click="auth.retryStatus()">
+        Retry
+      </button>
+    </div>
+
+    <!-- 2. Auth check in flight -->
+    <div v-else-if="auth.loading" class="loading">
+      <p>Loading…</p>
+    </div>
+
+    <!-- 3. Auth resolved, unauthenticated -->
+    <div v-else-if="!auth.isAuthenticated">
+      <SetupWizard v-if="auth.setupRequired" />
+      <LoginPage v-else />
+    </div>
+
+    <!-- 4. Authenticated, data loading -->
+    <div v-else-if="dataLoading" class="loading">
+      <p>Loading…</p>
+    </div>
+
+    <!-- 5. Authenticated, data loaded -->
+    <div v-else class="app">
       <Header
         :sidebar-collapsed="sidebarCollapsed"
         @toggle-sidebar="toggleSidebar"
         @go-today="goToToday"
+        @logout="handleLogout"
+        @change-password="openChangePasswordModal"
       />
 
       <div class="main-container">
@@ -506,6 +625,7 @@ onMounted(async () => {
             :day-notes="dayNotes"
             :selected-project="selectedProject"
             :calendar="calendar"
+            :go-to-today-trigger="goToTodayTrigger"
             @add-task="openTaskModal"
             @edit-task="handleEditTask"
             @move-task="handleMoveTask"
@@ -574,13 +694,16 @@ onMounted(async () => {
         @close="deleteModalOpen = false"
         @confirm="executeDelete"
       />
-    </div>
 
-    <div v-else class="loading">
-      <p>Loading...</p>
+      <ChangePasswordModal
+        :show="changePasswordModalOpen"
+        @close="closeChangePasswordModal"
+        @change="handlePasswordChanged"
+      />
     </div>
   </ErrorBoundary>
   <ErrorDisplay />
+  <SuccessDisplay />
 </template>
 
 <style scoped>

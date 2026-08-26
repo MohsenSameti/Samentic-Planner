@@ -90,11 +90,32 @@ export function useWeekNavigation(
     currentWeekStart.value = toLocalISODate(d)
   }
 
+  /**
+   * Monotonic counter incremented on every `goToToday()` call. Exposed
+   * so consumers (e.g. `WeekView`) can run a side effect — namely,
+   * scrolling today's column into view — even when the user's call is
+   * a no-op for the navigation state. The most common case is the
+   * user already being in today's week: `currentWeekStart.value`
+   * stays the same, the `watch` on that prop is silent, but the user
+   * still expects Today to bring today back into view (especially on
+   * mobile, where the seven-column grid overflows and today is easy
+   * to scroll offscreen).
+   *
+   * Starts at `0` and increments by exactly one per call. Consumers
+   * should skip the initial value (`if (n === 0) return ...`) so the
+   * signal fires only on explicit user action, not on mount.
+   */
+  const goToTodayTrigger = ref<number>(0)
+
   /** Jumps back to the week containing today. */
   function goToToday(): void {
     currentWeekStart.value = toLocalISODate(
       getWeekStart(new Date(), safeWeekStart.value),
     )
+    // Increment after the week assignment so the state order is
+    // "navigate first, then signal" — observers that derive both
+    // signals observe a consistent post-update state.
+    goToTodayTrigger.value++
   }
 
   return {
@@ -104,5 +125,6 @@ export function useWeekNavigation(
     weekStart: currentWeekStartStr,
     navigateWeek,
     goToToday,
+    goToTodayTrigger,
   }
 }

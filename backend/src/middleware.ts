@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { type Request, type Response, type NextFunction } from 'express';
 import { ZodError } from 'zod';
 
 /**
@@ -86,6 +86,28 @@ export function errorHandler(
         ? 'Internal Server Error'
         : err.message,
   });
+}
+
+/**
+ * Authentication guard middleware. Checks `req.session.authenticated`
+ * (added to `SessionData` via the module augmentation in
+ * `types/express-session.d.ts`); if the session is missing or not
+ * authenticated, surfaces a 401 through the standard error pipeline
+ * (`errorHandler` responds `{ error: 'Unauthorized' }`).
+ *
+ * Applied selectively — not globally — so unauthenticated routes
+ * (login, setup, status) can be reached without a session.
+ */
+export function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  if (req.session.authenticated) {
+    next();
+    return;
+  }
+  next(new ApiError('Unauthorized', 401));
 }
 
 /**

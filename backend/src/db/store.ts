@@ -16,6 +16,7 @@
  * need to do anything).
  */
 import { and, eq } from 'drizzle-orm';
+import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 import {
   getDb,
   openDb,
@@ -67,6 +68,9 @@ function buildDb(dbPath: string): Db {
  * `Settings` object the API returns. Centralised so the type
  * narrowing (Zod's `weekStart` is a plain `number` but we
  * promised callers a `WeekStartDay`) lives in one place.
+ *
+ * `passwordHash` is intentionally excluded — it is internal
+ * state used only by the auth layer.
  */
 function mapSettingsRow(row: {
   weekStart: number;
@@ -135,6 +139,7 @@ export class DbStore {
           id: 1,
           weekStart: 6,
           calendar: 'gregorian',
+          passwordHash: null,
           updatedAt: now,
         }).run();
       });
@@ -154,6 +159,7 @@ export class DbStore {
         id: 1,
         weekStart: 6,
         calendar: 'gregorian',
+        passwordHash: null,
         updatedAt: Date.now(),
       }).run();
     }
@@ -216,6 +222,34 @@ export class DbStore {
       weekNotes: this.getWeekNotes(),
       settings: this.getSettings(),
     };
+  }
+
+  // --- Underlying client ----------------------------------------------
+
+  /**
+   * Return the raw `better-sqlite3` connection backing this store.
+   * Used by the session store constructor, which needs the raw
+   * SQLite handle (Drizzle is not involved in session management).
+   */
+  public getUnderlyingClient(): BetterSqliteDatabase {
+    return this.db.$client;
+  }
+
+  // --- Password Hash (internal, not exposed via API) -------------------
+
+  /** Get the stored password hash. Returns `null` when no password
+   *  has been set yet (first-run / setup mode). */
+  public getPasswordHash(): string | null {
+    const row = this.db.select().from(settings).limit(1).all()[0];
+    return row?.passwordHash ?? null;
+  }
+
+  /** Store a bcrypt password hash in the settings row. */
+  public setPasswordHash(hash: string): void {
+    this.db
+      .update(settings)
+      .set({ passwordHash: hash, updatedAt: Date.now() })
+      .run();
   }
 
   // --- Settings --------------------------------------------------------
