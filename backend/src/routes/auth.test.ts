@@ -106,19 +106,41 @@ describe('Auth routes', () => {
   // -------------------------------------------------------------------
 
   describe('GET /api/auth/status', () => {
-    it('returns setupRequired: true on a fresh DB', async () => {
+    it('returns setupRequired: true, authenticated: false on a fresh DB', async () => {
       const res = await request(app).get('/api/auth/status');
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ setupRequired: true });
+      expect(res.body).toEqual({ setupRequired: true, authenticated: false });
     });
 
-    it('returns setupRequired: false after a password is set', async () => {
+    it('returns setupRequired: false, authenticated: false when no session is established', async () => {
       await request(app)
         .post('/api/auth/setup')
         .send({ password: 'password123' });
+      // A fresh supertest request carries no cookies, so the session is
+      // unauthenticated even though the password exists.
       const res = await request(app).get('/api/auth/status');
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ setupRequired: false });
+      expect(res.body).toEqual({ setupRequired: false, authenticated: false });
+    });
+
+    it('returns authenticated: true after login, using the same cookie jar', async () => {
+      // Use a persistent agent so the session cookie set by /login is
+      // sent on the subsequent /status call — this is what proves the
+      // server is reading `req.session.authenticated`, not just the
+      // presence of a password hash.
+      await request(app)
+        .post('/api/auth/setup')
+        .send({ password: 'password123' });
+
+      const agent = request.agent(app);
+      const login = await agent
+        .post('/api/auth/login')
+        .send({ password: 'password123' });
+      expect(login.status).toBe(200);
+
+      const status = await agent.get('/api/auth/status');
+      expect(status.status).toBe(200);
+      expect(status.body).toEqual({ setupRequired: false, authenticated: true });
     });
   });
 

@@ -64,7 +64,7 @@ describe('useAuth', () => {
 
   describe('after mocked api.authStatus() resolves with { setupRequired: true }', () => {
     it('setupRequired === true, loading === false', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: true })
+      mockAuthStatus.mockResolvedValue({ setupRequired: true, authenticated: false })
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
@@ -80,7 +80,7 @@ describe('useAuth', () => {
 
   describe('after mocked api.authStatus() resolves with { setupRequired: false }', () => {
     it('setupRequired === false, loading === false', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
@@ -90,6 +90,23 @@ describe('useAuth', () => {
       expect(auth.setupRequired).toBe(false)
       expect(auth.loading).toBe(false)
       expect(auth.error).toBe(null)
+    })
+
+    it('authenticated: true flips isAuthenticated to true without a manual login', async () => {
+      // This is the regression test for the "close + reopen tab" bug:
+      // when the server reports an existing valid session, the client
+      // must mirror that into isAuthenticated on the initial fetch so
+      // the user is not prompted to log in again.
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: true })
+
+      const { useAuth } = await import('./useAuth.js')
+      const auth = useAuth()
+
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(auth.isAuthenticated).toBe(true)
+      expect(auth.setupRequired).toBe(false)
+      expect(auth.loading).toBe(false)
     })
   })
 
@@ -124,8 +141,8 @@ describe('useAuth', () => {
     it('re-runs the fetch and clears error on success', async () => {
       // First call fails, second call succeeds.
       mockAuthStatus
-        .mockResolvedValueOnce({ setupRequired: false })  // initial
-        .mockResolvedValueOnce({ setupRequired: true })   // retry
+        .mockResolvedValueOnce({ setupRequired: false, authenticated: false })  // initial
+        .mockResolvedValueOnce({ setupRequired: true, authenticated: false })   // retry
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
@@ -147,7 +164,7 @@ describe('useAuth', () => {
 
   describe('login()', () => {
     it('calls api.login and flips isAuthenticated to true on success', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
       mockLogin.mockResolvedValue({ success: true })
 
       const { useAuth } = await import('./useAuth.js')
@@ -164,7 +181,7 @@ describe('useAuth', () => {
     })
 
     it('re-throws on api.login rejection; isAuthenticated stays false', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
       mockLogin.mockRejectedValue(new Error('Incorrect password'))
 
       const { useAuth } = await import('./useAuth.js')
@@ -180,7 +197,7 @@ describe('useAuth', () => {
   describe('logout()', () => {
     it('calls api.logout and flips isAuthenticated AND setupRequired to false', async () => {
       // Need to use .mockResolvedValueOnce chain to handle initial authStatus call + retry
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
       mockLogout.mockResolvedValue({ success: true })
       mockLogin.mockResolvedValue({ success: true })
 
@@ -204,7 +221,7 @@ describe('useAuth', () => {
 
   describe('setup()', () => {
     it('calls api.setup and flips isAuthenticated to true on success', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: true })
+      mockAuthStatus.mockResolvedValue({ setupRequired: true, authenticated: false })
       mockSetup.mockResolvedValue({ success: true })
 
       const { useAuth } = await import('./useAuth.js')
@@ -221,7 +238,7 @@ describe('useAuth', () => {
     })
 
     it('re-throws on api.setup rejection', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: true })
+      mockAuthStatus.mockResolvedValue({ setupRequired: true, authenticated: false })
       mockSetup.mockRejectedValue(new Error('Password already set'))
 
       const { useAuth } = await import('./useAuth.js')
@@ -236,7 +253,7 @@ describe('useAuth', () => {
 
   describe('readonly state', () => {
     it('isAuthenticated is readonly - assignment is ignored', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
@@ -254,7 +271,7 @@ describe('useAuth', () => {
     })
 
     it('setupRequired is readonly - assignment is ignored', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: true })
+      mockAuthStatus.mockResolvedValue({ setupRequired: true, authenticated: false })
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
@@ -269,7 +286,7 @@ describe('useAuth', () => {
     })
 
     it('loading is readonly - assignment is ignored', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
@@ -284,7 +301,7 @@ describe('useAuth', () => {
     })
 
     it('error is readonly - assignment is ignored', async () => {
-      mockAuthStatus.mockResolvedValue({ setupRequired: false })
+      mockAuthStatus.mockResolvedValue({ setupRequired: false, authenticated: false })
 
       const { useAuth } = await import('./useAuth.js')
       const auth = useAuth()
