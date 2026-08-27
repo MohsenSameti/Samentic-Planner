@@ -87,6 +87,13 @@ export interface State {
 // Auth types
 export interface AuthStatus {
   setupRequired: boolean
+  /**
+   * True when the calling session is already authenticated (i.e. the
+   * user has logged in and the session cookie is still within its
+   * window). The client uses this on boot to skip the login screen
+   * for returning users.
+   */
+  authenticated: boolean
 }
 
 export interface AuthChangePasswordRequest {

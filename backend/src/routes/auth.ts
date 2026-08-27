@@ -25,12 +25,23 @@ export function createAuthRouter(store: DbStore): ExpressRouter {
   const router: ExpressRouter = Router();
 
   // --- GET /auth/status --------------------------------------------------
-  // Returns whether the app is in first-run setup mode. The client
-  // uses this to decide whether to show a login form or a setup wizard.
+  // Returns both whether the app is in first-run setup mode and whether
+  // the calling session is already authenticated. The client uses these
+  // together on boot to decide:
+  //   - setupRequired: true  → show SetupWizard (no password yet)
+  //   - setupRequired: false, authenticated: false → show LoginPage
+  //   - authenticated: true                       → enter the app
+  //
+  // We read `req.session.authenticated` here so a returning user whose
+  // session cookie is still within the 7-day window is recognised without
+  // being asked for the password again.
 
-  router.get('/status', (_req, res) => {
+  router.get('/status', (req, res) => {
     const hash = store.getPasswordHash();
-    res.json({ setupRequired: hash === null });
+    res.json({
+      setupRequired: hash === null,
+      authenticated: req.session.authenticated === true,
+    });
   });
 
   // --- POST /auth/setup --------------------------------------------------

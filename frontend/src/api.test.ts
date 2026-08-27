@@ -342,7 +342,7 @@ describe('api', () => {
     it('api.authStatus hits /api/auth/status', async () => {
       const fetchSpy = vi
         .fn()
-        .mockImplementation(() => Promise.resolve(jsonResponse({ setupRequired: false })))
+        .mockImplementation(() => Promise.resolve(jsonResponse({ setupRequired: false, authenticated: false })))
       vi.stubGlobal('fetch', fetchSpy)
 
       await api.authStatus()

@@ -30,6 +30,12 @@ async function fetchStatus(): Promise<void> {
     .authStatus()
     .then((status) => {
       setupRequired.value = status.setupRequired
+      // Adopt the server's view of the session. This is what lets a
+      // returning user skip the login screen: when their cookie is
+      // still valid, the server reports `authenticated: true` and we
+      // flip the local flag in lockstep. The `App.vue` watcher on
+      // `isAuthenticated` then triggers the initial data load.
+      isAuthenticated.value = status.authenticated
       loading.value = false
       error.value = null
     })
@@ -148,6 +154,10 @@ export function useAuth() {
         .authStatus()
         .then((status) => {
           setupRequired.value = status.setupRequired
+          // Mirror fetchStatus: adopt the server's session state on
+          // retry so a transient error that wipes auth state gets
+          // restored once the server is reachable again.
+          isAuthenticated.value = status.authenticated
           loading.value = false
           error.value = null
         })
