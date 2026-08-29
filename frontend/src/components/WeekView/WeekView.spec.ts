@@ -170,6 +170,14 @@ describe('WeekView', () => {
       expect(wrapper.emitted('drop-task')).toBeTruthy()
       expect(wrapper.emitted('drop-task')?.[0]?.[1]).toBe('2024-01-05')
     })
+
+    it('forwards open-day from a DayColumn up with the date payload', async () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      const col = wrapper.findComponent({ name: 'DayColumn' })
+      await col.vm.$emit('open-day', '2024-01-04')
+      expect(wrapper.emitted('open-day')).toBeTruthy()
+      expect(wrapper.emitted('open-day')?.[0]).toEqual(['2024-01-04'])
+    })
   })
 
   describe('derived state', () => {

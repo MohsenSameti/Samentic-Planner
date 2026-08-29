@@ -48,6 +48,7 @@ const props = defineProps<{
  */
 const emit = defineEmits<{
   (e: 'add-task', date: string): void
+  (e: 'open-day', date: string): void
   (e: 'update-day-note', date: string, note: string): void
   (e: 'update-property-value', date: string, propertyId: string, value: number): void
   (e: 'drop-task', event: DragEvent, date: string): void
@@ -329,6 +330,7 @@ watch(
       :property-values="propertyValues"
       :day-note-value="noteForDay(day.date)"
       @add-task="(date) => emit('add-task', date)"
+      @open-day="(date) => emit('open-day', date)"
       @update-day-note="(date, note) => emit('update-day-note', date, note)"
       @update-property-value="(date, propertyId, value) => emit('update-property-value', date, propertyId, value)"
       @drop-task="(event, date) => emit('drop-task', event, date)"
