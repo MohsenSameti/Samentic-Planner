@@ -180,4 +180,47 @@ describe('DayColumn', () => {
       }
     })
   })
+
+  describe('open-day', () => {
+    it('emits open-day with the column date when the day header is clicked', async () => {
+      const wrapper = mount(DayColumn, {
+        props: { ...baseProps, date: '2024-01-15' },
+      })
+      await wrapper.find('.day-header').trigger('click')
+      expect(wrapper.emitted('open-day')).toBeTruthy()
+      expect(wrapper.emitted('open-day')?.[0]).toEqual(['2024-01-15'])
+    })
+
+    it('emits open-day on Enter pressed on the day header', async () => {
+      const wrapper = mount(DayColumn, {
+        props: { ...baseProps, date: '2024-01-15' },
+      })
+      await wrapper.find('.day-header').trigger('keydown.enter')
+      expect(wrapper.emitted('open-day')).toBeTruthy()
+      expect(wrapper.emitted('open-day')?.[0]).toEqual(['2024-01-15'])
+    })
+
+    it('emits open-day on Space pressed on the day header', async () => {
+      const wrapper = mount(DayColumn, {
+        props: { ...baseProps, date: '2024-01-15' },
+      })
+      await wrapper.find('.day-header').trigger('keydown.space')
+      expect(wrapper.emitted('open-day')).toBeTruthy()
+      expect(wrapper.emitted('open-day')?.[0]).toEqual(['2024-01-15'])
+    })
+
+    it('does NOT emit open-day when the add-task button is clicked', async () => {
+      // The "+" button is a sibling of the day-header. It must
+      // still emit `add-task` and never `open-day` — clicking the
+      // "+" should not open day view.
+      const wrapper = mount(DayColumn, {
+        props: { ...baseProps, date: '2024-01-15' },
+      })
+      await wrapper.find('.add-task-btn').trigger('click')
+      expect(wrapper.emitted('open-day')).toBeFalsy()
+      // Sanity: the original `add-task` emit still fires.
+      expect(wrapper.emitted('add-task')).toBeTruthy()
+      expect(wrapper.emitted('add-task')?.[0]).toEqual(['2024-01-15'])
+    })
+  })
 })

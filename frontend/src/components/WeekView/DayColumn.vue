@@ -64,6 +64,7 @@ const props = defineProps<{
  */
 const emit = defineEmits<{
   (e: 'add-task', date: string): void
+  (e: 'open-day', date: string): void
   (e: 'update-day-note', date: string, note: string): void
   (e: 'update-property-value', date: string, propertyId: string, value: number): void
   (e: 'drop-task', event: DragEvent, date: string): void
@@ -116,6 +117,16 @@ function onAddTask(): void {
   emit('add-task', props.date)
 }
 
+/**
+ * Open day view for this column's date. Wired to clicks and
+ * keyboard activation (Enter / Space) on the `.day-header` element.
+ * The `+` button is a sibling of the day-header and stops
+ * propagation so the add-task click never bubbles up to here.
+ */
+function onOpenDay(): void {
+  emit('open-day', props.date)
+}
+
 const taskCount = computed(() => props.tasks.length)
 </script>
 
@@ -126,8 +137,16 @@ const taskCount = computed(() => props.tasks.length)
     @dragover.prevent
     @drop="handleDrop"
   >
-    <div class="day-header">
-      <div>
+    <div
+      class="day-header"
+      role="button"
+      tabindex="0"
+      :aria-label="`Open ${dayName} in day view`"
+      @click="onOpenDay"
+      @keydown.enter.prevent="onOpenDay"
+      @keydown.space.prevent="onOpenDay"
+    >
+      <div class="day-header-text">
         <div class="day-name">{{ dayName }}</div>
         <div class="day-date">{{ dayNumJalali ?? dayNum }}</div>
       </div>
@@ -135,7 +154,7 @@ const taskCount = computed(() => props.tasks.length)
         class="add-task-btn"
         type="button"
         aria-label="Add task"
-        @click="onAddTask"
+        @click.stop="onAddTask"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -260,6 +279,21 @@ const taskCount = computed(() => props.tasks.length)
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.day-header:hover {
+  background: var(--bg);
+}
+
+.day-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.day-header-text {
+  min-width: 0;
 }
 
 .day-name {
