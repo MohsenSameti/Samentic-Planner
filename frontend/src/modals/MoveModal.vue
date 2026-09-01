@@ -95,7 +95,9 @@ function onPickDate(value: string): void {
   border-radius: 4px;
   font-size: 0.9rem;
   background: var(--surface);
+  color: var(--text-primary);
   font-family: inherit;
+  color-scheme: light dark;
 }
 
 .form-group input:focus {

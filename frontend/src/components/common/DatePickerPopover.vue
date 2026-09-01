@@ -249,7 +249,7 @@ void internalInteraction
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
   z-index: 200;
   padding: 8px;
 }
@@ -263,6 +263,12 @@ void internalInteraction
   border-radius: 4px;
   background: var(--bg);
   color: var(--text-primary);
+  /* `color-scheme: light dark` is also declared globally on
+   * `input, select, textarea` in `style.css`; the duplicated
+   * declaration here is intentional and harmless — it ensures the
+   * native `<input type="date">` calendar icon adapts even on
+   * browsers that don't pick up the page-level value. */
+  color-scheme: light dark;
 }
 
 .popover-input:focus {

@@ -90,7 +90,7 @@ async function handleSubmit(): Promise<void> {
   width: 100%;
   max-width: 400px;
   padding: 32px 28px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .login-title {
@@ -138,10 +138,10 @@ async function handleSubmit(): Promise<void> {
 
 .error-message {
   padding: 10px 12px;
-  background: #FDF2EC;
-  border: 1px solid #F0C4A8;
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
   border-radius: 6px;
-  color: #B84700;
+  color: var(--accent);
   font-size: 0.875rem;
   margin-bottom: 16px;
 }

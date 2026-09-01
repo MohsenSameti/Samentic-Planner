@@ -9,9 +9,29 @@
  * rendered text and event emissions.
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import Header from './Header.vue'
+
+/**
+ * Read the SFC source. Used by the source-level regression tests at
+ * the bottom of this file — happy-dom doesn't process the SFC's
+ * `<style scoped>` block, so we can't drive a `getComputedStyle`
+ * assertion on `.logout-btn` etc. Instead, we lock in the
+ * contract that the broken `var(--text)` reference is gone and the
+ * rules use the real `var(--text-primary)` token. The token's
+ * value in both themes is already locked in by `style.css`'s
+ * `:root` / `:root[data-theme="dark"]` declarations.
+ */
+const source = readFileSync(
+  // Vitest's loader doesn't expose `import.meta.url` as a `file://`
+  // URL, so resolve the SFC relative to the working directory (the
+  // repo root in `pnpm test`).
+  resolve(process.cwd(), 'src/components/Header.vue'),
+  'utf8',
+)
 
 const defaultProps = {
   sidebarCollapsed: true,
@@ -159,6 +179,40 @@ describe('Header', () => {
       expect(wrapper.find('.settings-menu').exists()).toBe(true)
 
       wrapper.unmount()
+    })
+  })
+
+  // --------------------------------------------------------------- //
+  // Source-level regression coverage for dark-mode icon colors.    //
+  // --------------------------------------------------------------- //
+  //
+  // The original `Header.vue` used `color: var(--text)` for the three
+  // icon buttons (logout, settings, sidebar-toggle). `--text` is not
+  // a defined token, so the property was invalid and the buttons fell
+  // back to the browser UA `buttontext` color — which some browsers
+  // render black even in dark mode. These tests lock in that the
+  // broken reference is gone and the rules now use
+  // `var(--text-primary)` (the real, theme-aware token).
+
+  describe('dark-mode icon colors (regression)', () => {
+    it('does NOT reference the undefined --text token anywhere in the SFC', () => {
+      expect(source).not.toMatch(/var\(--text\)/)
+    })
+
+    it.each([
+      '.logout-btn',
+      '.settings-btn',
+      '.sidebar-toggle',
+    ])('styles %s with var(--text-primary), not a hard-coded color', (selector) => {
+      // Find the rule body for the selector. The SFC's scoped style
+      // uses standard CSS, so a regex anchored to the selector
+      // picks up the property list.
+      const escaped = selector.replace(/\./g, '\\.')
+      const rule = new RegExp(`${escaped}\\s*\\{[^}]*\\}`)
+      const match = source.match(rule)
+      expect(match, `expected to find a CSS rule for ${selector}`).toBeTruthy()
+      if (!match) return
+      expect(match[0]).toMatch(/var\(--text-primary\)/)
     })
   })
 })

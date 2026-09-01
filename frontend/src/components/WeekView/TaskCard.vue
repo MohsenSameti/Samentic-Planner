@@ -487,7 +487,7 @@ function handleToggleStatus(): void {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   padding: 8px;
   min-width: 150px;
   z-index: 1000;
@@ -522,11 +522,11 @@ function handleToggleStatus(): void {
 }
 
 .task-menu-item.danger {
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 .task-menu-item.danger svg {
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 .task-notes {

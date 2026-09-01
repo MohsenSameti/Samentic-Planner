@@ -245,7 +245,7 @@ onUnmounted(() => {
 }
 
 .today-btn:hover {
-  background: #b84700;
+  background: var(--accent-hover);
 }
 
 .today-btn:focus-visible {
@@ -264,7 +264,7 @@ onUnmounted(() => {
   width: 36px;
   height: 36px;
   background: transparent;
-  color: var(--text);
+  color: var(--text-primary);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -300,7 +300,7 @@ onUnmounted(() => {
   width: 36px;
   height: 36px;
   background: transparent;
-  color: var(--text);
+  color: var(--text-primary);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -335,7 +335,7 @@ onUnmounted(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
   z-index: 200;
 }
 
@@ -367,7 +367,7 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   background: transparent;
-  color: var(--text);
+  color: var(--text-primary);
   border: none;
   border-radius: 6px;
   cursor: pointer;

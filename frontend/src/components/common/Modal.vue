@@ -93,7 +93,7 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -109,7 +109,7 @@ onUnmounted(() => {
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
   animation: modalSlideIn 0.2s ease;
 }
 
@@ -141,7 +141,7 @@ onUnmounted(() => {
 }
 
 .modal-close:hover {
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .modal-close:focus-visible {

@@ -38,6 +38,13 @@ const emit = defineEmits<{
   height: 36px;
   border: 1px solid var(--border);
   background: var(--surface);
+  /* Explicit `color` so the chevron SVG (which uses
+   * `stroke="currentColor"`) resolves to the theme-aware
+   * `--text-primary` rather than the browser UA `buttontext`
+   * color — some browsers still render that one black even when
+   * the page is dark, which is the same regression that hit the
+   * `Header` icon buttons. */
+  color: var(--text-primary);
   border-radius: 4px;
   display: flex;
   align-items: center;

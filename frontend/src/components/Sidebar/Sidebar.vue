@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Calendar, Project, Property, Task, WeekStartDay } from '../../types'
+import type { Calendar, Project, Property, Task, Theme, WeekStartDay } from '../../types'
 import ProjectList from './ProjectList.vue'
 import PropertiesSection from './PropertiesSection.vue'
 import SettingsSection from './SettingsSection.vue'
@@ -18,6 +18,8 @@ const props = defineProps<{
   tasks: Task[]
   selectedProject: string
   weeklyPropertySums: PropertyWithSum[]
+  /** Current theme choice (persisted in localStorage, applied to <html>). */
+  theme: Theme
   /** Current start-of-week setting (0=Sunday..6=Saturday). */
   weekStart: WeekStartDay
   /** Current calendar preference. */
@@ -34,6 +36,7 @@ const emit = defineEmits<{
   (e: 'select-project', id: string): void
   (e: 'add-project'): void
   (e: 'add-property'): void
+  (e: 'change-theme', t: Theme): void
   (e: 'change-week-start', day: WeekStartDay): void
   (e: 'change-calendar', c: Calendar): void
 }>()
@@ -89,8 +92,10 @@ const totalActiveTasks = computed<number>(() =>
     <section class="sidebar-section">
       <h3>Settings</h3>
       <SettingsSection
+        :theme="theme"
         :week-start="weekStart"
         :calendar="calendar"
+        @change-theme="(t) => emit('change-theme', t)"
         @change-week-start="(day) => emit('change-week-start', day)"
         @change-calendar="(c) => emit('change-calendar', c)"
       />
@@ -170,7 +175,7 @@ const totalActiveTasks = computed<number>(() =>
 
   .sidebar:not(.collapsed) {
     transform: translateX(0);
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-md);
   }
 }
 </style>

@@ -162,7 +162,20 @@ function onPickDate(value: string): void {
   border-radius: 4px;
   font-size: 0.9rem;
   background: var(--surface);
+  /* Explicit `color` so the input text is always `var(--text-primary)`
+   * regardless of any wrapping element that sets `color` on the
+   * parent. The page-level `color-scheme: light dark` covers most
+   * cases, but an explicit value here is the cross-browser-safest
+   * path and keeps the placeholder (`::placeholder` rules globally)
+   * in lockstep with the typed text. */
+  color: var(--text-primary);
   font-family: inherit;
+  /* `color-scheme: light dark` is also declared globally on
+   * `input, select, textarea` in `style.css`; the duplicated
+   * declaration here is intentional and harmless — it ensures the
+   * native `<input type="date">` calendar icon adapts even on
+   * browsers that don't pick up the page-level value. */
+  color-scheme: light dark;
 }
 
 .form-group input:focus,

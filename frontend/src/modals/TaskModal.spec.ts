@@ -5,10 +5,26 @@
  * (Jalali) based on the `calendar` prop.
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import TaskModal from './TaskModal.vue'
 import JalaliDatePicker from '../components/common/JalaliDatePicker.vue'
 import type { Calendar, Project } from '../types/index.js'
+
+/**
+ * Read the modal SFC's source for the dark-mode regression tests
+ * at the bottom. happy-dom doesn't process the SFC's `<style
+ * scoped>` block, so we assert on the source instead. The contract
+ * we lock in: every form-control rule in the modal's scoped style
+ * has an explicit `color: var(--text-primary)`, so a future
+ * wrapping element that sets `color` cannot silently change the
+ * input text color in dark mode.
+ */
+const modalSource = readFileSync(
+  resolve(process.cwd(), 'src/modals/TaskModal.vue'),
+  'utf8',
+)
 
 const now = Date.now()
 
@@ -94,5 +110,39 @@ describe('TaskModal', () => {
     await wrapper.setProps({ calendar: 'gregorian' as Calendar })
     expect(wrapper.findComponent(JalaliDatePicker).exists()).toBe(false)
     expect(wrapper.find('input[type="date"]').exists()).toBe(true)
+  })
+
+  // --------------------------------------------------------------- //
+  // Source-level regression coverage for dark-mode form-control   //
+  // colors (see `docs/specs/4-implement-dark-theme.md` §6.1).    //
+  // --------------------------------------------------------------- //
+
+  describe('dark-mode form-control colors (regression)', () => {
+    it('does NOT reference the undefined --text token anywhere in the SFC', () => {
+      expect(modalSource).not.toMatch(/var\(--text\)/)
+    })
+
+    it('sets an explicit color: var(--text-primary) on form inputs', () => {
+      // The rule body is the property list of the combined
+      // `.form-group input, .form-group textarea, .form-group select`
+      // selector group.
+      const rule = /\.form-group\s+input,\s*\.form-group\s+textarea,\s*\.form-group\s+select\s*\{([\s\S]*?)\}/
+      const match = modalSource.match(rule)
+      expect(match, 'expected the form-group input/textarea/select rule').toBeTruthy()
+      if (!match) return
+      expect(match[1]).toMatch(/color\s*:\s*var\(--text-primary\)/)
+    })
+
+    it('declares color-scheme: light dark on the native date input', () => {
+      // The form-group input rule (shared with the date input via
+      // the `form-group input` selector) is the carrier for the
+      // native date input's color-scheme. Asserting on the same
+      // rule body keeps the test close to the real source.
+      const rule = /\.form-group\s+input,\s*\.form-group\s+textarea,\s*\.form-group\s+select\s*\{([\s\S]*?)\}/
+      const match = modalSource.match(rule)
+      expect(match).toBeTruthy()
+      if (!match) return
+      expect(match[1]).toMatch(/color-scheme\s*:\s*light\s+dark/)
+    })
   })
 })

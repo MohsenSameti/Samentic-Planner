@@ -6,6 +6,7 @@ import { useTasks } from './composables/useTasks'
 import { useProjects } from './composables/useProjects'
 import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
+import { useTheme } from './composables/useTheme'
 import { useWeekNavigation } from './composables/useWeekNavigation'
 import {
   DEFAULT_WEEK_START,
@@ -109,6 +110,18 @@ const {
   setPropertyValue,
 } = useProperties()
 const { dayNotes, weekNotes, setDayNote, setWeekNote } = useNotes()
+
+/* ------------------------------------------------------------------ */
+/* Theme (singleton accessed via useTheme)                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The theme composable owns its own `data-theme` attribute side-effect
+ * (see `useTheme.initTheme` / `setTheme`); `App.vue` only needs the
+ * `theme` ref to render the settings picker and the `setTheme` method
+ * to react to the user's choice.
+ */
+const { theme, setTheme } = useTheme()
 
 /* ------------------------------------------------------------------ */
 /* Local UI state                                                       */
@@ -813,11 +826,13 @@ function handlePasswordChanged(): void {
           :tasks="tasks"
           :selected-project="selectedProject"
           :weekly-property-sums="weeklyPropertySums"
+          :theme="theme"
           :week-start="weekStart"
           :calendar="calendar"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
           @add-property="openPropertyModal()"
+          @change-theme="setTheme"
           @change-week-start="changeWeekStart"
           @change-calendar="changeCalendar"
         />
@@ -992,7 +1007,7 @@ function handlePasswordChanged(): void {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--modal-backdrop);
   z-index: 140;
 }
 

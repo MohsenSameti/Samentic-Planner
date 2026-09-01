@@ -1,16 +1,86 @@
 :root {
+  /* Light theme palette. Tokens consumed everywhere via var(--name)
+   * so re-skinning is a single block. See `:root[data-theme="dark"]`
+   * for the dark counterpart. */
   --bg: #FAF9F7;
   --surface: #FFFFFF;
   --border: #E8E5E1;
   --text-primary: #2D2A26;
   --text-secondary: #6B6560;
+  /* Back-compat alias for components that wrote `var(--text)`. The
+   * token doesn't exist anywhere — only `--text-primary` /
+   * `--text-secondary` do — but five rules historically used the
+   * shorter form and broke in dark mode. Re-declared in the dark
+   * block below so any future component that uses `var(--text)`
+   * resolves to the right value in both themes. New components
+   * should prefer `var(--text-primary)`. */
+  --text: var(--text-primary);
+  /* Placeholder color for inputs/textareas/selects. Light value is
+   * a softened `--text-secondary`; dark value (see below) is a
+   * half-step lighter so it pops against the dark surface but still
+   * reads as "placeholder" rather than typed content. */
+  --placeholder: #8A857F;
   --accent: #D35400;
-  --accent-light: #FDF2EC;
+  /* Translucent accent so `::selection` and soft accent backgrounds
+   * read correctly in both light and dark modes. */
+  --accent-light: rgba(211, 84, 0, 0.12);
+  --accent-hover: #B84700;
   --success: #27AE60;
+  --success-bg: #E8F5E9;
+  --danger: #E74C3C;
+  --danger-hover: #C0392B;
   --muted: #9B9B9B;
+  /* Slightly raised surface used for icon-button hover backgrounds
+   * (e.g. logout, settings, sidebar-toggle). In light mode it matches
+   * the page background; in dark mode it's a subtle lift. */
+  --hover-bg: var(--bg);
+  /* Shadows that need to feel heavier in dark mode (because there's
+   * less contrast against the page background). Both palettes define
+   * a value; components never write `rgba(0,0,0,...)` directly. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  /* Modal scrim. Darker in dark mode so the modal still pops. */
+  --modal-backdrop: rgba(0, 0, 0, 0.5);
   --font-heading: 'DM Serif Display', Georgia, serif;
   --font-body: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Hint to the browser that this page supports both color schemes
+   * so native form controls (date picker, scrollbars) and the
+   * page's own default colors follow along. */
+  color-scheme: light dark;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dark theme palette                                                   */
+/* ------------------------------------------------------------------ */
+/*
+ * Applied via the `data-theme` attribute on `<html>`, written by
+ * `useTheme.ts` before the first paint. Warm-leaning values to match
+ * the "well-worn leather" feel of the light palette — not pure
+ * greys, never pure black. The accent stays burnt orange but is
+ * slightly brightened for contrast against the dark surface.
+ */
+:root[data-theme="dark"] {
+  --bg: #1A1816;
+  --surface: #221F1C;
+  --border: #3A3530;
+  --text-primary: #F1ECE5;
+  --text-secondary: #A8A19A;
+  --text: var(--text-primary);
+  --placeholder: #BAB3AC;
+  --accent: #E96A1A;
+  --accent-light: rgba(233, 106, 26, 0.16);
+  --accent-hover: #FF7A2A;
+  --success: #4FCB7E;
+  --success-bg: #1F3A2A;
+  --danger: #E96A5A;
+  --danger-hover: #FF7A6A;
+  --muted: #6B6560;
+  --hover-bg: #2C2825;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --modal-backdrop: rgba(0, 0, 0, 0.7);
 }
 
 *, *::before, *::after {
@@ -75,6 +145,22 @@ button {
 
 input, select, textarea {
   font-family: inherit;
+  /* Declare dual color-scheme on every form control so the native
+   * date-picker icon (and any other UA-rendered widget) follows
+   * the page's resolved theme. Setting this on the inputs
+   * themselves — not just on `:root` — is the cross-browser-safest
+   * path; Safari and a few Chromium builds don't pick up the
+   * page-level declaration. */
+  color-scheme: light dark;
+}
+
+/* Global placeholder styling. Browsers default to a `#757575`-ish
+ * grey which is barely visible against the dark surface. `opacity:
+ * 1` cancels Firefox's default 0.54 so the placeholder doesn't
+ * dim further when combined with `--placeholder`. */
+::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
 }
 
 .btn {
@@ -94,7 +180,7 @@ input, select, textarea {
 }
 
 .btn-primary:hover {
-  background: #B84700;
+  background: var(--accent-hover);
 }
 
 .btn-secondary {
@@ -108,12 +194,12 @@ input, select, textarea {
 }
 
 .btn-danger {
-  background: #E74C3C;
+  background: var(--danger);
   color: white;
 }
 
 .btn-danger:hover {
-  background: #C0392B;
+  background: var(--danger-hover);
 }
 
 /* ------------------------------------------------------------------ */
