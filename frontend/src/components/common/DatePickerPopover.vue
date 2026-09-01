@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import JalaliDatePicker from './JalaliDatePicker.vue'
-import { fromLocalISODate } from '../../utils/date'
-import {
-  JALALI_MONTH_LABELS,
-  JALALI_WEEKDAY_LABELS,
-  toJalaliYMD,
-} from '../../utils/jalali'
+import { formatDayTitle } from '../../utils/date'
 import type { Calendar } from '../../types'
 
 const props = defineProps<{
@@ -55,21 +50,7 @@ const popoverRef = ref<HTMLElement | null>(null)
  * weekday + day + month + year. The label is derived purely from
  * `value` so the anchor always reflects the current selection.
  */
-const anchorLabel = computed<string>(() => {
-  const d = fromLocalISODate(props.value)
-  if (props.calendar === 'jalali') {
-    const j = toJalaliYMD(props.value)
-    const weekday = JALALI_WEEKDAY_LABELS[d.getDay()] ?? ''
-    const month = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
-    return `${weekday} ${j.jd} ${month} ${j.jy}`
-  }
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
-})
+const anchorLabel = computed<string>(() => formatDayTitle(props.value, props.calendar))
 
 /* ------------------------------------------------------------------ */
 /* Toggle                                                               */

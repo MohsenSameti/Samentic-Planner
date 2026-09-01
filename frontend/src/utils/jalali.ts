@@ -84,13 +84,23 @@ export const JALALI_MONTH_LABELS: readonly string[] = [
  * calendar.
  */
 export const JALALI_WEEKDAY_LABELS: readonly string[] = [
-  'Sun',
-  'Mon',
-  'Tue',
-  'Wed',
-  'Thu',
-  'Fri',
-  'Sat',
+  '1 Shan', // Sun (getDay 0)
+  '2 Shan', // Mon (1)
+  '3 Shan', // Tue (2)
+  '4 Shan', // Wed (3)
+  '5 Shan', // Thu (4)
+  'Jomeh', // Fri (5)
+  'Shan',  // Sat (6)
+] as const
+
+export const JALALI_WEEKDAY_LABELS_LONG: readonly string[] = [
+  '1 Shanbe',
+  '2 Shanbe',
+  '3 Shanbe',
+  '4 Shanbe',
+  '5 Shanbe',
+  'Jomeh',
+  'Shanbe',
 ] as const
 
 /**

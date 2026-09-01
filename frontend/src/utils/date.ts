@@ -1,6 +1,7 @@
 import type { Calendar, WeekStartDay } from '../types'
 import {
   JALALI_MONTH_LABELS,
+  JALALI_WEEKDAY_LABELS_LONG,
   toJalaliYMD,
 } from './jalali'
 
@@ -162,33 +163,56 @@ export function formatWeekDisplay(
     const startYear = jStart.jy
     const endYear = jEnd.jy
 
-    // Same month: collapse into "Mon D - D, YYYY".
+    // Same month: collapse into "Mon DD-DD, YYYY".
     if (jStart.jm === jEnd.jm && startYear === endYear) {
-      return `${startLabel} ${jStart.jd} - ${jEnd.jd}, ${startYear}`
+      return `${startLabel} ${String(jStart.jd).padStart(2, '0')}-${String(jEnd.jd).padStart(2, '0')}, ${startYear}`
     }
-    // Same year, different months: "Mon D - Mon D, YYYY".
+    // Same year, different months: "Mon DD-Mon DD, YYYY".
     if (startYear === endYear) {
-      return `${startLabel} ${jStart.jd} - ${endLabel} ${jEnd.jd}, ${startYear}`
+      return `${startLabel} ${String(jStart.jd).padStart(2, '0')}-${endLabel} ${String(jEnd.jd).padStart(2, '0')}, ${startYear}`
     }
     // Cross-year: include the year on both ends so the range is unambiguous.
-    return `${startLabel} ${jStart.jd}, ${startYear} - ${endLabel} ${jEnd.jd}, ${endYear}`
+    return `${startLabel} ${String(jStart.jd).padStart(2, '0')}, ${startYear} - ${endLabel} ${String(jEnd.jd).padStart(2, '0')}, ${endYear}`
   }
 
   const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
   const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
   const startYear = start.getFullYear()
   const endYear = end.getFullYear()
+  const sDay = String(start.getDate()).padStart(2, '0')
+  const eDay = String(end.getDate()).padStart(2, '0')
 
-  // Same month: collapse into "Mon D - D, YYYY".
+  // Same month: collapse into "Mon DD-DD, YYYY".
   if (startMonth === endMonth && startYear === endYear) {
-    return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${startYear}`
+    return `${startMonth} ${sDay}-${eDay}, ${startYear}`
   }
-  // Same year, different months: "Mon D - Mon D, YYYY".
+  // Same year, different months: "Mon DD - Mon DD, YYYY".
   if (startYear === endYear) {
-    return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${startYear}`
+    return `${startMonth} ${sDay} - ${endMonth} ${eDay}, ${startYear}`
   }
   // Cross-year: include the year on both ends so the range is unambiguous.
-  return `${startMonth} ${start.getDate()}, ${startYear} - ${endMonth} ${end.getDate()}, ${endYear}`
+  return `${startMonth} ${sDay}, ${startYear} - ${endMonth} ${eDay}, ${endYear}`
+}
+
+/**
+ * Format the day-view title string in `yyyy-MM-dd (shortWeekday)` style.
+ *
+ * - Gregorian: `2024-03-04 (Mon)` — uses English short weekday.
+ * - Jalali:    `1403-06-14 (2 Shanbe)` — uses `JALALI_WEEKDAY_LABELS_LONG`
+ *   indexed by the Gregorian `Date#getDay()` of the same instant.
+ */
+export function formatDayTitle(
+  value: string,
+  calendar: Calendar,
+): string {
+  const d = fromLocalISODate(value)
+  const weekdayShort = d.toLocaleDateString('en-US', { weekday: 'short' })
+  if (calendar === 'jalali') {
+    const j = toJalaliYMD(value)
+    const weekdayLong = JALALI_WEEKDAY_LABELS_LONG[d.getDay()] ?? ''
+    return `${j.jy}-${String(j.jm).padStart(2, '0')}-${String(j.jd).padStart(2, '0')} (${weekdayLong})`
+  }
+  return `${value} (${weekdayShort})`
 }
 
 /**

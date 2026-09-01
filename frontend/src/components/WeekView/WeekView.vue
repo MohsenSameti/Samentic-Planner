@@ -9,7 +9,7 @@ import type {
   Calendar,
 } from '../../types'
 import { fromLocalISODate, toLocalISODate } from '../../utils/date'
-import { toJalaliYMD, JALALI_MONTH_LABELS } from '../../utils/jalali'
+import { toJalaliYMD, JALALI_MONTH_LABELS, JALALI_WEEKDAY_LABELS } from '../../utils/jalali'
 import DayColumn from './DayColumn.vue'
 
 const props = defineProps<{
@@ -89,7 +89,9 @@ const weekDays = computed<DayCell[]>(() => {
     const gregIso = toLocalISODate(d)
     const entry: DayCell = {
       date: gregIso,
-      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      name: props.calendar === 'jalali'
+        ? (JALALI_WEEKDAY_LABELS[d.getDay()] ?? '')
+        : d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
       isToday: d.toDateString() === today,
     }
