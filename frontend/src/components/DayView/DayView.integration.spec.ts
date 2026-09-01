@@ -104,7 +104,7 @@ const Harness = defineComponent({
           })
         : h(DayView, {
             date: this.currentDay,
-            dayName: 'Wednesday',
+            title: '2024-03-06 (Wed)',
             dayNum: 3,
             tasks: [baseTask],
             projects: new Map([[baseProject.id, baseProject]]),

@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import {
   JALALI_MONTH_LABELS,
   JALALI_WEEKDAY_LABELS,
+  JALALI_WEEKDAY_LABELS_LONG,
   fromJalaliYMD,
   isLeapJalali,
   jalaliMonthLength,
@@ -146,7 +147,37 @@ describe('JALALI_MONTH_LABELS', () => {
 describe('JALALI_WEEKDAY_LABELS', () => {
   it('has 7 entries in Date#getDay() order', () => {
     expect(JALALI_WEEKDAY_LABELS).toHaveLength(7)
-    expect(JALALI_WEEKDAY_LABELS[0]).toBe('Sun')
-    expect(JALALI_WEEKDAY_LABELS[6]).toBe('Sat')
+  })
+
+  it('maps Sun..Thu to "1 Shan" .. "5 Shan"', () => {
+    expect(JALALI_WEEKDAY_LABELS[0]).toBe('1 Shan') // Sun
+    expect(JALALI_WEEKDAY_LABELS[1]).toBe('2 Shan') // Mon
+    expect(JALALI_WEEKDAY_LABELS[2]).toBe('3 Shan') // Tue
+    expect(JALALI_WEEKDAY_LABELS[3]).toBe('4 Shan') // Wed
+    expect(JALALI_WEEKDAY_LABELS[4]).toBe('5 Shan') // Thu
+  })
+
+  it('maps Fri to "Jomeh" and Sat to "Shan"', () => {
+    expect(JALALI_WEEKDAY_LABELS[5]).toBe('Jomeh') // Fri
+    expect(JALALI_WEEKDAY_LABELS[6]).toBe('Shan')  // Sat
+  })
+})
+
+describe('JALALI_WEEKDAY_LABELS_LONG', () => {
+  it('has 7 entries in Date#getDay() order', () => {
+    expect(JALALI_WEEKDAY_LABELS_LONG).toHaveLength(7)
+  })
+
+  it('maps Sun..Thu to "1 Shanbe" .. "5 Shanbe"', () => {
+    expect(JALALI_WEEKDAY_LABELS_LONG[0]).toBe('1 Shanbe') // Sun
+    expect(JALALI_WEEKDAY_LABELS_LONG[1]).toBe('2 Shanbe') // Mon
+    expect(JALALI_WEEKDAY_LABELS_LONG[2]).toBe('3 Shanbe') // Tue
+    expect(JALALI_WEEKDAY_LABELS_LONG[3]).toBe('4 Shanbe') // Wed
+    expect(JALALI_WEEKDAY_LABELS_LONG[4]).toBe('5 Shanbe') // Thu
+  })
+
+  it('maps Fri to "Jomeh" and Sat to "Shanbe"', () => {
+    expect(JALALI_WEEKDAY_LABELS_LONG[5]).toBe('Jomeh')  // Fri
+    expect(JALALI_WEEKDAY_LABELS_LONG[6]).toBe('Shanbe') // Sat
   })
 })

@@ -9,6 +9,7 @@ import { useNotes } from './composables/useNotes'
 import { useWeekNavigation } from './composables/useWeekNavigation'
 import {
   DEFAULT_WEEK_START,
+  formatDayTitle,
   formatWeekDisplay,
   fromLocalISODate,
   getWeekStart,
@@ -234,7 +235,7 @@ const currentDay = ref<string>(toLocalISODate(new Date()))
  * list / property inputs / notes.
  */
 interface DayHeaderInfo {
-  dayName: string
+  title: string
   dayNum: number
   dayNumJalali?: number
   monthLabelJalali?: string
@@ -243,7 +244,7 @@ interface DayHeaderInfo {
 const dayHeaderInfo = computed<DayHeaderInfo>(() => {
   const d = fromLocalISODate(currentDay.value)
   const info: DayHeaderInfo = {
-    dayName: d.toLocaleDateString('en-US', { weekday: 'long' }),
+    title: formatDayTitle(currentDay.value, calendar.value),
     dayNum: d.getDate(),
   }
   if (calendar.value === 'jalali') {
@@ -875,7 +876,7 @@ function handlePasswordChanged(): void {
           <DayView
             v-else
             :date="currentDay"
-            :day-name="dayHeaderInfo.dayName"
+            :title="dayHeaderInfo.title"
             :day-num="dayHeaderInfo.dayNum"
             :day-num-jalali="dayHeaderInfo.dayNumJalali"
             :month-label-jalali="dayHeaderInfo.monthLabelJalali"

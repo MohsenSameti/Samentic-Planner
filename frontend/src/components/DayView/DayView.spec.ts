@@ -60,7 +60,7 @@ interface SummaryFixture {
 
 const baseProps = {
   date: '2024-01-15',
-  dayName: 'Monday',
+  title: '2024-03-04 (Mon)',
   dayNum: 15,
   tasks: [] as Task[],
   projects: projectsMap,
@@ -105,10 +105,17 @@ describe('DayView', () => {
       const anchor = wrapper.find('.date-anchor')
       expect(anchor.exists()).toBe(true)
       const txt = anchor.text()
-      expect(txt).toContain('Monday')
-      expect(txt).toContain('January')
-      expect(txt).toContain('15')
-      expect(txt).toContain('2024')
+      // Anchor label is the new `formatDayTitle` shape: `YYYY-MM-DD (Mon)`.
+      // The focused day is Gregorian 2024-01-15 (a Monday).
+      expect(txt).toBe('2024-01-15 (Mon)')
+    })
+
+    it('renders the new title prop in the header', () => {
+      const wrapper = mount(DayView, { props: baseProps })
+      const title = wrapper.find('.day-view-title')
+      expect(title.exists()).toBe(true)
+      // baseProps.title is the pre-formatted string supplied by App.vue.
+      expect(title.text()).toBe('2024-03-04 (Mon)')
     })
 
     it('contains a DatePickerPopover anchored to the header date', () => {

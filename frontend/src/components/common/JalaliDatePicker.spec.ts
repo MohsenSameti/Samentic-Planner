@@ -138,6 +138,20 @@ describe('JalaliDatePicker', () => {
     expect(wrapper.findAll('.day-cell')).toHaveLength(42)
   })
 
+  it('renders the Persian numeric weekday headers (Sun..Thu = "1 Shan".."5 Shan", Fri = "Jomeh", Sat = "Shan")', () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const weekdays = wrapper.findAll('.weekday').map(w => w.text())
+    expect(weekdays).toEqual([
+      '1 Shan', // Sun (getDay 0)
+      '2 Shan', // Mon (1)
+      '3 Shan', // Tue (2)
+      '4 Shan', // Wed (3)
+      '5 Shan', // Thu (4)
+      'Jomeh',  // Fri (5)
+      'Shan',   // Sat (6)
+    ])
+  })
+
   it('shows the leap-year badge when the view year is a Jalali leap year', () => {
     // 1403 is a Jalali leap year.
     const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })

@@ -32,18 +32,24 @@ describe('DatePickerPopover', () => {
       expect(anchor.attributes('aria-label')).toBe('Pick a date')
     })
 
-    it('renders the anchor text including weekday and day-of-month', () => {
+    it('renders the anchor text as the new "YYYY-MM-DD (ShortWeekday)" format', () => {
       const wrapper = mount(DatePickerPopover, {
         props: { value: '2024-01-15', calendar: 'gregorian' as Calendar },
       })
-      // 2024-01-15 is a Monday — the en-US long format produces
-      // "Monday, January 15, 2024". Verify substrings so the test
-      // isn't coupled to spaces / punctuation.
+      // 2024-01-15 is a Monday — the strict `formatDayTitle` shape is
+      // "2024-01-15 (Mon)".
       const anchor = wrapper.find('button.date-anchor').text()
-      expect(anchor).toContain('Monday')
-      expect(anchor).toContain('January')
-      expect(anchor).toContain('15')
-      expect(anchor).toContain('2024')
+      expect(anchor).toBe('2024-01-15 (Mon)')
+    })
+
+    it('renders the Jalali anchor text in "jy-MM-dd (LongPersianWeekday)" format', () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
+      })
+      // 2024-01-15 is Jalali 1402-10-25, and Gregorian getDay() is 1
+      // (Monday) → "2 Shanbe".
+      const anchor = wrapper.find('button.date-anchor').text()
+      expect(anchor).toBe('1402-10-25 (2 Shanbe)')
     })
 
     it('sets aria-expanded to false when the popover is closed', () => {

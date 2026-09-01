@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_WEEK_START,
   WEEKDAY_LABELS,
+  formatDayTitle,
   formatWeekDisplay,
   fromLocalISODate,
   getWeekDays,
@@ -215,56 +216,79 @@ describe('getWeekDays', () => {
 })
 
 describe('formatWeekDisplay', () => {
-  it('formats a single-month week as "Mon D - D, YYYY"', () => {
-    expect(formatWeekDisplay('2024-01-01')).toBe('Jan 1 - 7, 2024')
+  it('formats a single-month week as "Mon DD-DD, YYYY"', () => {
+    // 2024-01-01 (Mon) .. 2024-01-07 (Sun) — days zero-padded.
+    expect(formatWeekDisplay('2024-01-01')).toBe('Jan 01-07, 2024')
   })
 
-  it('formats a cross-month week as "Mon D - Mon D, YYYY"', () => {
+  it('formats a cross-month week as "Mon DD - Mon DD, YYYY"', () => {
     // 2024-01-29 is a Monday; the week ends on 2024-02-04.
-    expect(formatWeekDisplay('2024-01-29')).toBe('Jan 29 - Feb 4, 2024')
+    expect(formatWeekDisplay('2024-01-29')).toBe('Jan 29 - Feb 04, 2024')
   })
 
   it('formats a cross-year week with the start year', () => {
     // 2023-12-25 is a Monday; the week ends on 2023-12-31.
-    expect(formatWeekDisplay('2023-12-25')).toBe('Dec 25 - 31, 2023')
+    expect(formatWeekDisplay('2023-12-25')).toBe('Dec 25-31, 2023')
   })
 
   it('formats a Saturday-start week that crosses into the new year', () => {
     // 2023-12-30 (Sat) .. 2024-01-05 (Fri)
-    expect(formatWeekDisplay('2023-12-30')).toBe('Dec 30, 2023 - Jan 5, 2024')
+    expect(formatWeekDisplay('2023-12-30')).toBe('Dec 30, 2023 - Jan 05, 2024')
   })
 
-  it('formats a Jalali single-month week as "Far D - D, YYYY"', () => {
+  it('formats a Jalali single-month week as "Far DD-DD, YYYY"', () => {
     // Saturday-start week beginning Gregorian 2024-03-16:
     // Sat 2024-03-16 (Jalali 1402-12-26) .. Fri 2024-03-22 (Jalali 1403-01-03).
     // Nowruz lands on 2024-03-20, so the week straddles 1402 / 1403 —
     // see the cross-year case below for the pure-Far week.
-    expect(formatWeekDisplay('2024-03-16', 'jalali')).toBe('Esf 26, 1402 - Far 3, 1403')
+    expect(formatWeekDisplay('2024-03-16', 'jalali')).toBe('Esf 26, 1402 - Far 03, 1403')
   })
 
-  it('formats a Jalali Nowruz week as "Far 1 - 7, 1403"', () => {
-    // Saturday-start week beginning Gregorian 2024-03-23:
-    // Sat 2024-03-23 (Jalali 1403-01-04) .. Fri 2024-03-29 (Jalali 1403-01-10).
-    // Hmm — wanted the pure "Far 1 - 7, 1403" week. Let me recompute.
-    // The plan asks for the week starting Gregorian 2024-03-20 with
-    // Saturday-start, but that ISN'T Saturday — 2024-03-20 is a
-    // Wednesday. The plan's anchor is the *normalised* Saturday-start
-    // week containing Gregorian 2024-03-20 (= Gregorian 2024-03-16,
-    // Sat). The plan describes the Jalali range as 1403-01-01 . 1403-01-07
-    // for that week, which maps to Gregorian 2024-03-20..2024-03-26.
-    // Use the Saturday-start week of 2024-03-20 passed through
-    // `getWeekDays` for verification, but for `formatWeekDisplay` we
-    // call it with the literal start-of-week ISO so the assertion is
-    // exact.
-    expect(formatWeekDisplay('2024-03-20', 'jalali')).toBe('Far 1 - 7, 1403')
+  it('formats a Jalali Nowruz week as "Far 01-07, 1403"', () => {
+    // Gregorian 2024-03-20 (Wed) is Jalali 1403-01-01; +6 days
+    // lands on Gregorian 2024-03-26 = Jalali 1403-01-07. Days are
+    // zero-padded to two digits.
+    expect(formatWeekDisplay('2024-03-20', 'jalali')).toBe('Far 01-07, 1403')
   })
 
-  it('formats a Jalali cross-month week as "Ord D - Kho D, 1403"', () => {
+  it('formats a Jalali cross-month week as "Ord DD-Kho DD, 1403"', () => {
     // Saturday-start week beginning Gregorian 2024-05-18 = Jalali
     // 1403-02-29 (Ordibehesht 29). The week ends on Gregorian
     // 2024-05-24 = Jalali 1403-03-04 (Khordad 4). Expected:
-    // "Ord 29 - Kho 4, 1403".
-    expect(formatWeekDisplay('2024-05-18', 'jalali')).toBe('Ord 29 - Kho 4, 1403')
+    // "Ord 29-Kho 04, 1403".
+    expect(formatWeekDisplay('2024-05-18', 'jalali')).toBe('Ord 29-Kho 04, 1403')
+  })
+})
+
+describe('formatDayTitle', () => {
+  it('formats a Gregorian Monday as "YYYY-MM-DD (Mon)"', () => {
+    // 2024-03-04 is a Monday.
+    expect(formatDayTitle('2024-03-04', 'gregorian')).toBe('2024-03-04 (Mon)')
+  })
+
+  it('formats a Gregorian Friday as "YYYY-MM-DD (Fri)"', () => {
+    // 2024-03-15 is a Friday.
+    expect(formatDayTitle('2024-03-15', 'gregorian')).toBe('2024-03-15 (Fri)')
+  })
+
+  it('formats a Gregorian Saturday as "YYYY-MM-DD (Sat)"', () => {
+    // 2024-03-16 is a Saturday.
+    expect(formatDayTitle('2024-03-16', 'gregorian')).toBe('2024-03-16 (Sat)')
+  })
+
+  it('formats a Jalali Friday (one day before Nowruz) as "jy-MM-dd (Jomeh)"', () => {
+    // 2024-03-15 (Fri) = Jalali 1402-12-25 (Esf 25), Friday.
+    expect(formatDayTitle('2024-03-15', 'jalali')).toBe('1402-12-25 (Jomeh)')
+  })
+
+  it('formats a Jalali Saturday as "jy-MM-dd (Shanbe)"', () => {
+    // 2024-03-16 (Sat) = Jalali 1402-12-26 (Esf 26), Saturday.
+    expect(formatDayTitle('2024-03-16', 'jalali')).toBe('1402-12-26 (Shanbe)')
+  })
+
+  it('formats a Jalali Monday as "jy-MM-dd (2 Shanbe)"', () => {
+    // 2024-03-18 (Mon) = Jalali 1402-12-28 (Esf 28), Monday.
+    expect(formatDayTitle('2024-03-18', 'jalali')).toBe('1402-12-28 (2 Shanbe)')
   })
 })
 

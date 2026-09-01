@@ -38,8 +38,8 @@ interface Summary {
 const props = defineProps<{
   /** ISO date (`YYYY-MM-DD`) of the focused day. */
   date: string
-  /** Weekday label, e.g. "Monday". */
-  dayName: string
+  /** Formatted title: `yyyy-MM-dd (Mon)` or `1403-06-14 (2 Shanbe)`. */
+  title: string
   /** Day-of-month number, Gregorian. */
   dayNum: number
   /** Jalali day-of-month when calendar is jalali; `undefined` otherwise. */
@@ -264,6 +264,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
           :calendar="calendar"
           @update="handleDatePicked"
         />
+        <span class="day-view-title" aria-hidden="true">{{ title }}</span>
         <button
           class="day-next-btn"
           type="button"
