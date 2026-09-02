@@ -63,6 +63,25 @@ export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6
 export type Calendar = 'gregorian' | 'jalali'
 
 /**
+ * User's *choice* for the theme setting. Persisted in `localStorage`
+ * and exposed in the settings UI. The actual applied theme is a
+ * subset of this — see `ResolvedTheme`.
+ *
+ * - `'light'` — force the light palette.
+ * - `'dark'` — force the dark palette.
+ * - `'system'` — track `prefers-color-scheme` and follow it.
+ */
+export type Theme = 'light' | 'dark' | 'system'
+
+/**
+ * The theme actually applied to the document. Always a concrete
+ * `light` / `dark` — never `'system'`, because the OS preference is
+ * resolved at the boundary (see `utils/theme.ts#resolveTheme`) and
+ * the rest of the app only deals with the applied value.
+ */
+export type ResolvedTheme = 'light' | 'dark'
+
+/**
  * User-facing settings. The full object is the unit of write — the
  * PUT endpoint replaces the persisted settings wholesale, which is
  * fine because the set of keys is small and known.

@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
 import { api, setSuccessMessage } from './api'
 import { useAuth } from './composables/useAuth'
 import { useTasks } from './composables/useTasks'
 import { useProjects } from './composables/useProjects'
 import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
+import { useTheme } from './composables/useTheme'
 import { useWeekNavigation } from './composables/useWeekNavigation'
-import { DEFAULT_WEEK_START, formatWeekDisplay } from './utils/date'
+import {
+  DEFAULT_WEEK_START,
+  formatDayTitle,
+  formatWeekDisplay,
+  fromLocalISODate,
+  getWeekStart,
+  toLocalISODate,
+} from './utils/date'
+import { JALALI_MONTH_LABELS, toJalaliYMD } from './utils/jalali'
 import type { Calendar, Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
@@ -16,6 +25,7 @@ import SetupWizard from './components/SetupWizard.vue'
 import WeekNavigation from './components/WeekNavigation.vue'
 import Sidebar from './components/Sidebar/Sidebar.vue'
 import WeekView from './components/WeekView/WeekView.vue'
+import DayView from './components/DayView/DayView.vue'
 import WeekNotes from './components/Notes/WeekNotes.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import ErrorDisplay from './components/common/ErrorDisplay.vue'
@@ -100,6 +110,18 @@ const {
   setPropertyValue,
 } = useProperties()
 const { dayNotes, weekNotes, setDayNote, setWeekNote } = useNotes()
+
+/* ------------------------------------------------------------------ */
+/* Theme (singleton accessed via useTheme)                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The theme composable owns its own `data-theme` attribute side-effect
+ * (see `useTheme.initTheme` / `setTheme`); `App.vue` only needs the
+ * `theme` ref to render the settings picker and the `setTheme` method
+ * to react to the user's choice.
+ */
+const { theme, setTheme } = useTheme()
 
 /* ------------------------------------------------------------------ */
 /* Local UI state                                                       */
@@ -196,6 +218,207 @@ const weekDateStrings = computed<string[]>(() => weekDays.value.map(d => d.date)
 const currentWeekNote = computed<string>(
   () => weekNotes.value.find(w => w.weekStart === currentWeekStart.value)?.note ?? '',
 )
+
+/* ------------------------------------------------------------------ */
+/* Day view (single-day focus mode)                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Which view is currently rendered in the main content area.
+ * - `'week'` (default): the existing `WeekView` with 7 day columns.
+ * - `'day'`: the focused single-day `DayView`.
+ *
+ * Not persisted across reloads — the default-on-load view is always
+ * `'week'` so a returning user lands in the same layout they were
+ * last editing.
+ */
+const viewMode = ref<'week' | 'day'>('week')
+
+/**
+ * The focused day when `viewMode === 'day'`. ISO date (`YYYY-MM-DD`).
+ * Defaults to today so the first day-view entry has a sensible value
+ * even before the user clicks a column header.
+ */
+const currentDay = ref<string>(toLocalISODate(new Date()))
+
+/**
+ * Header info for `DayView`, derived from `currentDay` and the
+ * active calendar preference. Computed once per day / calendar
+ * change so the title row updates without re-rendering the task
+ * list / property inputs / notes.
+ */
+interface DayHeaderInfo {
+  title: string
+  dayNum: number
+  dayNumJalali?: number
+  monthLabelJalali?: string
+}
+
+const dayHeaderInfo = computed<DayHeaderInfo>(() => {
+  const d = fromLocalISODate(currentDay.value)
+  const info: DayHeaderInfo = {
+    title: formatDayTitle(currentDay.value, calendar.value),
+    dayNum: d.getDate(),
+  }
+  if (calendar.value === 'jalali') {
+    const j = toJalaliYMD(currentDay.value)
+    info.dayNumJalali = j.jd
+    info.monthLabelJalali = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
+  }
+  return info
+})
+
+/**
+ * Pre-aggregated day summary for `DayView`'s summary line. Single
+ * pass over `tasks` for status counts, single pass over
+ * `propertyValues` for per-property totals. The cost is O(T + V)
+ * instead of recomputing on every render of `DayView`.
+ */
+const daySummary = computed(() => {
+  const counts = { active: 0, completed: 0, cancelled: 0 }
+  for (const t of tasks.value) {
+    if (t.date !== currentDay.value) continue
+    if (t.status === 'completed') counts.completed++
+    else if (t.status === 'cancelled') counts.cancelled++
+    else counts.active++
+  }
+  const valueByProp = new Map<string, number>()
+  for (const pv of propertyValues.value) {
+    if (pv.date !== currentDay.value) continue
+    valueByProp.set(pv.propertyId, (valueByProp.get(pv.propertyId) ?? 0) + pv.value)
+  }
+  const propertyValuesForDay = properties.value.map(p => ({
+    id: p.id,
+    name: p.name,
+    unit: p.unit,
+    value: valueByProp.get(p.id) ?? 0,
+  }))
+  return { ...counts, propertyValues: propertyValuesForDay }
+})
+
+/**
+ * Project lookup map for `DayView`. Same shape as `WeekView`'s so
+ * the two views render `TaskCard` identically.
+ */
+const projectsMap = computed<Map<string, Project>>(
+  () => new Map(projects.value.map(p => [p.id, p])),
+)
+
+/**
+ * Day-note text for `currentDay`, pre-resolved so `DayView` doesn't
+ * have to filter `dayNotes` on every render.
+ */
+const currentDayNote = computed<string>(
+  () => dayNotes.value.find(d => d.date === currentDay.value)?.note ?? '',
+)
+
+/**
+ * Open day view for a date. Called from `WeekView`'s `open-day`
+ * emit (a user clicked a column header).
+ */
+function openDayView(date: string): void {
+  currentDay.value = date
+  viewMode.value = 'day'
+}
+
+/**
+ * Close day view and re-anchor the week to the focused day. The
+ * week anchor matters: without it the user would return to whatever
+ * week they were last in (which could be weeks ago if they drilled
+ * through several days), losing context.
+ *
+ * `getWeekStart(date, weekStart)` returns the ISO of the day-of-week
+ * the user's settings consider the start of the week. We re-set
+ * `currentWeekStart` to that value so the week view snaps to the
+ * week containing `currentDay`.
+ */
+function closeDayView(): void {
+  viewMode.value = 'week'
+  currentWeekStart.value = toLocalISODate(
+    getWeekStart(fromLocalISODate(currentDay.value), weekStart.value),
+  )
+}
+
+/**
+ * Shift `currentDay` by `dir` days. Uses the same `setDate` pattern
+ * as `useWeekNavigation#navigateWeek` so month/year boundaries
+ * wrap automatically.
+ */
+function navigateDay(dir: number): void {
+  const d = fromLocalISODate(currentDay.value)
+  d.setDate(d.getDate() + dir)
+  currentDay.value = toLocalISODate(d)
+}
+
+/**
+ * Jump `currentDay` directly to a picked date (from the
+ * `DatePickerPopover`). Mirrors `openDayView` but for the date
+ * picker path.
+ */
+function jumpToDay(date: string): void {
+  currentDay.value = date
+}
+
+/**
+ * Toolbar Today button when in day view. Jumps `currentDay` to today
+ * and increments `goToTodayTrigger` so `WeekView`'s auto-scroll
+ * still fires once the user returns to week view (the
+ * `currentWeekStart` watcher is silent in that case, but the trigger
+ * watcher is not).
+ */
+function goToDayToday(): void {
+  currentDay.value = toLocalISODate(new Date())
+  goToTodayTrigger.value++
+}
+
+/* ------------------------------------------------------------------ */
+/* Today button dispatch                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Route the Header's Today click based on the active view. In week
+ * view this is the existing `goToToday()` (which sets
+ * `currentWeekStart` to today's week). In day view it sets
+ * `currentDay` to today instead. The Header itself stays mode-agnostic;
+ * the dispatch lives here in App.vue where the view state is owned.
+ */
+function handleGoToday(): void {
+  if (viewMode.value === 'day') {
+    goToDayToday()
+  } else {
+    goToToday()
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Esc handler                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Window-level `keydown` listener for Esc, mounted only while in
+ * day view. The `DatePickerPopover` (when open) handles its own Esc
+ * with `stopPropagation()` so this listener doesn't fire while the
+ * popover is closing — pressing Esc twice is the documented flow:
+ * first Esc closes the popover, second Esc closes day view.
+ */
+function handleDocumentKeydown(e: KeyboardEvent): void {
+  if (viewMode.value === 'day' && e.key === 'Escape') {
+    closeDayView()
+  }
+}
+
+/**
+ * Dynamically attach/detach the Esc listener based on `viewMode`.
+ * When entering day view, we add the keydown listener. When leaving,
+ * we remove it. This aligns with the original design intention.
+ */
+watch(viewMode, (newMode) => {
+  if (newMode === 'day') {
+    document.addEventListener('keydown', handleDocumentKeydown)
+  } else {
+    document.removeEventListener('keydown', handleDocumentKeydown)
+  }
+})
 
 /* ------------------------------------------------------------------ */
 /* Sidebar / layout                                                      */
@@ -512,6 +735,15 @@ onMounted(() => {
   // Collapse sidebar on small viewports by default — most users will
   // not need it visible when they first open the app on mobile.
   sidebarCollapsed.value = window.innerWidth <= 1024
+  // Window-level Esc listener for day view. We'll bind it only
+  // when `viewMode` is `'day'` and clean up when leaving day view.
+  // The actual listener registration is handled via a watch on
+  // `viewMode` below.
+
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleDocumentKeydown)
 })
 
 async function handleLogout(): Promise<void> {
@@ -581,7 +813,7 @@ function handlePasswordChanged(): void {
       <Header
         :sidebar-collapsed="sidebarCollapsed"
         @toggle-sidebar="toggleSidebar"
-        @go-today="goToToday"
+        @go-today="handleGoToday"
         @logout="handleLogout"
         @change-password="openChangePasswordModal"
       />
@@ -594,11 +826,13 @@ function handlePasswordChanged(): void {
           :tasks="tasks"
           :selected-project="selectedProject"
           :weekly-property-sums="weeklyPropertySums"
+          :theme="theme"
           :week-start="weekStart"
           :calendar="calendar"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
           @add-property="openPropertyModal()"
+          @change-theme="setTheme"
           @change-week-start="changeWeekStart"
           @change-calendar="changeCalendar"
         />
@@ -610,13 +844,20 @@ function handlePasswordChanged(): void {
         ></div>
 
         <main class="week-container">
+          <!--
+            `WeekNavigation` is only meaningful in week view; it's
+            hidden in day view because day view has its own header
+            (back button + prev/next-day chevrons).
+          -->
           <WeekNavigation
+            v-if="viewMode === 'week'"
             :week-display="weekDisplay"
             @prev-week="navigateWeek(-1)"
             @next-week="navigateWeek(1)"
           />
 
           <WeekView
+            v-if="viewMode === 'week'"
             :current-week-start="currentWeekStart"
             :tasks="tasks"
             :projects="projects"
@@ -626,6 +867,46 @@ function handlePasswordChanged(): void {
             :selected-project="selectedProject"
             :calendar="calendar"
             :go-to-today-trigger="goToTodayTrigger"
+            @add-task="openTaskModal"
+            @open-day="openDayView"
+            @edit-task="handleEditTask"
+            @move-task="handleMoveTask"
+            @toggle-task-status="toggleTaskStatus"
+            @cancel-task="cancelTask"
+            @restore-task="restoreTask"
+            @delete-task="deleteTask"
+            @update-task-notes="updateTaskNotes"
+            @update-day-note="updateDayNote"
+            @update-property-value="updatePropertyValue"
+            @drop-task="onDropTask"
+          />
+
+          <!--
+            DayView is mounted only when in day view. It reuses the
+            same entity-event handlers as WeekView (add-task, edit-
+            task, etc.) so the data flow is identical; the
+            additional emits (back-to-week, prev-day, next-day,
+            navigate-day) drive App.vue's view-mode state.
+          -->
+          <DayView
+            v-else
+            :date="currentDay"
+            :title="dayHeaderInfo.title"
+            :day-num="dayHeaderInfo.dayNum"
+            :day-num-jalali="dayHeaderInfo.dayNumJalali"
+            :month-label-jalali="dayHeaderInfo.monthLabelJalali"
+            :tasks="tasks"
+            :projects="projectsMap"
+            :properties="properties"
+            :property-values="propertyValues"
+            :day-note-value="currentDayNote"
+            :selected-project="selectedProject"
+            :calendar="calendar"
+            :summary="daySummary"
+            @back-to-week="closeDayView"
+            @prev-day="navigateDay(-1)"
+            @next-day="navigateDay(1)"
+            @navigate-day="jumpToDay"
             @add-task="openTaskModal"
             @edit-task="handleEditTask"
             @move-task="handleMoveTask"
@@ -640,13 +921,14 @@ function handlePasswordChanged(): void {
           />
 
           <WeekNotes
+            v-if="viewMode === 'week'"
             :week-start="currentWeekStart"
             :initial-value="currentWeekNote"
             @update="updateWeekNote"
           />
 
           <WeekSummary
-            v-if="showWeekSummary"
+            v-if="viewMode === 'week' && showWeekSummary"
             :tasks="tasks"
             :week-date-strings="weekDateStrings"
             :properties="weeklyPropertySums"
@@ -725,7 +1007,7 @@ function handlePasswordChanged(): void {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--modal-backdrop);
   z-index: 140;
 }
 

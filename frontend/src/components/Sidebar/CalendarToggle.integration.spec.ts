@@ -16,7 +16,7 @@ import { h, defineComponent, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import SettingsSection from './SettingsSection.vue'
 import WeekView from '../WeekView/WeekView.vue'
-import type { Calendar, Project, Task, Property, WeekStartDay } from '../../types/index.js'
+import type { Calendar, Project, Task, Property, Theme, WeekStartDay } from '../../types/index.js'
 
 const now = Date.now()
 
@@ -52,6 +52,7 @@ const Harness = defineComponent({
   render(): ReturnType<typeof h> {
     return h('div', [
       h(SettingsSection, {
+        theme: 'system' as Theme,
         weekStart: this.weekStart,
         calendar: this.calendar,
         'onChange-calendar': (c: Calendar) => { this.calendar = c },
@@ -143,6 +144,7 @@ describe('Calendar toggle (SettingsSection → WeekView)', () => {
       render(): ReturnType<typeof h> {
         return h('div', [
           h(SettingsSection, {
+            theme: 'system' as Theme,
             weekStart: this.weekStart,
             calendar: this.calendar,
             'onChange-calendar': (c: Calendar) => { this.calendar = c },

@@ -72,11 +72,11 @@ function dismissSuccess(): void {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: #2e7d32;
+  background: var(--success);
   color: white;
   padding: 16px 20px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: 12px;

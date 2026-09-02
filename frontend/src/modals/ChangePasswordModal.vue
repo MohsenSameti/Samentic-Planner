@@ -238,6 +238,7 @@ async function handleSubmit(): Promise<void> {
   font-family: inherit;
   color: var(--text-primary);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  color-scheme: light dark;
 }
 
 .form-input:focus {
@@ -263,10 +264,10 @@ async function handleSubmit(): Promise<void> {
 
 .error-message {
   padding: 10px 12px;
-  background: #fdf2ec;
-  border: 1px solid #f0c4a8;
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
   border-radius: 6px;
-  color: #b84700;
+  color: var(--accent);
   font-size: 0.875rem;
   margin-bottom: 16px;
 }

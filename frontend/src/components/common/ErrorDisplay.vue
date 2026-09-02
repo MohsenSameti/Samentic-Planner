@@ -66,11 +66,11 @@ function dismissError(): void {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: #e74c3c;
+  background: var(--danger);
   color: white;
   padding: 16px 20px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: 12px;

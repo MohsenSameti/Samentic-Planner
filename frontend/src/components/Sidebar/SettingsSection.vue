@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import type { Calendar, WeekStartDay } from '../../types'
+import type { Calendar, Theme, WeekStartDay } from '../../types'
 import { WEEKDAY_LABELS } from '../../utils/date'
 
 /**
- * Sidebar settings panel. Currently exposes two controls — the
- * start-of-week picker and the calendar preference — and is
- * structured as its own component so adding more settings later is
- * a one-section change in the sidebar.
+ * Sidebar settings panel. Exposes three controls — the theme
+ * picker, the start-of-week picker, and the calendar preference —
+ * and is structured as its own component so adding more settings
+ * later is a one-section change in the sidebar.
  */
 defineProps<{
+  /** Current theme choice (persisted in localStorage, applied to <html>). */
+  theme: Theme
   /** Current start-of-week setting, 0=Sunday..6=Saturday. */
   weekStart: WeekStartDay
   /** Current calendar preference. */
@@ -16,6 +18,12 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
+  /**
+   * Emitted when the user picks a new theme. The value is one of the
+   * `Theme` literal union and is persisted in localStorage by the
+   * parent (via `useTheme().setTheme`).
+   */
+  (e: 'change-theme', t: Theme): void
   /**
    * Emitted when the user picks a new start-of-week. The numeric
    * value matches `Date#getDay()` and `WeekStartDay`.
@@ -29,6 +37,18 @@ const emit = defineEmits<{
 }>()
 
 /**
+ * `Theme` options shown in the `<select>`. Centralised as a constant
+ * so the rendering and the validation stay in lockstep. Order is
+ * deliberate: Light → Dark → System reads as "off, on, follow OS" in
+ * the order most users will scan.
+ */
+const THEME_OPTIONS: ReadonlyArray<{ value: Theme; label: string }> = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+] as const
+
+/**
  * `Calendar` options shown in the `<select>`. Centralised as a
  * constant so the rendering and the validation stay in lockstep.
  */
@@ -36,6 +56,20 @@ const CALENDAR_OPTIONS: ReadonlyArray<{ value: Calendar; label: string }> = [
   { value: 'gregorian', label: 'Gregorian' },
   { value: 'jalali', label: 'Jalali' },
 ] as const
+
+/**
+ * Controlled-`<select>` change handler for the theme picker. Same
+ * validation pattern as the other two settings: only emit when the
+ * picked value is a valid `Theme` literal, so a stale or
+ * hand-edited DOM can't poison the parent state.
+ */
+function onChangeTheme(e: Event): void {
+  const target = e.target as HTMLSelectElement
+  const next = target.value
+  if (next === 'light' || next === 'dark' || next === 'system') {
+    emit('change-theme', next)
+  }
+}
 
 /**
  * Build the `value` for the underlying `<select>`. Kept as a function
@@ -69,6 +103,23 @@ function onChangeCalendar(e: Event): void {
 
 <template>
   <div class="settings-list">
+    <label class="setting-row">
+      <span class="setting-label">Theme</span>
+      <select
+        class="setting-select"
+        :value="theme"
+        aria-label="Theme"
+        @change="onChangeTheme"
+      >
+        <option
+          v-for="opt in THEME_OPTIONS"
+          :key="opt.value"
+          :value="opt.value"
+        >
+          {{ opt.label }}
+        </option>
+      </select>
+    </label>
     <label class="setting-row">
       <span class="setting-label">Start of week</span>
       <select

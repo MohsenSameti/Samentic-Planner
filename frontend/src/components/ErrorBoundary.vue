@@ -66,7 +66,7 @@ function resetError(): void {
 }
 
 .error-content h3 {
-  color: var(--text);
+  color: var(--text-primary);
   margin-bottom: 8px;
 }
 
@@ -82,7 +82,7 @@ function resetError(): void {
 }
 
 .retry-btn:hover {
-  background: #b84700;
+  background: var(--accent-hover);
 }
 
 .retry-btn:focus-visible {

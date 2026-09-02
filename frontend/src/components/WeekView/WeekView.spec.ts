@@ -81,6 +81,18 @@ describe('WeekView', () => {
     expect(names).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
   })
 
+  it('labels the day names with Persian short labels when calendar is jalali', () => {
+    const wrapper = mount(WeekView, {
+      props: { ...baseProps, calendar: 'jalali' as Calendar },
+    })
+    const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+    const names = cols.map(c => c.props('dayName'))
+    // 2024-01-01..2024-01-07 is Mon..Sun in getDay() order
+    // (Mon=1..Sun=0), so the Persian short labels walk through
+    // index 1, 2, 3, 4, 5, 6, 0 of JALALI_WEEKDAY_LABELS.
+    expect(names).toEqual(['2 Shan', '3 Shan', '4 Shan', '5 Shan', 'Jomeh', 'Shan', '1 Shan'])
+  })
+
   it('passes day numbers 1..7 to the columns', () => {
     const wrapper = mount(WeekView, { props: baseProps })
     const cols = wrapper.findAllComponents({ name: 'DayColumn' })
@@ -169,6 +181,14 @@ describe('WeekView', () => {
       await col.vm.$emit('drop-task', fakeEvent, '2024-01-05')
       expect(wrapper.emitted('drop-task')).toBeTruthy()
       expect(wrapper.emitted('drop-task')?.[0]?.[1]).toBe('2024-01-05')
+    })
+
+    it('forwards open-day from a DayColumn up with the date payload', async () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      const col = wrapper.findComponent({ name: 'DayColumn' })
+      await col.vm.$emit('open-day', '2024-01-04')
+      expect(wrapper.emitted('open-day')).toBeTruthy()
+      expect(wrapper.emitted('open-day')?.[0]).toEqual(['2024-01-04'])
     })
   })
 
