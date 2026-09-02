@@ -71,18 +71,18 @@ function handleBlur(e: FocusEvent): void {
 <style scoped>
 .day-notes {
   border-top: 1px solid var(--border);
-  padding: 8px;
+  padding: var(--space-2);
   flex-shrink: 0;
 }
 
 .day-notes-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   font-size: 0.75rem;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 4px;
+  padding: var(--space-1);
   border-radius: 4px;
   user-select: none;
 }
@@ -103,7 +103,7 @@ function handleBlur(e: FocusEvent): void {
 
 .day-notes-content {
   display: none;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .day-notes-content.expanded {
@@ -114,7 +114,7 @@ function handleBlur(e: FocusEvent): void {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 8px;
+  padding: var(--space-2);
   font-size: 0.8rem;
   resize: vertical;
   min-height: 50px;

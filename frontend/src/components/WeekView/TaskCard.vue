@@ -335,10 +335,10 @@ function handleToggleStatus(): void {
 .task-card {
   background: var(--bg);
   border-radius: 6px;
-  padding: 10px;
+  padding: var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   cursor: grab;
 }
 
@@ -367,7 +367,7 @@ function handleToggleStatus(): void {
 .task-main {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .task-checkbox {
@@ -381,7 +381,7 @@ function handleToggleStatus(): void {
   justify-content: center;
   flex-shrink: 0;
   transition: all 0.1s ease;
-  margin-top: 2px;
+  margin-top: var(--space-1);
 }
 
 .task-checkbox:hover {
@@ -423,7 +423,7 @@ function handleToggleStatus(): void {
 .task-description {
   font-size: 0.75rem;
   color: var(--text-secondary);
-  margin-top: 4px;
+  margin-top: var(--space-1);
   word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -434,8 +434,8 @@ function handleToggleStatus(): void {
 .task-project {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 2px;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
 }
 
 .task-project-dot {
@@ -488,7 +488,7 @@ function handleToggleStatus(): void {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow-sm);
-  padding: 8px;
+  padding: var(--space-2);
   min-width: 150px;
   z-index: 1000;
   display: none;
@@ -501,8 +501,8 @@ function handleToggleStatus(): void {
 .task-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.85rem;
@@ -532,8 +532,8 @@ function handleToggleStatus(): void {
 .task-notes {
   display: none;
   border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: 8px;
+  padding-top: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .task-notes.expanded {
@@ -544,7 +544,7 @@ function handleToggleStatus(): void {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 8px;
+  padding: var(--space-2);
   font-size: 0.8rem;
   resize: vertical;
   min-height: 60px;

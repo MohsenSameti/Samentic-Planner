@@ -148,6 +148,7 @@ planner/
 ### Responsive Design
 - Desktop: Full sidebar + 7-column grid
 - Tablet/Mobile: Collapsible sidebar
+- Mobile breakpoint: `max-width: 768px` (declared as `--bp-md` in `style.css`). At this width, container padding shrinks by one step on each axis (e.g. desktop `24 px` → mobile `16 px`) and primary button padding drops from `10/20` to `8/16` so it stays consistent with the rest of the shrunk layout. The sidebar switches to a fixed slide-in at `max-width: 1024px`.
 
 ## Design Language
 
@@ -165,6 +166,26 @@ planner/
 - **Headings**: DM Serif Display
 - **Body**: IBM Plex Sans
 - **Monospace**: IBM Plex Mono
+
+### Spacing
+A 4 px base scale, declared as CSS custom properties in `:root` (see `frontend/src/style.css`):
+
+| Token | Value | Common use |
+|---|---|---|
+| `--space-0` | 0 | reset |
+| `--space-1` | 4 px | tight padding (chips, button icons) |
+| `--space-2` | 8 px | most gaps, small padding |
+| `--space-3` | 12 px | larger gaps, section padding |
+| `--space-4` | 16 px | page gutters, form fields, modal padding |
+| `--space-5` | 20 px | modal section padding, page outer padding |
+| `--space-6` | 24 px | page-level padding, large section padding |
+| `--space-8` | 32 px | login card padding, top-level hero spacing |
+| `--space-10` | 40 px | reserved for future use |
+| `--space-12` | 48 px | reserved for future use |
+
+Component styles **must** reference these tokens via `var(--space-N)` for every `padding`, `margin`, and `gap` declaration. Raw `Npx` literals in spacing declarations are a CI lint failure (see `style.spec.ts`). Off-grid values from the pre-token codebase (2, 6, 10, 14, 28 px) were rounded into the nearest token during the migration; the scale itself is locked at the values above.
+
+The mobile breakpoint is `--bp-md: 768px` (see **Responsive Design**). The same `--space-*` tokens apply at all widths — there is no separate mobile token set.
 
 ## Running the App
 

@@ -16,6 +16,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { globSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
@@ -155,5 +156,72 @@ describe('source-wide: no var(--text) references remain', () => {
     ] as const),
   )('%s does not contain var(--text)', (_path, content) => {
     expect(content).not.toMatch(/var\(--text\)/)
+  })
+})
+
+/**
+ * Cross-component contract: every `padding`, `margin[-position]`, and
+ * `gap` declaration in `frontend/src` must reference a `--space-*`
+ * token rather than a raw `Npx` literal. This is the backstop that
+ * locks the 4-px spacing scale (declared in `style.css`) in at CI
+ * time — a future contributor who writes `padding: 13px` will fail
+ * tests rather than silently re-introducing an off-grid value.
+ *
+ * Implementation: a glob over all `vue` and `css` files under
+ * `frontend/src`. For each file we extract every declaration whose
+ * property is one of the spacing properties below, then assert the
+ * value contains no `\d+px` substring. Properties that legitimately
+ * take px values (border-radius, font-size, width, height,
+ * outline-offset, and the four positioning `top`/`right`/`bottom`/
+ * `left` properties) are NOT scanned — the regex matches the
+ * spacing-property selector literally, so non-spacing properties
+ * are structurally excluded.
+ */
+describe('source-wide: spacing declarations use --space-* tokens', () => {
+  // Match `padding`, `margin`, `gap`, and their per-side variants
+  // (`padding-top`, `padding-right`, `padding-bottom`, `padding-left`,
+  // `margin-top`, `margin-right`, `margin-bottom`, `margin-left`).
+  // The optional side-suffix MUST be inside the alternation group
+  // (not just on `margin`) — otherwise `padding-top` etc. slip past
+  // the regex and a raw `Npx` literal inside them is never caught.
+  const SPACING_PROP = String.raw`\b(?:(?:padding|margin)(?:-top|-right|-bottom|-left)?|gap)`
+  // Matches `padding: 12px;` (or `margin-top: 12px;`, `padding-bottom: 8px;`, `gap: 12px;`).
+  // Captures the value up to the next `;`, `{`, `}`, or newline so
+  // multi-line values don't leak across declarations.
+  const SPACING_DECL_RE = new RegExp(
+    SPACING_PROP + String.raw`\s*:\s*([^;{}\n]+);`,
+    'g',
+  )
+  const PX_LITERAL_RE = /\b\d+px\b/
+
+  // Files the test scans. Glob over `frontend/src` for `*.vue` and
+  // `*.css`. The list is built at test-time so a new component file
+  // is picked up automatically without editing this spec.
+  const targetFiles: ReadonlyArray<string> = [
+    ...globSync('src/**/*.vue', { cwd: process.cwd() }),
+    ...globSync('src/**/*.css', { cwd: process.cwd() }),
+  ].sort()
+
+  it('finds at least one source file under frontend/src', () => {
+    // Sanity check: if the glob ever returns empty (e.g. someone
+    // moves the source tree), fail loudly so the test isn't
+    // silently green.
+    expect(targetFiles.length).toBeGreaterThan(0)
+  })
+
+  it.each(
+    targetFiles.map(f => [
+      f,
+      readFileSync(resolve(process.cwd(), f), 'utf8'),
+    ] as const),
+  )('%s has no raw px literals in spacing declarations', (_path, content) => {
+    const violations: Array<string> = []
+    for (const m of content.matchAll(SPACING_DECL_RE)) {
+      const decl = m[0].trim()
+      if (PX_LITERAL_RE.test(m[1])) {
+        violations.push(decl)
+      }
+    }
+    expect(violations).toEqual([])
   })
 })

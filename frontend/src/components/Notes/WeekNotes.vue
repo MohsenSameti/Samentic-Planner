@@ -73,20 +73,20 @@ function handleBlur(e: FocusEvent): void {
 
 <style scoped>
 .week-notes-section {
-  margin-top: 24px;
+  margin-top: var(--space-6);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .week-notes-section h3 {
   font-size: 0.85rem;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .week-notes-section h3 svg {
@@ -99,7 +99,7 @@ function handleBlur(e: FocusEvent): void {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 12px;
+  padding: var(--space-3);
   font-size: 0.9rem;
   resize: vertical;
   min-height: 80px;

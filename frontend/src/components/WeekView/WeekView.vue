@@ -350,22 +350,22 @@ watch(
 <style scoped>
 .week-grid {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   flex-shrink: 0;
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding-bottom: var(--space-2);
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   min-height: 300px;
-  margin-top: 24px;
+  margin-top: var(--space-6);
 }
 
 @media (max-width: 768px) {
   .week-grid {
-    gap: 8px;
-    margin: 0 -16px;
-    margin-top: 24px;
-    padding: 0 16px 8px 16px;
+    gap: var(--space-2);
+    margin: 0 calc(-1 * var(--space-4));
+    margin-top: var(--space-6);
+    padding: 0 var(--space-4) var(--space-2) var(--space-4);
     min-height: 250px;
   }
 }

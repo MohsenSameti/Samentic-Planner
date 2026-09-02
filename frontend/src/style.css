@@ -45,6 +45,27 @@
   --font-body: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 
+  /* Spacing scale. 4 px base, multiples only — values match the
+   * Material Design 3 subset the project actually uses. Every
+   * `padding`, `margin`, and `gap` in component styles must
+   * reference one of these tokens; raw `Npx` literals are a lint
+   * failure (see `style.spec.ts`). */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  /* Single canonical mobile breakpoint. 768 px matches Bootstrap,
+   * Tailwind, and Material Design 3. Defined as a token so future
+   * contributors don't reinvent the value (the project historically
+   * had a 767/768 inconsistency that this resolves). */
+  --bp-md: 768px;
+
   /* Hint to the browser that this page supports both color schemes
    * so native form controls (date picker, scrollbars) and the
    * page's own default colors follow along. */
@@ -164,7 +185,7 @@ input, select, textarea {
 }
 
 .btn {
-  padding: 10px 20px;
+  padding: var(--space-2) var(--space-5);
   border-radius: 6px;
   font-family: var(--font-body);
   font-size: 0.9rem;
@@ -200,6 +221,16 @@ input, select, textarea {
 
 .btn-danger:hover {
   background: var(--danger-hover);
+}
+
+/* Primary buttons participate in the same shrink-at-768 pattern as
+ * the today-button in `Header.vue` so primary actions stay visually
+ * consistent across the app. Without this rule `.btn` would keep its
+ * desktop `10/20` padding at 360 px while everything else tightens. */
+@media (max-width: 768px) {
+  .btn {
+    padding: var(--space-2) var(--space-4);
+  }
 }
 
 /* ------------------------------------------------------------------ */

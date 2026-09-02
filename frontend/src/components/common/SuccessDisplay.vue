@@ -74,12 +74,12 @@ function dismissSuccess(): void {
   right: 20px;
   background: var(--success);
   color: white;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   border-radius: 8px;
   box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   z-index: 1000;
   max-width: min(420px, calc(100vw - 40px));
 }
@@ -87,7 +87,7 @@ function dismissSuccess(): void {
 .success-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex: 1;
   min-width: 0;
 }
@@ -109,7 +109,7 @@ function dismissSuccess(): void {
   border: none;
   color: white;
   cursor: pointer;
-  padding: 4px;
+  padding: var(--space-1);
   opacity: 0.7;
   flex-shrink: 0;
   display: flex;

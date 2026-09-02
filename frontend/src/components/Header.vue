@@ -202,7 +202,7 @@ onUnmounted(() => {
 .header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 16px 24px;
+  padding: var(--space-4) var(--space-6);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -213,13 +213,13 @@ onUnmounted(() => {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .logo svg {
@@ -234,7 +234,7 @@ onUnmounted(() => {
 }
 
 .today-btn {
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   background: var(--accent);
   color: white;
   border: none;
@@ -256,7 +256,7 @@ onUnmounted(() => {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .logout-btn {
@@ -330,7 +330,7 @@ onUnmounted(() => {
   right: 0;
   min-width: 180px;
   margin: 0;
-  padding: 6px 0;
+  padding: var(--space-2) 0;
   list-style: none;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -342,7 +342,7 @@ onUnmounted(() => {
 .settings-menu-item {
   width: 100%;
   text-align: left;
-  padding: 10px 14px;
+  padding: var(--space-2) var(--space-3);
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -392,12 +392,12 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .header {
-    padding: 12px 16px;
+    padding: var(--space-3) var(--space-4);
     overflow: visible;
   }
 
   .header-left {
-    gap: 12px;
+    gap: var(--space-3);
     flex-shrink: 0;
   }
 
@@ -412,7 +412,7 @@ onUnmounted(() => {
   }
 
   .today-btn {
-    padding: 6px 12px;
+    padding: var(--space-2) var(--space-3);
     font-size: 0.8rem;
     white-space: nowrap;
   }

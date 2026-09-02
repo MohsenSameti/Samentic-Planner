@@ -218,19 +218,19 @@ async function handleSubmit(): Promise<void> {
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
   font-size: 0.85rem;
   font-weight: 500;
 }
 
 .form-input {
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.9rem;
@@ -254,29 +254,29 @@ async function handleSubmit(): Promise<void> {
 }
 
 .validation-hint {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg);
   border-radius: 6px;
   color: var(--text-secondary);
   font-size: 0.8rem;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .error-message {
-  padding: 10px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--accent-light);
   border: 1px solid var(--accent);
   border-radius: 6px;
   color: var(--accent);
   font-size: 0.875rem;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .modal-actions .btn:disabled {

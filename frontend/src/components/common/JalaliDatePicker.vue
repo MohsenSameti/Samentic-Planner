@@ -528,10 +528,10 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 12px;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   font-family: inherit;
   color: var(--text-primary);
   min-width: 280px;
@@ -541,7 +541,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .view-label {
@@ -549,7 +549,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 500;
@@ -569,7 +569,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 
 .leap-badge {
   display: inline-block;
-  margin-left: 6px;
+  margin-left: var(--space-2);
   font-size: 0.7rem;
   color: var(--accent);
   text-transform: uppercase;
@@ -608,13 +608,13 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 .input-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .input-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   font-size: 0.7rem;
   color: var(--text-secondary);
 }
@@ -626,7 +626,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 }
 
 .num-input {
-  padding: 4px 6px;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);
@@ -645,7 +645,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 .grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: var(--space-1);
   outline: none;
 }
 
@@ -659,7 +659,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
-  padding: 4px 0;
+  padding: var(--space-1) var(--space-0);
   letter-spacing: 0.5px;
 }
 

@@ -273,7 +273,7 @@ const taskCount = computed(() => props.tasks.length)
 }
 
 .day-header {
-  padding: 12px;
+  padding: var(--space-3);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -332,11 +332,11 @@ const taskCount = computed(() => props.tasks.length)
 
 .task-list {
   flex: 1;
-  padding: 8px;
+  padding: var(--space-2);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   min-height: 0;
 }
 
@@ -345,7 +345,7 @@ const taskCount = computed(() => props.tasks.length)
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: var(--space-8);
   color: var(--text-secondary);
   text-align: center;
   min-height: 150px;
@@ -354,7 +354,7 @@ const taskCount = computed(() => props.tasks.length)
 .empty-state svg {
   width: 48px;
   height: 48px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   opacity: 0.5;
 }
 
@@ -364,17 +364,17 @@ const taskCount = computed(() => props.tasks.length)
 
 .day-properties {
   border-top: 1px solid var(--border);
-  padding: 8px;
+  padding: var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 
 .property-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .property-label {
@@ -388,7 +388,7 @@ const taskCount = computed(() => props.tasks.length)
 
 .property-input {
   width: 50px;
-  padding: 4px 6px;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-family: var(--font-mono);

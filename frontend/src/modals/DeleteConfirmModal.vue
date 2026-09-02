@@ -26,12 +26,12 @@ const emit = defineEmits<{
 <style scoped>
 .message {
   color: var(--text-secondary);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: var(--space-3);
 }
 </style>

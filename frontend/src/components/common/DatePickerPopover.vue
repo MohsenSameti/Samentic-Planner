@@ -226,7 +226,7 @@ void internalInteraction
   font-family: var(--font-heading);
   font-size: 1.4rem;
   font-weight: normal;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   border-radius: 4px;
   cursor: pointer;
   text-align: center;
@@ -251,14 +251,14 @@ void internalInteraction
   border-radius: 6px;
   box-shadow: var(--shadow-md);
   z-index: 200;
-  padding: 8px;
+  padding: var(--space-2);
 }
 
 .popover-input {
   display: block;
   font-family: inherit;
   font-size: 0.9rem;
-  padding: 6px 8px;
+  padding: var(--space-2) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);

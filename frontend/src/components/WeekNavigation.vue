@@ -30,7 +30,7 @@ const emit = defineEmits<{
 .week-nav {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .nav-btn {

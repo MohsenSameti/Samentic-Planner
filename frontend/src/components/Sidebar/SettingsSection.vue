@@ -161,13 +161,13 @@ function onChangeCalendar(e: Event): void {
 .settings-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .setting-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 0.9rem;
 }
 
@@ -177,7 +177,7 @@ function onChangeCalendar(e: Event): void {
 }
 
 .setting-select {
-  padding: 6px 8px;
+  padding: var(--space-2) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);

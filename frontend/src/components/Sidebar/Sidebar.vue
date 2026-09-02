@@ -108,7 +108,7 @@ const totalActiveTasks = computed<number>(() =>
   width: 280px;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  padding: 24px;
+  padding: var(--space-6);
   overflow-y: auto;
   transition: width 0.2s ease, padding 0.2s ease;
   flex-shrink: 0;
@@ -121,7 +121,7 @@ const totalActiveTasks = computed<number>(() =>
 }
 
 .sidebar-section {
-  margin-bottom: 32px;
+  margin-bottom: var(--space-8);
 }
 
 .sidebar-section h3 {
@@ -130,19 +130,19 @@ const totalActiveTasks = computed<number>(() =>
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .property-sums {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .sum-card {
   background: var(--bg);
-  padding: 12px;
+  padding: var(--space-3);
   border-radius: 6px;
   text-align: center;
 }
@@ -158,7 +158,7 @@ const totalActiveTasks = computed<number>(() =>
   font-size: 0.7rem;
   color: var(--text-secondary);
   text-transform: uppercase;
-  margin-top: 2px;
+  margin-top: var(--space-1);
 }
 
 @media (max-width: 1024px) {
