@@ -6,7 +6,7 @@
  * drive the component through user events: clicks on the menu button,
  * keyboard activation of the checkbox, etc.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import TaskCard from './TaskCard.vue'
 import type { Project, Task } from '../../types/index.js'
@@ -34,6 +34,9 @@ const baseProject: Project = {
 }
 
 describe('TaskCard', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
   describe('rendering', () => {
     it('renders the task title', () => {
       const wrapper = mount(TaskCard, {
@@ -147,88 +150,181 @@ describe('TaskCard', () => {
   })
 
   describe('menu', () => {
+    it('teleports the menu to document.body when opened', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const menuEl = document.body.querySelector('.task-menu')
+      expect(menuEl).not.toBeNull()
+      expect(wrapper.find('.task-card').element.contains(menuEl)).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('closes the menu when Escape key is pressed', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      expect(document.body.querySelector('.task-menu.open')).not.toBeNull()
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      expect(document.body.querySelector('.task-menu.open')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('closes the menu when clicking outside', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      expect(document.body.querySelector('.task-menu.open')).not.toBeNull()
+
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      expect(document.body.querySelector('.task-menu.open')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('closes the menu on window scroll', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      expect(document.body.querySelector('.task-menu.open')).not.toBeNull()
+
+      window.dispatchEvent(new Event('scroll'))
+      await wrapper.vm.$nextTick()
+
+      expect(document.body.querySelector('.task-menu.open')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('closes the menu on window resize', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      expect(document.body.querySelector('.task-menu.open')).not.toBeNull()
+
+      window.dispatchEvent(new Event('resize'))
+      await wrapper.vm.$nextTick()
+
+      expect(document.body.querySelector('.task-menu.open')).toBeNull()
+      wrapper.unmount()
+    })
+
     it('opens the menu when the kebab button is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
-      expect(wrapper.find('.task-menu').classes()).not.toContain('open')
+      expect(document.body.querySelector('.task-menu')?.classList.contains('open')).toBeFalsy()
       await wrapper.find('.task-menu-btn').trigger('click')
-      expect(wrapper.find('.task-menu').classes()).toContain('open')
+      expect(document.body.querySelector('.task-menu')?.classList.contains('open')).toBe(true)
+      wrapper.unmount()
     })
 
     it('shows edit / move / cancel items when the task is active', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      const labels = items.map(i => i.text())
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      const labels = items.map(i => i.textContent || '')
       expect(labels.some(l => l.includes('Edit'))).toBe(true)
       expect(labels.some(l => l.includes('Move'))).toBe(true)
       expect(labels.some(l => l.includes('Cancel'))).toBe(true)
+      wrapper.unmount()
     })
 
     it('shows restore / delete items when the task is cancelled', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      const labels = items.map(i => i.text())
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      const labels = items.map(i => i.textContent || '')
       expect(labels.some(l => l.includes('Restore'))).toBe(true)
       expect(labels.some(l => l.includes('Delete'))).toBe(true)
       // Active-only items should not appear.
       expect(labels.some(l => l.includes('Move'))).toBe(false)
+      wrapper.unmount()
     })
 
     it('emits edit when the Edit item is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Edit'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Edit'))!.click()
+      await wrapper.vm.$nextTick()
       expect(wrapper.emitted('edit')).toBeTruthy()
+      wrapper.unmount()
     })
 
     it('emits move when the Move item is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Move'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Move'))!.click()
+      await wrapper.vm.$nextTick()
       expect(wrapper.emitted('move')).toBeTruthy()
+      wrapper.unmount()
     })
 
     it('emits cancel when the Cancel item is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Cancel'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Cancel'))!.click()
+      await wrapper.vm.$nextTick()
       expect(wrapper.emitted('cancel')).toBeTruthy()
+      wrapper.unmount()
     })
 
     it('emits restore when the Restore item is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Restore'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Restore'))!.click()
+      await wrapper.vm.$nextTick()
       expect(wrapper.emitted('restore')).toBeTruthy()
+      wrapper.unmount()
     })
 
     it('emits delete when the Delete item is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Delete'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Delete'))!.click()
+      await wrapper.vm.$nextTick()
       expect(wrapper.emitted('delete')).toBeTruthy()
+      wrapper.unmount()
     })
   })
 
@@ -243,27 +339,33 @@ describe('TaskCard', () => {
     it('expands the notes block when the Add Notes menu item is clicked', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Notes'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
       expect(wrapper.find('.task-notes').classes()).toContain('expanded')
+      wrapper.unmount()
     })
 
     it('emits update-notes with the new value on textarea blur', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
       })
       // Open the notes section.
       await wrapper.find('.task-menu-btn').trigger('click')
-      const items = wrapper.findAll('.task-menu-item')
-      await items.find(i => i.text().includes('Notes'))!.trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
 
       const textarea = wrapper.find('textarea')
       await textarea.setValue('New note content')
       await textarea.trigger('blur')
       expect(wrapper.emitted('update-notes')).toBeTruthy()
       expect(wrapper.emitted('update-notes')?.[0]).toEqual(['New note content'])
+      wrapper.unmount()
     })
 
     it('seeds the textarea with the task notes prop on mount', () => {
