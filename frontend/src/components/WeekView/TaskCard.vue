@@ -87,6 +87,9 @@ function handleNotesBlur(): void {
 /** Anchor for the menu (the kebab button) — populated on open. */
 const menuAnchor = ref<HTMLElement | null>(null)
 
+/** Root element of the teleported menu. */
+const menuRef = ref<HTMLElement | null>(null)
+
 /**
  * Menu position. Recomputed whenever the menu opens so we always have
  * a fresh viewport-relative box (window can resize between opens).
@@ -102,11 +105,15 @@ function computeMenuPosition(): void {
   let left = rect.right - menuWidth
   let top = rect.bottom + 4
 
-  // Clamp to viewport edges so the menu never gets clipped.
+  // Clamp to viewport edges so the menu never gets clipped (mobile/tablet/desktop).
   if (left < 8) left = 8
-  if (top + menuHeight > window.innerHeight - 8) {
-    top = rect.top - menuHeight - 4
+  if (left + menuWidth > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - menuWidth - 8)
   }
+  if (top + menuHeight > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - menuHeight - 4)
+  }
+  if (top < 8) top = 8
 
   menuPosition.value = { top, left }
 }
@@ -134,25 +141,42 @@ function handleDocumentClick(e: MouseEvent): void {
   const target = e.target as Node | null
   if (!target) return
   if (menuAnchor.value?.contains(target)) return
-  // The menu itself is `position: fixed` so it lives outside the card's
-  // DOM. Check it explicitly.
-  const menuEl = document.querySelector('.task-menu.open')
-  if (menuEl && menuEl.contains(target)) return
+  if (menuRef.value?.contains(target)) return
   closeMenu()
+}
+
+/**
+ * Closes the menu when pressing Escape. Stops propagation so window-level
+ * view shortcuts don't also fire.
+ */
+function handleDocumentKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    closeMenu()
+  }
 }
 
 watch(menuOpen, open => {
   if (open) {
     document.addEventListener('click', handleDocumentClick)
+    document.addEventListener('keydown', handleDocumentKeydown, true)
+    window.addEventListener('scroll', closeMenu, true)
+    window.addEventListener('resize', closeMenu)
     // Recompute in case the viewport changed between toggles.
     computeMenuPosition()
   } else {
     document.removeEventListener('click', handleDocumentClick)
+    document.removeEventListener('keydown', handleDocumentKeydown, true)
+    window.removeEventListener('scroll', closeMenu, true)
+    window.removeEventListener('resize', closeMenu)
   }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('keydown', handleDocumentKeydown, true)
+  window.removeEventListener('scroll', closeMenu, true)
+  window.removeEventListener('resize', closeMenu)
 })
 
 /* ------------------------------------------------------------------ */
@@ -258,65 +282,67 @@ function handleToggleStatus(): void {
             <circle cx="12" cy="19" r="1" />
           </svg>
         </button>
-        <div
-          class="task-menu"
-          :class="{ open: menuOpen }"
-          :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
-          role="menu"
-          @click.stop
-        >
-          <template v-if="task.status !== 'cancelled'">
-            <div class="task-menu-item" role="menuitem" @click="handleEdit">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              Edit
-            </div>
-            <div class="task-menu-item" role="menuitem" @click="handleToggleNotes">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              {{ notesExpanded ? 'Hide Notes' : 'Add Notes' }}
-            </div>
-            <div class="task-menu-item" role="menuitem" @click="handleMove">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="5 9 2 12 5 15" />
-                <polyline points="9 5 12 2 15 5" />
-                <polyline points="15 19 12 22 9 19" />
-                <polyline points="19 9 22 12 19 15" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <line x1="12" y1="2" x2="12" y2="22" />
-              </svg>
-              Move to...
-            </div>
-            <div class="task-menu-item danger" role="menuitem" @click="handleCancel">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
-              Cancel
-            </div>
-          </template>
-          <template v-else>
-            <div class="task-menu-item" role="menuitem" @click="handleRestore">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-              Restore
-            </div>
-            <div class="task-menu-item danger" role="menuitem" @click="handleDelete">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              Delete
-            </div>
-          </template>
-        </div>
+        <Teleport to="body" v-if="menuOpen">
+          <div
+            ref="menuRef"
+            class="task-menu open"
+            :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
+            role="menu"
+            @click.stop
+          >
+            <template v-if="task.status !== 'cancelled'">
+              <div class="task-menu-item" role="menuitem" @click="handleEdit">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Edit
+              </div>
+              <div class="task-menu-item" role="menuitem" @click="handleToggleNotes">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                {{ notesExpanded ? 'Hide Notes' : 'Add Notes' }}
+              </div>
+              <div class="task-menu-item" role="menuitem" @click="handleMove">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="5 9 2 12 5 15" />
+                  <polyline points="9 5 12 2 15 5" />
+                  <polyline points="15 19 12 22 9 19" />
+                  <polyline points="19 9 22 12 19 15" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <line x1="12" y1="2" x2="12" y2="22" />
+                </svg>
+                Move to...
+              </div>
+              <div class="task-menu-item danger" role="menuitem" @click="handleCancel">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                Cancel
+              </div>
+            </template>
+            <template v-else>
+              <div class="task-menu-item" role="menuitem" @click="handleRestore">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+                Restore
+              </div>
+              <div class="task-menu-item danger" role="menuitem" @click="handleDelete">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Delete
+              </div>
+            </template>
+          </div>
+        </Teleport>
       </div>
     </div>
 
