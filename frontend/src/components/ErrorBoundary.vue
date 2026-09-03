@@ -53,10 +53,10 @@ function resetError(): void {
   align-items: center;
   justify-content: center;
   min-height: 200px;
-  padding: 20px;
+  padding: var(--space-5);
   background: var(--bg);
   border-radius: 8px;
-  margin: 20px;
+  margin: var(--space-5);
 }
 
 .error-content {
@@ -67,12 +67,12 @@ function resetError(): void {
 
 .error-content h3 {
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .retry-btn {
-  margin-top: 16px;
-  padding: 8px 16px;
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-4);
   background: var(--accent);
   color: white;
   border: none;

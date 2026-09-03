@@ -1013,7 +1013,7 @@ function handlePasswordChanged(): void {
 
 .week-container {
   flex: 1;
-  padding: 24px;
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -1038,7 +1038,7 @@ function handlePasswordChanged(): void {
 
 @media (max-width: 768px) {
   .week-container {
-    padding: 16px;
+    padding: var(--space-4);
     overflow-y: auto;
     flex: 1;
     height: calc(100dvh - 73px);

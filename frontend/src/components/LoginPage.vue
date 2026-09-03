@@ -80,7 +80,7 @@ async function handleSubmit(): Promise<void> {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 20px;
+  padding: var(--space-5);
   background: var(--bg);
 }
 
@@ -89,7 +89,7 @@ async function handleSubmit(): Promise<void> {
   border-radius: 8px;
   width: 100%;
   max-width: 400px;
-  padding: 32px 28px;
+  padding: var(--space-8) var(--space-6);
   box-shadow: var(--shadow-md);
 }
 
@@ -97,12 +97,12 @@ async function handleSubmit(): Promise<void> {
   font-family: var(--font-heading);
   font-size: 1.5rem;
   color: var(--text-primary);
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
   text-align: center;
 }
 
 .field {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .field-label {
@@ -110,12 +110,12 @@ async function handleSubmit(): Promise<void> {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
 }
 
 .field-input {
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 1rem;
@@ -137,20 +137,20 @@ async function handleSubmit(): Promise<void> {
 }
 
 .error-message {
-  padding: 10px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--accent-light);
   border: 1px solid var(--accent);
   border-radius: 6px;
   color: var(--accent);
   font-size: 0.875rem;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .submit-btn {
   width: 100%;
-  padding: 12px;
+  padding: var(--space-3);
   font-size: 1rem;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .submit-btn:disabled {
@@ -160,12 +160,12 @@ async function handleSubmit(): Promise<void> {
 
 @media (max-width: 480px) {
   .login-card {
-    padding: 24px 20px;
+    padding: var(--space-6) var(--space-5);
   }
 
   .login-title {
     font-size: 1.25rem;
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
   }
 }
 </style>

@@ -143,12 +143,12 @@ function onPickDate(value: string): void {
 
 <style scoped>
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -157,7 +157,7 @@ function onPickDate(value: string): void {
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.9rem;
@@ -193,7 +193,7 @@ function onPickDate(value: string): void {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 </style>

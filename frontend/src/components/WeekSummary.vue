@@ -91,20 +91,20 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
 
 <style scoped>
 .week-summary {
-  margin-top: 24px;
+  margin-top: var(--space-6);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .week-summary h3 {
   font-size: 0.85rem;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .week-summary h3 svg {
@@ -115,14 +115,14 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
 
 .summary-stats {
   display: flex;
-  gap: 24px;
+  gap: var(--space-6);
   flex-wrap: wrap;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .stat-value {

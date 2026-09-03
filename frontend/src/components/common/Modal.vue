@@ -98,7 +98,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: var(--space-5);
   animation: modalFadeIn 0.15s ease;
 }
 
@@ -114,12 +114,12 @@ onUnmounted(() => {
 }
 
 .modal-header {
-  padding: 20px;
+  padding: var(--space-5);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .modal-header h2 {
@@ -132,7 +132,7 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 4px;
+  padding: var(--space-1);
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -155,7 +155,7 @@ onUnmounted(() => {
 }
 
 .modal-content {
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 @keyframes modalFadeIn {

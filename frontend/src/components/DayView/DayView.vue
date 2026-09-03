@@ -415,7 +415,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   max-width: 960px;
   margin: 0 auto;
   width: 100%;
@@ -427,19 +427,19 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 56px;
 }
 
 .day-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-primary);
   border-radius: 4px;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-family: inherit;
   font-size: 0.85rem;
   cursor: pointer;
@@ -465,7 +465,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex: 1;
   justify-content: center;
   position: relative;
@@ -529,10 +529,10 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   color: var(--text-secondary);
   font-size: 0.85rem;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -541,7 +541,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-summary-counts {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .day-view-summary-count {
@@ -559,7 +559,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-summary-properties {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -575,7 +575,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-body {
   display: grid;
   grid-template-columns: 1fr 340px;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: start;
 }
 
@@ -584,10 +584,10 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -595,7 +595,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .day-view-tasks-header h3,
@@ -641,7 +641,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-tasks-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 96px;
 }
 
@@ -650,7 +650,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--space-6);
   color: var(--text-secondary);
   text-align: center;
   min-height: 96px;
@@ -659,7 +659,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-empty svg {
   width: 36px;
   height: 36px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
   opacity: 0.5;
 }
 
@@ -669,13 +669,13 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 }
 
 .day-view-side {
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .property-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .property-label {
@@ -689,7 +689,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 
 .property-input {
   width: 80px;
-  padding: 6px 8px;
+  padding: var(--space-2) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-family: var(--font-mono);
@@ -706,10 +706,10 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 
 /* Responsive -------------------------------------------------------------- */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .day-view-header {
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
     min-height: auto;
   }
   .day-back-btn {
@@ -735,7 +735,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   }
   .day-view-summary {
     font-size: 0.8rem;
-    padding: 6px 10px;
+    padding: var(--space-2) var(--space-2);
   }
 }
 </style>

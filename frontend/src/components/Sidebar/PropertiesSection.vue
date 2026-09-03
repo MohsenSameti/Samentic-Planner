@@ -39,14 +39,14 @@ const emit = defineEmits<{
 .property-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .property-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   font-size: 0.9rem;
 }
 
@@ -58,8 +58,8 @@ const emit = defineEmits<{
 .add-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px dashed var(--border);
   background: transparent;
   border-radius: 6px;
@@ -67,7 +67,7 @@ const emit = defineEmits<{
   width: 100%;
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin-top: 8px;
+  margin-top: var(--space-2);
   font-family: inherit;
 }
 
