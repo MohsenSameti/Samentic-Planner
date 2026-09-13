@@ -44,8 +44,6 @@ const props = defineProps<{
   dayNum: number
   /** Jalali day-of-month when calendar is jalali; `undefined` otherwise. */
   dayNumJalali?: number
-  /** Jalali month label when calendar is jalali; `undefined` otherwise. */
-  monthLabelJalali?: string
   /** All tasks in the system; filtered to the focused day + project here. */
   tasks: Task[]
   /** `Project` lookup keyed by id, used by `TaskCard` for the badge. */

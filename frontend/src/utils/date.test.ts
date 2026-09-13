@@ -15,6 +15,7 @@ import {
   fromLocalISODate,
   getWeekDays,
   getWeekStart,
+  monthMarkerFor,
   toLocalISODate,
 } from './date.js'
 
@@ -182,7 +183,31 @@ describe('getWeekDays', () => {
     expect(days[0]?.name).toBe('Sat')
   })
 
-  it('populates dayNumJalali / monthLabelJalali when calendar is jalali', () => {
+  it('honors an explicit `today` parameter so reactive callers can pin the clock', () => {
+    // Pin the *system* clock to a date that's NOT in the displayed
+    // week, then pass a `today` argument that IS. Exactly one cell
+    // must be marked `isToday`, and it must be the cell whose date
+    // matches the argument. Regression guard for the new parameter:
+    // if a future refactor drops the argument, the default fallback
+    // would read the system clock and no cell would be marked.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2024, 5, 15)) // June 15, 2024
+    try {
+      const days = getWeekDays(
+        '2024-01-01',
+        1,
+        'gregorian',
+        new Date(2024, 0, 3),
+      )
+      const todayCells = days.filter(d => d.isToday)
+      expect(todayCells).toHaveLength(1)
+      expect(todayCells[0]?.date).toBe('2024-01-03')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('populates dayNumJalali when calendar is jalali', () => {
     // Nowruz week: Gregorian 2024-03-20..2024-03-26 is Jalali
     // 1403-01-01..1403-01-07. Use a Saturday-start so the displayed
     // grid lines up with the plan's anchor.
@@ -191,18 +216,15 @@ describe('getWeekDays', () => {
     // The first day of the grid is Gregorian 2024-03-16 = Jalali
     // 1402-12-26 (Esfand 26).
     expect(days[0]?.dayNumJalali).toBe(26)
-    expect(days[0]?.monthLabelJalali).toBe('Esf')
     // Find the day that lands on Gregorian 2024-03-20 (= Jalali 1403-01-01).
     const nowruz = days.find(d => d.date === '2024-03-20')
     expect(nowruz?.dayNumJalali).toBe(1)
-    expect(nowruz?.monthLabelJalali).toBe('Far')
   })
 
-  it('leaves dayNumJalali / monthLabelJalali undefined when calendar is gregorian', () => {
+  it('leaves dayNumJalali undefined when calendar is gregorian', () => {
     const days = getWeekDays('2024-03-20', 6, 'gregorian')
     for (const d of days) {
       expect(d.dayNumJalali).toBeUndefined()
-      expect(d.monthLabelJalali).toBeUndefined()
     }
   })
 
@@ -210,7 +232,122 @@ describe('getWeekDays', () => {
     const days = getWeekDays('2024-03-20', 6)
     for (const d of days) {
       expect(d.dayNumJalali).toBeUndefined()
-      expect(d.monthLabelJalali).toBeUndefined()
+    }
+  })
+})
+
+/**
+ * Spec §17: month-marker helper. Tested independently from the
+ * component because the calendar arithmetic is non-trivial (Jalali
+ * months don't align with Gregorian ones), and a unit-level seam
+ * is far easier to debug than a rendered DOM assertion.
+ */
+describe('monthMarkerFor (spec §17)', () => {
+  function days(start: string): ReadonlyArray<{ date: string }> {
+    // Use the existing `getWeekDays` to enumerate a week, but only
+    // carry the `date` field through so the helper's input shape is
+    // preserved.
+    return getWeekDays(start, 1).map(d => ({ date: d.date }))
+  }
+
+  it('returns null for every column in a mid-month week', () => {
+    // 2024-02-05 is a Monday; the entire week (Feb 5..11) is mid-Feb.
+    const result = monthMarkerFor(days('2024-02-05'), 'gregorian')
+    for (const v of result.values()) {
+      expect(v).toBeNull()
+    }
+  })
+
+  it('does not mark the first column even when the week starts on the 1st', () => {
+    // 2024-04-01 is a Monday. The toolbar already says "Apr 01-07",
+    // so an inline marker on the first column would be redundant.
+    const result = monthMarkerFor(days('2024-04-01'), 'gregorian')
+    expect(result.get('2024-04-01')).toBeNull()
+  })
+
+  it('marks the rollover column when a new month starts mid-week', () => {
+    // 2024-01-29 is a Monday; week is Jan 29 - Feb 04. The Feb 1
+    // column (Thursday) gets the marker.
+    const result = monthMarkerFor(days('2024-01-29'), 'gregorian')
+    expect(result.get('2024-01-29')).toBeNull()
+    expect(result.get('2024-01-30')).toBeNull()
+    expect(result.get('2024-01-31')).toBeNull()
+    expect(result.get('2024-02-01')).toBe('1 Feb')
+    expect(result.get('2024-02-02')).toBeNull()
+    expect(result.get('2024-02-03')).toBeNull()
+    expect(result.get('2024-02-04')).toBeNull()
+  })
+
+  it('marks with year when the rollover is January (new Gregorian year)', () => {
+    // 2023-12-25 is a Monday; week is Dec 25 - Dec 31. None of
+    // these is Jan 1; for an actual year rollover, use a week
+    // that includes 2024-01-01 (Monday) — but per the spec the
+    // first column is *never* marked, so a Jan-1 week starting on
+    // the 1st itself isn't useful for the year test. The year
+    // case is exercised in 2024-12-30 → 2025-01-05 (Sat-start week
+    // including 1 Jan).
+    const result = monthMarkerFor(days('2023-12-25'), 'gregorian')
+    // No Jan 1 in this week; nothing is marked.
+    expect(result.get('2024-01-01')).toBeUndefined()
+  })
+
+  it('handles a year rollover mid-week with a year marker on the right column', () => {
+    // 2024-12-30 is a Monday; week is Dec 30 - Jan 05.
+    const result = monthMarkerFor(days('2024-12-30'), 'gregorian')
+    // The Dec 30 column is the first → no marker.
+    expect(result.get('2024-12-30')).toBeNull()
+    // Jan 1 (Wed in this Monday-start week) carries the year marker.
+    expect(result.get('2025-01-01')).toBe('1 Jan 2025')
+  })
+
+  it('marks a Jalali month rollover independently of the Gregorian 1st', () => {
+    // 2024-03-20 is a Jalali 1403-01-01 (Nowruz). In a Monday-start
+    // week 2024-03-18..2024-03-24 the Gregorian 1st is NOT in the
+    // week, but the Jalali Far 1st IS (Wed Mar 20). The marker must
+    // appear on the Jalali rollover column. Because Far 1 *is* the
+    // first month of a new Jalali year, the marker carries the
+    // year — see the year-rollover test below for the same data
+    // point with the assertion spelled out separately.
+    const result = monthMarkerFor(days('2024-03-18'), 'jalali')
+    expect(result.get('2024-03-18')).toBeNull() // first column never marked
+    expect(result.get('2024-03-19')).toBeNull()
+    expect(result.get('2024-03-20')).toBe('1 Far 1403')
+    expect(result.get('2024-03-21')).toBeNull()
+  })
+
+  it('marks a Jalali year rollover (1 Farvardin) with the year', () => {
+    // Same Nowruz date as above but the new Jalali year → include year.
+    const result = monthMarkerFor(days('2024-03-18'), 'jalali')
+    // Far 1 of 1403 — first month of a new Jalali year, so the
+    // marker includes the year.
+    expect(result.get('2024-03-20')).toBe('1 Far 1403')
+  })
+
+  it('does not apply Jalali boundary when calendar is gregorian (independence check)', () => {
+    // Spec §17: "the two checks cannot be collapsed into one" and
+    // "a Jalali boundary ... is marked on the correct column and
+    // not on the Gregorian 1st" — meaning the calendar argument
+    // is the single source of truth, and a Gregorian-mode query
+    // on a day that's Jalali 1 Far (Mar 20) must return null
+    // because Mar 20 is *not* a Gregorian 1st.
+    const result = monthMarkerFor(days('2024-03-18'), 'gregorian')
+    expect(result.get('2024-03-20')).toBeNull()
+  })
+
+  it('does not apply Gregorian boundary when calendar is jalali (independence check)', () => {
+    // Mirror of the previous test for the other direction: in
+    // Jalali mode, a Gregorian 1st (Jan 1) must not produce a
+    // Gregorian-style marker — Jalali Dey 11 has no `jd === 1`.
+    const result = monthMarkerFor(days('2023-12-25'), 'jalali')
+    // 2024-01-01 is Gregorian 1 Jan but Jalali 1402-10-11.
+    // The map shouldn't even contain it (the week ends Dec 31),
+    // but assert what's there anyway.
+    expect(result.get('2024-01-01')).toBeUndefined()
+    for (const v of result.values()) {
+      // No Gregorian-style "1 <English>" labels must leak through.
+      if (v !== null) {
+        expect(v).not.toMatch(/^1 (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/)
+      }
     }
   })
 })

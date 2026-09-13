@@ -2,6 +2,13 @@
 defineProps<{
   /** Pre-formatted week display string (e.g. "Mar 4 - 10, 2024"). */
   weekDisplay: string
+  /**
+   * Today's label inside the visible week (e.g. "Wed 03"). When
+   * `null` (today is not in the visible week) the orientation pill
+   * is hidden — the toolbar Today button already handles returning
+   * the user to today's week. Spec §8.
+   */
+  currentDayLabel?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +25,11 @@ const emit = defineEmits<{
       </svg>
     </button>
     <span class="week-display">{{ weekDisplay }}</span>
+    <span
+      v-if="currentDayLabel"
+      class="today-pill"
+      :title="`Today: ${currentDayLabel}`"
+    >{{ currentDayLabel }}</span>
     <button class="nav-btn" type="button" aria-label="Next week" @click="emit('next-week')">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polyline points="9 18 15 12 9 6" />
@@ -75,6 +87,24 @@ const emit = defineEmits<{
   text-align: center;
 }
 
+/* Spec §8: today-orientation pill. Non-interactive indicator that
+ * stays visible so the user can re-find today's column even after
+ * scrolling it out of the viewport on mobile. Token-based padding /
+ * gap; width / border-radius kept as raw px per the project's
+ * "spacing lint doesn't scan these" convention. */
+.today-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .week-nav {
     flex-shrink: 0;
@@ -83,6 +113,11 @@ const emit = defineEmits<{
   .week-display {
     font-size: 0.8rem;
     min-width: 130px;
+  }
+
+  .today-pill {
+    font-size: 0.7rem;
+    padding: var(--space-1) var(--space-2);
   }
 
   .nav-btn {

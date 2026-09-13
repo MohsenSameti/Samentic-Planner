@@ -86,6 +86,7 @@ const Harness = defineComponent({
             selectedProject: 'all',
             calendar: this.calendar,
             goToTodayTrigger: this.goToTodayTrigger,
+            pendingTaskIds: new Set<string>(),
             onOpenDay: (date: string) => {
               this.currentDay = date
               this.viewMode = 'day'

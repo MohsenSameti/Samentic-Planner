@@ -56,11 +56,6 @@ export interface WeekDay {
    * the Jalali calendar; otherwise `undefined`.
    */
   dayNumJalali?: number
-  /**
-   * Jalali month label (e.g. "Far"). Only populated when the user
-   * has selected the Jalali calendar; otherwise `undefined`.
-   */
-  monthLabelJalali?: string
 }
 
 /** Default week start — Saturday — when the persisted setting is
@@ -91,14 +86,19 @@ export function getWeekStart(date: Date, weekStart: WeekStartDay = DEFAULT_WEEK_
  * `weekStart` (e.g. Saturday when `weekStart === 6`).
  *
  * When `calendar === 'jalali'`, each entry is enriched with
- * `dayNumJalali` and `monthLabelJalali`. The `date` field stays
- * Gregorian ISO (the canonical key for storage, navigation, and
- * grouping).
+ * `dayNumJalali`. The `date` field stays Gregorian ISO (the
+ * canonical key for storage, navigation, and grouping).
+ *
+ * The optional `today` parameter lets callers (notably
+ * `useTodayISO`-driven components) pin "today" to whatever clock
+ * they consider authoritative. It defaults to `new Date()` so existing
+ * callers and tests stay untouched.
  */
 export function getWeekDays(
   weekStartStr: string,
   weekStart: WeekStartDay = DEFAULT_WEEK_START,
   calendar: Calendar = 'gregorian',
+  today: Date = new Date(),
 ): WeekDay[] {
   const days: WeekDay[] = []
   const start = fromLocalISODate(weekStartStr)
@@ -106,7 +106,7 @@ export function getWeekDays(
   // setting change that happened while a different week was visible,
   // snap back to the actual week-start for the current setting.
   const normalized = getWeekStart(start, weekStart)
-  const today = new Date().toDateString()
+  const todayKey = today.toDateString()
   for (let i = 0; i < 7; i++) {
     const d = new Date(normalized)
     d.setDate(d.getDate() + i)
@@ -115,16 +115,11 @@ export function getWeekDays(
       date: gregIso,
       name: d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
-      isToday: d.toDateString() === today,
+      isToday: d.toDateString() === todayKey,
     }
     if (calendar === 'jalali') {
       const j = toJalaliYMD(gregIso)
       entry.dayNumJalali = j.jd
-      // `JALALI_MONTH_LABELS` is indexed by `jm - 1`; default to an
-      // empty string for an out-of-range month (should never happen
-      // for valid dates, but the type system requires a fallback).
-      const labelIdx = j.jm - 1
-      entry.monthLabelJalali = JALALI_MONTH_LABELS[labelIdx] ?? ''
     }
     days.push(entry)
   }
@@ -229,3 +224,63 @@ export const WEEKDAY_LABELS: readonly string[] = [
   'Friday',
   'Saturday',
 ] as const
+
+/**
+ * Spec §17: for a given week, returns a map of `dateISO -> label`
+ * marking the column(s) that should display an inline month/year
+ * context. The first column is *never* marked (the week-range
+ * toolbar already says it); the marker goes on exactly the column
+ * whose day is the 1st of a new month in the active calendar —
+ * `getDate() === 1` Gregorian, `toJalaliYMD(...).jd === 1` Jalali.
+ *
+ * A Jalali month boundary almost always falls on a different
+ * weekday than the Gregorian 1st, so the two checks are evaluated
+ * **independently per calendar** — never run both checks for the
+ * same day; the active calendar is the single source of truth. A
+ * Jalali-year boundary (1 Farvardin) is marked the same way the
+ * Gregorian-year boundary (1 January) is, by appending the year
+ * on the 1st-of-the-first-month.
+ *
+ * Returns `null` for every column when no marker applies.
+ */
+export function monthMarkerFor(
+  days: ReadonlyArray<{ date: string }>,
+  calendar: Calendar,
+): Map<string, string | null> {
+  const out = new Map<string, string | null>()
+  if (days.length === 0) return out
+  // Spec §17: skip the first column's marker — the toolbar
+  // `formatWeekDisplay` already prefixes the week with its start
+  // month, so a redundant inline label on the first column would
+  // duplicate information rather than surface a new one.
+  const [first] = days
+  if (first) out.set(first.date, null)
+
+  for (const day of days) {
+    if (first && day.date === first.date) continue
+    const d = fromLocalISODate(day.date)
+    let label: string | null = null
+    if (calendar === 'jalali') {
+      // Jalali 1st — marker for the column. `jm === 1` is
+      // Farvardin, the first month of a new Jalali year, so the
+      // year is appended in that case.
+      const j = toJalaliYMD(day.date)
+      if (j.jd === 1) {
+        const monthLabel = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
+        label = j.jm === 1
+          ? `1 ${monthLabel} ${j.jy}`
+          : `1 ${monthLabel}`
+      }
+    } else if (d.getDate() === 1) {
+      // Gregorian 1st — marker for the column. `getMonth() === 0`
+      // is January, the first month of a new Gregorian year, so
+      // the year is appended in that case.
+      const monthLabel = d.toLocaleDateString('en-US', { month: 'short' })
+      label = d.getMonth() === 0
+        ? `1 ${monthLabel} ${d.getFullYear()}`
+        : `1 ${monthLabel}`
+    }
+    out.set(day.date, label)
+  }
+  return out
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { provideDayActions } from './composables/useDayActions'
 import { api, setSuccessMessage } from './api'
 import { useAuth } from './composables/useAuth'
 import { useTasks } from './composables/useTasks'
@@ -16,7 +17,8 @@ import {
   getWeekStart,
   toLocalISODate,
 } from './utils/date'
-import { JALALI_MONTH_LABELS, toJalaliYMD } from './utils/jalali'
+import { toJalaliYMD } from './utils/jalali'
+import { initialSidebarCollapsed } from './utils/layout'
 import type { Calendar, Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
@@ -235,6 +237,25 @@ const currentWeekNote = computed<string>(
 const viewMode = ref<'week' | 'day'>('week')
 
 /**
+ * Template ref into the mounted `WeekView`. Used by the toolbar
+ * (`WeekNavigation`) to read the today-orientation pill computed
+ * from inside WeekView without adding a new state store. The
+ * instance type is loosely typed because WeekView is conditionally
+ * mounted (`v-if="viewMode === 'week'"`).
+ */
+const weekViewRef = ref<{ currentDayLabel?: { value: string | null } } | null>(null)
+
+/**
+ * Today's column label inside the visible week (e.g. "Wed 03"), or
+ * `null` when today isn't in the week (spec §8). Surfaces here from
+ * WeekView's computed so the toolbar pill is reactive to week /
+ * today changes without duplicating the calendar logic.
+ */
+const currentDayLabel = computed<string | null>(
+  () => weekViewRef.value?.currentDayLabel?.value ?? null,
+)
+
+/**
  * The focused day when `viewMode === 'day'`. ISO date (`YYYY-MM-DD`).
  * Defaults to today so the first day-view entry has a sensible value
  * even before the user clicks a column header.
@@ -251,7 +272,6 @@ interface DayHeaderInfo {
   title: string
   dayNum: number
   dayNumJalali?: number
-  monthLabelJalali?: string
 }
 
 const dayHeaderInfo = computed<DayHeaderInfo>(() => {
@@ -263,7 +283,6 @@ const dayHeaderInfo = computed<DayHeaderInfo>(() => {
   if (calendar.value === 'jalali') {
     const j = toJalaliYMD(currentDay.value)
     info.dayNumJalali = j.jd
-    info.monthLabelJalali = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
   }
   return info
 })
@@ -525,13 +544,50 @@ async function updateTaskNotes(task: Task, notes: string): Promise<void> {
 /* Drag-and-drop                                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Task IDs whose `updateTask` call is currently in flight (spec §14).
+ * Passed down to `WeekView` so each `DayColumn` can render its
+ * `TaskCard` in a pending state — the save is slow / dropped / failed
+ * until the ID leaves the set. The optimistic local value is already
+ * reconciled by `useTasks.updateTask`, so this is purely presentation.
+ */
+const pendingTaskIds = reactive(new Set<string>())
+
+/**
+ * Spec §22: single typed seam for every day- and task-level action
+ * consumed by `DayView` / `WeekView` / `DayColumn` / `DayNotes` /
+ * `TaskCard`. The methods are thin wrappers around the existing
+ * handlers — no business logic moves here. `provide()`ing the
+ * object lets every descendant consume it via `useDayActions()`
+ * instead of bouncing events up the tree.
+ */
+provideDayActions({
+  addTask: openTaskModal,
+  openDay: openDayView,
+  updateDayNote,
+  updatePropertyValue,
+  dropTask: onDropTask,
+  editTask: handleEditTask,
+  moveTask: handleMoveTask,
+  toggleTaskStatus: toggleTaskStatus,
+  cancelTask: cancelTask,
+  restoreTask: restoreTask,
+  deleteTask: deleteTask,
+  updateTaskNotes,
+})
+
 async function onDropTask(event: DragEvent, date: string): Promise<void> {
   event.preventDefault()
   const taskId = event.dataTransfer?.getData('text/plain')
   if (!taskId) return
   const task = tasks.value.find(t => t.id === taskId)
   if (!task) return
-  await updateTask(task.id, { date })
+  pendingTaskIds.add(taskId)
+  try {
+    await updateTask(task.id, { date })
+  } finally {
+    pendingTaskIds.delete(taskId)
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -732,9 +788,12 @@ watch(
 /* ------------------------------------------------------------------ */
 
 onMounted(() => {
-  // Collapse sidebar on small viewports by default — most users will
-  // not need it visible when they first open the app on mobile.
-  sidebarCollapsed.value = window.innerWidth <= 1024
+  // Spec §23: start with the sidebar collapsed whenever a full
+  // 7-column week at the 176px column floor wouldn't fit (<1632px).
+  // Below 1024px the sidebar is an overlay anyway. The user can
+  // still open it — the grid then scrolls horizontally and the §8
+  // edge fades signal the overflow. Mount-time only, as before.
+  sidebarCollapsed.value = initialSidebarCollapsed(window.innerWidth)
   // Window-level Esc listener for day view. We'll bind it only
   // when `viewMode` is `'day'` and clean up when leaving day view.
   // The actual listener registration is handled via a watch on
@@ -852,12 +911,14 @@ function handlePasswordChanged(): void {
           <WeekNavigation
             v-if="viewMode === 'week'"
             :week-display="weekDisplay"
+            :current-day-label="currentDayLabel"
             @prev-week="navigateWeek(-1)"
             @next-week="navigateWeek(1)"
           />
 
           <WeekView
             v-if="viewMode === 'week'"
+            ref="weekViewRef"
             :current-week-start="currentWeekStart"
             :tasks="tasks"
             :projects="projects"
@@ -867,18 +928,7 @@ function handlePasswordChanged(): void {
             :selected-project="selectedProject"
             :calendar="calendar"
             :go-to-today-trigger="goToTodayTrigger"
-            @add-task="openTaskModal"
-            @open-day="openDayView"
-            @edit-task="handleEditTask"
-            @move-task="handleMoveTask"
-            @toggle-task-status="toggleTaskStatus"
-            @cancel-task="cancelTask"
-            @restore-task="restoreTask"
-            @delete-task="deleteTask"
-            @update-task-notes="updateTaskNotes"
-            @update-day-note="updateDayNote"
-            @update-property-value="updatePropertyValue"
-            @drop-task="onDropTask"
+            :pending-task-ids="pendingTaskIds"
           />
 
           <!--
@@ -894,7 +944,6 @@ function handlePasswordChanged(): void {
             :title="dayHeaderInfo.title"
             :day-num="dayHeaderInfo.dayNum"
             :day-num-jalali="dayHeaderInfo.dayNumJalali"
-            :month-label-jalali="dayHeaderInfo.monthLabelJalali"
             :tasks="tasks"
             :projects="projectsMap"
             :properties="properties"

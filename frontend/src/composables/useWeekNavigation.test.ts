@@ -234,7 +234,6 @@ describe('useWeekNavigation', () => {
       const { weekDays } = useWeekNavigation(ref(6), ref<Calendar>('gregorian'))
       for (const d of weekDays.value) {
         expect(d.dayNumJalali).toBeUndefined()
-        expect(d.monthLabelJalali).toBeUndefined()
       }
     })
 
@@ -245,7 +244,6 @@ describe('useWeekNavigation', () => {
       // 1402-10-13 (Dey 13).
       const wed = weekDays.value.find(d => d.date === '2024-01-03')
       expect(wed?.dayNumJalali).toBe(13)
-      expect(wed?.monthLabelJalali).toBe('Dey')
     })
 
     it('re-derives weekDays when the calendar ref changes', async () => {
@@ -256,7 +254,6 @@ describe('useWeekNavigation', () => {
       calRef.value = 'jalali'
       await nextTick()
       expect(weekDays.value[0]?.dayNumJalali).toBeDefined()
-      expect(weekDays.value[0]?.monthLabelJalali).toBeDefined()
     })
 
     it('clamps an out-of-range calendar value to the default', async () => {
