@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DayView from './DayView.vue'
+import { mountWithActions } from '../../composables/test-utils'
 import type {
   Calendar,
   Project,
@@ -291,8 +292,11 @@ describe('DayView', () => {
       expect(wrapper.find('.day-view-notes').exists()).toBe(true)
     })
 
-    it('emits update-day-note on blur of the textarea', async () => {
-      const wrapper = mount(DayView, {
+    it('calls updateDayNote on blur of the textarea', async () => {
+      // Spec §22: DayNotes no longer emits update; it calls the
+      // injected action. Mounting via mountWithActions wires the
+      // spy bag so we can assert the call directly.
+      const { wrapper, actions } = mountWithActions(DayView, {
         props: { ...baseProps, dayNoteValue: 'old' },
       })
       // DayNotes keeps the textarea collapsed until the toggle is
@@ -301,8 +305,7 @@ describe('DayView', () => {
       const textarea = wrapper.find('.day-notes textarea')
       await textarea.setValue('new note')
       await textarea.trigger('blur')
-      expect(wrapper.emitted('update-day-note')).toBeTruthy()
-      expect(wrapper.emitted('update-day-note')?.[0]).toEqual(['2024-01-15', 'new note'])
+      expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-15', 'new note')
     })
   })
 

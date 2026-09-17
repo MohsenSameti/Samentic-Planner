@@ -8,7 +8,10 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import TaskCard from './TaskCard.vue'
+import { mountWithActions } from '../../composables/test-utils'
 import type { Project, Task } from '../../types/index.js'
 
 const now = Date.now()
@@ -107,29 +110,98 @@ describe('TaskCard', () => {
     })
   })
 
-  describe('toggle-status', () => {
-    it('emits toggle-status when the checkbox is clicked', async () => {
+  /**
+   * Colour-per-state assertions for spec §4. The old code dimmed the
+   * container with `opacity: 0.6` / `0.4`, which dropped text
+   * contrast below AA. The fix uses foreground tokens
+   * (`--text-completed`, `--text-cancelled`). The component imports
+   * the `<style scoped>` block, so the values are resolved via
+   * `getComputedStyle` against the resolved `--text-completed` /
+   * `--text-cancelled` values from `style.css`. We read those values
+   * from the stylesheet source so the test is independent of how the
+   * cascade resolves the `var()` calls.
+   */
+  describe('colour per state (spec §4)', () => {
+    it('does NOT set container-level opacity on completed cards', () => {
       const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'completed' }, project: baseProject },
+      })
+      // `opacity` on the container used to halve contrast; now no
+      // container-level `opacity` declaration exists, and the resolved
+      // computed opacity is the browser default `1`. happy-dom
+      // returns `''` for unset properties — both are valid signals
+      // that no explicit opacity was applied.
+      const card = wrapper.find('.task-card').element as HTMLElement
+      const computed = window.getComputedStyle(card).opacity
+      expect(computed === '' || computed === '1').toBe(true)
+    })
+
+    it('does NOT set container-level opacity on cancelled cards', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+      })
+      const card = wrapper.find('.task-card').element as HTMLElement
+      const computed = window.getComputedStyle(card).opacity
+      expect(computed === '' || computed === '1').toBe(true)
+    })
+
+    it('keeps the .completed class on the root so the structural kicker (line-through, foreground token) is reachable', () => {
+      // The colour swap is on the *foreground*, not the container, so
+      // the structural `.completed` class must still apply so the CSS
+      // selectors `.task-card.completed .task-title { color: var(--text-completed); text-decoration: line-through; }`
+      // can reach the title. The actual rendering is a CSS concern;
+      // happy-dom does not resolve `var()` so we pin the class only.
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'completed' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-card').classes()).toContain('completed')
+      expect(wrapper.find('.task-title').exists()).toBe(true)
+    })
+
+    it('reads the resolved --text-completed / --text-cancelled tokens from style.css', () => {
+      // Sanity check that the tokens declared in `style.css` are the
+      // same ones referenced by the TaskCard — catches accidental
+      // divergence between the two layers.
+      const css = readFileSync(
+        resolve(process.cwd(), 'src/style.css'),
+        'utf8',
+      )
+      expect(css).toMatch(/--text-completed\s*:\s*#[0-9A-Fa-f]+/)
+      expect(css).toMatch(/--text-cancelled\s*:\s*#[0-9A-Fa-f]+/)
+      // The token references in TaskCard must use `var(--text-completed)`
+      // / `var(--text-cancelled)`, not a hex literal of their own.
+      const taskCardCss = readFileSync(
+        resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
+        'utf8',
+      )
+      expect(taskCardCss).toMatch(/var\(--text-completed\)/)
+      expect(taskCardCss).toMatch(/var\(--text-cancelled\)/)
+    })
+  })
+
+  describe('toggle-status', () => {
+    it('calls toggleTaskStatus when the checkbox is clicked', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
       })
       await wrapper.find('.task-checkbox').trigger('click')
-      expect(wrapper.emitted('toggle-status')).toBeTruthy()
+      expect(actions.toggleTaskStatus).toHaveBeenCalledWith(baseTask)
     })
 
-    it('emits toggle-status on Enter', async () => {
-      const wrapper = mount(TaskCard, {
+    it('calls toggleTaskStatus on Enter', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
       })
       await wrapper.find('.task-checkbox').trigger('keydown.enter')
-      expect(wrapper.emitted('toggle-status')).toBeTruthy()
+      expect(actions.toggleTaskStatus).toHaveBeenCalledWith(baseTask)
     })
 
-    it('emits toggle-status on Space', async () => {
-      const wrapper = mount(TaskCard, {
+    it('calls toggleTaskStatus on Space', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
       })
       await wrapper.find('.task-checkbox').trigger('keydown.space')
-      expect(wrapper.emitted('toggle-status')).toBeTruthy()
+      expect(actions.toggleTaskStatus).toHaveBeenCalledWith(baseTask)
     })
   })
 
@@ -262,8 +334,8 @@ describe('TaskCard', () => {
       wrapper.unmount()
     })
 
-    it('emits edit when the Edit item is clicked', async () => {
-      const wrapper = mount(TaskCard, {
+    it('calls editTask when the Edit item is clicked', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
         attachTo: document.body,
       })
@@ -271,12 +343,12 @@ describe('TaskCard', () => {
       const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
       items.find(i => (i.textContent || '').includes('Edit'))!.click()
       await wrapper.vm.$nextTick()
-      expect(wrapper.emitted('edit')).toBeTruthy()
+      expect(actions.editTask).toHaveBeenCalledWith(baseTask)
       wrapper.unmount()
     })
 
-    it('emits move when the Move item is clicked', async () => {
-      const wrapper = mount(TaskCard, {
+    it('calls moveTask when the Move item is clicked', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
         attachTo: document.body,
       })
@@ -284,12 +356,57 @@ describe('TaskCard', () => {
       const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
       items.find(i => (i.textContent || '').includes('Move'))!.click()
       await wrapper.vm.$nextTick()
-      expect(wrapper.emitted('move')).toBeTruthy()
+      expect(actions.moveTask).toHaveBeenCalledWith(baseTask)
       wrapper.unmount()
     })
 
-    it('emits cancel when the Cancel item is clicked', async () => {
-      const wrapper = mount(TaskCard, {
+    /**
+     * Spec §21 acceptance: on a touch viewport a task can be moved
+     * to another day in ≤3 taps. The flow is:
+     *   1. Tap the 44px kebab (§6 bump)
+     *   2. Tap the "Move to..." menu item
+     *   3. Pick the target in the existing MoveModal
+     * The modal is the only destination UI; desktop mouse drag is
+     * unchanged. Pointer-event drag between columns is explicitly
+     * deferred to a follow-up task — see the spec.
+     */
+    describe('touch-reachable Move to... (spec §21)', () => {
+      it('exposes "Move to..." in the kebab menu of an active task', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        const items = Array.from(
+          document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+        )
+        const labels = items.map(i => i.textContent || '')
+        const hasMove = labels.some(l => l.toLowerCase().includes('move to'))
+        expect(hasMove).toBe(true)
+        wrapper.unmount()
+      })
+
+      it('calls moveTask when the menu\'s Move item is clicked', async () => {
+        const { wrapper, actions } = mountWithActions(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        const items = Array.from(
+          document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+        )
+        const moveItem = items.find(
+          i => (i.textContent || '').toLowerCase().includes('move to'),
+        )
+        expect(moveItem).toBeDefined()
+        moveItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        expect(actions.moveTask).toHaveBeenCalledWith(baseTask)
+        wrapper.unmount()
+      })
+    })
+
+    it('calls cancelTask when the Cancel item is clicked', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
         attachTo: document.body,
       })
@@ -297,33 +414,35 @@ describe('TaskCard', () => {
       const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
       items.find(i => (i.textContent || '').includes('Cancel'))!.click()
       await wrapper.vm.$nextTick()
-      expect(wrapper.emitted('cancel')).toBeTruthy()
+      expect(actions.cancelTask).toHaveBeenCalledWith(baseTask)
       wrapper.unmount()
     })
 
-    it('emits restore when the Restore item is clicked', async () => {
-      const wrapper = mount(TaskCard, {
-        props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+    it('calls restoreTask when the Restore item is clicked', async () => {
+      const cancelledTask = { ...baseTask, status: 'cancelled' as const }
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: cancelledTask, project: baseProject },
         attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
       const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
       items.find(i => (i.textContent || '').includes('Restore'))!.click()
       await wrapper.vm.$nextTick()
-      expect(wrapper.emitted('restore')).toBeTruthy()
+      expect(actions.restoreTask).toHaveBeenCalledWith(cancelledTask)
       wrapper.unmount()
     })
 
-    it('emits delete when the Delete item is clicked', async () => {
-      const wrapper = mount(TaskCard, {
-        props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+    it('calls deleteTask when the Delete item is clicked', async () => {
+      const cancelledTask = { ...baseTask, status: 'cancelled' as const }
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: cancelledTask, project: baseProject },
         attachTo: document.body,
       })
       await wrapper.find('.task-menu-btn').trigger('click')
       const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
       items.find(i => (i.textContent || '').includes('Delete'))!.click()
       await wrapper.vm.$nextTick()
-      expect(wrapper.emitted('delete')).toBeTruthy()
+      expect(actions.deleteTask).toHaveBeenCalledWith(cancelledTask)
       wrapper.unmount()
     })
   })
@@ -349,8 +468,8 @@ describe('TaskCard', () => {
       wrapper.unmount()
     })
 
-    it('emits update-notes with the new value on textarea blur', async () => {
-      const wrapper = mount(TaskCard, {
+    it('calls updateTaskNotes with the new value on textarea blur', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
         props: { task: baseTask, project: baseProject },
         attachTo: document.body,
       })
@@ -363,8 +482,7 @@ describe('TaskCard', () => {
       const textarea = wrapper.find('textarea')
       await textarea.setValue('New note content')
       await textarea.trigger('blur')
-      expect(wrapper.emitted('update-notes')).toBeTruthy()
-      expect(wrapper.emitted('update-notes')?.[0]).toEqual(['New note content'])
+      expect(actions.updateTaskNotes).toHaveBeenCalledWith(baseTask, 'New note content')
       wrapper.unmount()
     })
 

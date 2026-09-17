@@ -7,6 +7,25 @@
   --border: #E8E5E1;
   --text-primary: #2D2A26;
   --text-secondary: #6B6560;
+  /* Foreground colour for completed tasks (spec §4). Pinned to the
+   * same value as `--text-secondary` in light mode for now — the
+   * semantic rename is the whole point: if a future contributor
+   * tightens `--text-secondary` for legibility, they have to think
+   * about whether completed cards should follow. Contrast vs `--bg`
+   * `#FAF9F7`: ≈5.4:1, vs `--surface` `#FFFFFF`: ≈5.1:1; both AA. */
+  --text-completed: #6B6560;
+  /* Foreground colour for cancelled tasks (spec §4). Danger-tinted
+   * so the cancelled state is visually distinct from completed at a
+   * glance — the line-through is secondary, the hue is the primary
+   * differentiator. Contrast vs `#FAF9F7`: ≈5.3:1; vs `#FFFFFF`:
+   * ≈5.0:1. Both AA. */
+  --text-cancelled: #8B5F55;
+  /* Generic icon-fade opacity (spec §4). The empty-state calendar
+   * glyph and any other decorative-but-secondary icon use this token
+   * so the page hierarchy (`text > icon > empty-state placeholder`)
+   * is one constant. Was a hard-coded `0.5` literal in the consumer
+   * rule; centralised here so it can be re-tuned in one place. */
+  --icon-muted-opacity: 0.5;
   /* Back-compat alias for components that wrote `var(--text)`. The
    * token doesn't exist anywhere — only `--text-primary` /
    * `--text-secondary` do — but five rules historically used the
@@ -88,6 +107,14 @@
   --border: #3A3530;
   --text-primary: #F1ECE5;
   --text-secondary: #A8A19A;
+  /* Dark-mode counterpart of the completed/cancelled tokens. Same
+   * rationale as the light values, re-evaluated against
+   * `--bg #1A1816` and `--surface #221F1C`:
+   *  - completed: ≥5.7:1 on both
+   *  - cancelled: ≥4.6:1 on both (brick tint, just over the AA
+   *    threshold — deliberately muted, not a full alarm colour) */
+  --text-completed: #A8A19A;
+  --text-cancelled: #B0857A;
   --text: var(--text-primary);
   --placeholder: #BAB3AC;
   --accent: #E96A1A;

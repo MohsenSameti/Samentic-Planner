@@ -1,27 +1,27 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import type { Task, Project } from '../../types'
+import { useDayActions } from '../../composables/useDayActions'
 
 const props = defineProps<{
   task: Task
   /** Resolved project for the badge; `null` when the task has no project. */
   project: Project | null
+  /**
+   * True while the task's `updateTask` save is in flight (spec §14).
+   * Drives a subtle visual state so the user knows the drag wasn't
+   * silently dropped on a slow network.
+   */
+  pending?: boolean
 }>()
 
 /**
- * Emits the *domain* actions a task card can take. UI-only state
- * (menu open/closed, notes expanded/collapsed) lives entirely inside
- * this component — callers don't need to know about it.
+ * Spec §22: day- and task-level actions consumed by this card.
+ * Provided once at the `App.vue` root; `null` means the component
+ * is mounted in isolation (a unit test) and the action calls are
+ * no-ops.
  */
-const emit = defineEmits<{
-  (e: 'edit'): void
-  (e: 'move'): void
-  (e: 'cancel'): void
-  (e: 'restore'): void
-  (e: 'delete'): void
-  (e: 'toggle-status'): void
-  (e: 'update-notes', notes: string): void
-}>()
+const actions = useDayActions()
 
 /* ------------------------------------------------------------------ */
 /* Local state                                                          */
@@ -52,6 +52,7 @@ watch(
 const statusClass = computed(() => ({
   completed: props.task.status === 'completed',
   cancelled: props.task.status === 'cancelled',
+  pending: Boolean(props.pending),
 }))
 
 /* ------------------------------------------------------------------ */
@@ -77,7 +78,7 @@ function handleDragStart(e: DragEvent): void {
 /* ------------------------------------------------------------------ */
 
 function handleNotesBlur(): void {
-  emit('update-notes', notes.value)
+  actions?.updateTaskNotes(props.task, notes.value)
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,27 +185,27 @@ onUnmounted(() => {
 /* ------------------------------------------------------------------ */
 
 function handleEdit(): void {
-  emit('edit')
+  actions?.editTask(props.task)
   closeMenu()
 }
 
 function handleMove(): void {
-  emit('move')
+  actions?.moveTask(props.task)
   closeMenu()
 }
 
 function handleCancel(): void {
-  emit('cancel')
+  actions?.cancelTask(props.task)
   closeMenu()
 }
 
 function handleRestore(): void {
-  emit('restore')
+  actions?.restoreTask(props.task)
   closeMenu()
 }
 
 function handleDelete(): void {
-  emit('delete')
+  actions?.deleteTask(props.task)
   closeMenu()
 }
 
@@ -214,7 +215,7 @@ function handleToggleNotes(): void {
 }
 
 function handleToggleStatus(): void {
-  emit('toggle-status')
+  actions?.toggleTaskStatus(props.task)
 }
 </script>
 
@@ -223,6 +224,7 @@ function handleToggleStatus(): void {
     class="task-card"
     :class="statusClass"
     :draggable="task.status !== 'cancelled'"
+    :aria-busy="pending ? 'true' : undefined"
     @dragstart="handleDragStart"
   >
     <div class="task-main">
@@ -373,21 +375,43 @@ function handleToggleStatus(): void {
 }
 
 .task-card.completed {
-  opacity: 0.6;
+  /* Foreground tokens only — container-level `opacity` would blend
+   * the card's `--bg` into the page's `--surface` and drop the
+   * text contrast below AA. Spec §4. */
+}
+
+.task-card.completed .task-title,
+.task-card.completed .task-description,
+.task-card.completed .task-project-name {
+  color: var(--text-completed);
 }
 
 .task-card.completed .task-title {
   text-decoration: line-through;
-  color: var(--text-secondary);
 }
 
 .task-card.cancelled {
-  opacity: 0.4;
+  /* Same rationale as `.task-card.completed`. */
+}
+
+.task-card.cancelled .task-title,
+.task-card.cancelled .task-description,
+.task-card.cancelled .task-project-name {
+  color: var(--text-cancelled);
 }
 
 .task-card.cancelled .task-title {
   text-decoration: line-through;
-  color: var(--muted);
+}
+
+/* Spec §14: pending save state. A subtle dashed outline + a muted
+ * cursor signal "in flight" without hiding the content or fighting
+ * the cancelled/completed colour tokens. `aria-busy="true"` on the
+ * root element announces the same state to assistive tech. */
+.task-card.pending {
+  outline: 1px dashed var(--text-secondary);
+  outline-offset: -2px;
+  cursor: progress;
 }
 
 .task-main {

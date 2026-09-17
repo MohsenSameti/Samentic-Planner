@@ -119,6 +119,57 @@ describe('style.css — dark-mode token contract', () => {
       expect(body).toMatch(/color-scheme\s*:\s*light\s+dark/)
     })
   })
+
+  describe('--text-completed / --text-cancelled tokens (spec §4)', () => {
+    // Tokens that replace container-level opacity for `.task-card.completed`
+    // and `.task-card.cancelled`. The old CSS halved the card's contrast
+    // against the page background; these foreground tokens keep the
+    // visual signal while staying readable.
+    it('declares --text-completed in :root', () => {
+      const body = ruleBody(/^:root\s*/)
+      expect(body).toMatch(/--text-completed\s*:\s*[^;]+;/)
+    })
+
+    it('re-declares --text-completed in :root[data-theme="dark"]', () => {
+      const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+      expect(body).toMatch(/--text-completed\s*:\s*[^;]+;/)
+    })
+
+    it('declares --text-cancelled in :root', () => {
+      const body = ruleBody(/^:root\s*/)
+      expect(body).toMatch(/--text-cancelled\s*:\s*[^;]+;/)
+    })
+
+    it('re-declares --text-cancelled in :root[data-theme="dark"]', () => {
+      const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+      expect(body).toMatch(/--text-cancelled\s*:\s*[^;]+;/)
+    })
+
+    it('uses distinct light values for completed vs cancelled', () => {
+      const body = ruleBody(/^:root\s*/)
+      const completed = body.match(/--text-completed\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const cancelled = body.match(/--text-cancelled\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      expect(completed).not.toBe('')
+      expect(cancelled).not.toBe('')
+      expect(completed).not.toBe(cancelled)
+    })
+
+    it('uses distinct dark values for completed vs cancelled', () => {
+      const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+      const completed = body.match(/--text-completed\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const cancelled = body.match(/--text-cancelled\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      expect(completed).not.toBe('')
+      expect(cancelled).not.toBe('')
+      expect(completed).not.toBe(cancelled)
+    })
+  })
+
+  describe('--icon-muted-opacity token (spec §4)', () => {
+    it('declares --icon-muted-opacity in :root', () => {
+      const body = ruleBody(/^:root\s*/)
+      expect(body).toMatch(/--icon-muted-opacity\s*:\s*[^;]+;/)
+    })
+  })
 })
 
 /**

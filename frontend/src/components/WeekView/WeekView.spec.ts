@@ -59,6 +59,7 @@ const baseProps = {
   // treats it as a "no-trigger-yet" sentinel so the only mount-time
   // scroll comes from the `onMounted` hook.
   goToTodayTrigger: 0,
+  pendingTaskIds: new Set<string>(),
 }
 
 describe('WeekView', () => {
@@ -81,16 +82,18 @@ describe('WeekView', () => {
     expect(names).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
   })
 
-  it('labels the day names with Persian short labels when calendar is jalali', () => {
+  it('labels the day names with Persian full names when calendar is jalali (spec §26)', () => {
     const wrapper = mount(WeekView, {
       props: { ...baseProps, calendar: 'jalali' as Calendar },
     })
     const cols = wrapper.findAllComponents({ name: 'DayColumn' })
     const names = cols.map(c => c.props('dayName'))
     // 2024-01-01..2024-01-07 is Mon..Sun in getDay() order
-    // (Mon=1..Sun=0), so the Persian short labels walk through
-    // index 1, 2, 3, 4, 5, 6, 0 of JALALI_WEEKDAY_LABELS.
-    expect(names).toEqual(['2 Shan', '3 Shan', '4 Shan', '5 Shan', 'Jomeh', 'Shan', '1 Shan'])
+    // (Mon=1..Sun=0), so the full Persian labels walk through
+    // index 1, 2, 3, 4, 5, 6, 0 of JALALI_WEEKDAY_LABELS_LONG.
+    expect(names).toEqual([
+      '2 Shanbe', '3 Shanbe', '4 Shanbe', '5 Shanbe', 'Jomeh', 'Shanbe', '1 Shanbe',
+    ])
   })
 
   it('passes day numbers 1..7 to the columns', () => {
@@ -149,46 +152,62 @@ describe('WeekView', () => {
   })
 
   describe('event forwarding', () => {
-    it('forwards add-task from a DayColumn up', async () => {
+    // Spec §22: WeekView no longer declares task-level emits; actions
+    // go directly from `DayColumn` -> injected `useDayActions()` ->
+    // App.vue's handler. WeekView's role is purely to compute the
+    // props each column receives. The integration assertion lives
+    // in `useDayActions.test.ts` (action channel end-to-end); this
+    // block pins the data side instead.
+
+    it('passes the date, day name, and day num to each column', () => {
       const wrapper = mount(WeekView, { props: baseProps })
-      const col = wrapper.findComponent({ name: 'DayColumn' })
-      await col.vm.$emit('add-task', '2024-01-03')
-      expect(wrapper.emitted('add-task')).toBeTruthy()
-      expect(wrapper.emitted('add-task')?.[0]).toEqual(['2024-01-03'])
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      expect(cols[0]?.props('date')).toBe('2024-01-01')
+      expect(cols[0]?.props('dayName')).toBe('Mon')
+      expect(cols[0]?.props('dayNum')).toBe(1)
+      expect(cols[6]?.props('date')).toBe('2024-01-07')
     })
 
-    it('forwards update-day-note up', async () => {
-      const wrapper = mount(WeekView, { props: baseProps })
-      const col = wrapper.findComponent({ name: 'DayColumn' })
-      await col.vm.$emit('update-day-note', '2024-01-01', 'hi')
-      expect(wrapper.emitted('update-day-note')).toBeTruthy()
-      expect(wrapper.emitted('update-day-note')?.[0]).toEqual(['2024-01-01', 'hi'])
+    it('passes the filtered task list to the matching column', () => {
+      const tasks = [
+        taskFor('p1', '2024-01-03', 'wed-task'),
+        taskFor('p1', '2024-01-05', 'fri-task'),
+      ]
+      const wrapper = mount(WeekView, { props: { ...baseProps, tasks } })
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      const wedTitles = cols[2]?.props('tasks').map((t: Task) => t.title)
+      const friTitles = cols[4]?.props('tasks').map((t: Task) => t.title)
+      expect(wedTitles).toEqual(['Task wed-task'])
+      expect(friTitles).toEqual(['Task fri-task'])
     })
 
-    it('forwards toggle-task-status up', async () => {
-      const task = taskFor('p1', '2024-01-01', 't1')
-      const wrapper = mount(WeekView, { props: { ...baseProps, tasks: [task] } })
-      const col = wrapper.findComponent({ name: 'DayColumn' })
-      await col.vm.$emit('toggle-task-status', task)
-      expect(wrapper.emitted('toggle-task-status')).toBeTruthy()
-      expect(wrapper.emitted('toggle-task-status')?.[0]).toEqual([task])
-    })
-
-    it('forwards drop-task up with the event and date', async () => {
+    it('does NOT declare any task-level emits (spec §22 acceptance)', () => {
+      // After §22 the WeekView wrapper should have no emit bus for
+      // the actions surface. We assert this by checking that
+      // `wrapper.emitted(...)` returns nothing for every action
+      // name — the previous suite relied on each being a real emit,
+      // and removing the re-wirings (and the `defineEmits` block)
+      // means the bus is empty.
       const wrapper = mount(WeekView, { props: baseProps })
-      const col = wrapper.findComponent({ name: 'DayColumn' })
-      const fakeEvent = new Event('drop') as Event
-      await col.vm.$emit('drop-task', fakeEvent, '2024-01-05')
-      expect(wrapper.emitted('drop-task')).toBeTruthy()
-      expect(wrapper.emitted('drop-task')?.[0]?.[1]).toBe('2024-01-05')
-    })
-
-    it('forwards open-day from a DayColumn up with the date payload', async () => {
-      const wrapper = mount(WeekView, { props: baseProps })
-      const col = wrapper.findComponent({ name: 'DayColumn' })
-      await col.vm.$emit('open-day', '2024-01-04')
-      expect(wrapper.emitted('open-day')).toBeTruthy()
-      expect(wrapper.emitted('open-day')?.[0]).toEqual(['2024-01-04'])
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      // Drive every action on every column and assert the bus is
+      // empty — that's the structural guarantee that §22's wiring
+      // refactor actually happened.
+      const eventNames = [
+        'add-task', 'open-day', 'update-day-note', 'update-property-value',
+        'drop-task', 'edit-task', 'move-task', 'toggle-task-status',
+        'cancel-task', 'restore-task', 'delete-task', 'update-task-notes',
+      ] as const
+      for (const col of cols) {
+        for (const name of eventNames) {
+          // Emit directly on the child; WeekView would re-emit if
+          // it still had a listener.
+          col.vm.$emit(name)
+        }
+      }
+      for (const name of eventNames) {
+        expect(wrapper.emitted(name)).toBeFalsy()
+      }
     })
   })
 
@@ -213,14 +232,13 @@ describe('WeekView', () => {
       expect(cols[0]?.props('dayNoteValue')).toBe('')
     })
 
-    it('passes Jalali day-num and month-label when calendar is jalali', () => {
+    it('passes Jalali day-num when calendar is jalali', () => {
       const wrapper = mount(WeekView, {
         props: { ...baseProps, calendar: 'jalali' as Calendar },
       })
       const cols = wrapper.findAllComponents({ name: 'DayColumn' })
       // 2024-01-01 (Mon) is Dey 11, 1402.
       expect(cols[0]?.props('dayNumJalali')).toBe(11)
-      expect(cols[0]?.props('monthLabelJalali')).toBe('Dey')
     })
 
     it('omits Jalali fields when calendar is gregorian', () => {
@@ -228,7 +246,6 @@ describe('WeekView', () => {
       const cols = wrapper.findAllComponents({ name: 'DayColumn' })
       for (const col of cols) {
         expect(col.props('dayNumJalali')).toBeUndefined()
-        expect(col.props('monthLabelJalali')).toBeUndefined()
       }
     })
   })
@@ -507,6 +524,273 @@ describe('WeekView', () => {
       expect(triggerScrollCall).toBeGreaterThan(initialCalls)
       const [options] = scrollSpy.mock.calls.at(-1) ?? []
       expect(options).toMatchObject({ inline: 'nearest', block: 'nearest' })
+    })
+  })
+
+  /**
+   * Regression suite for spec §3 (`docs/specs/7-improve-day-column.md`):
+   * `useTodayISO` must keep the `isToday` highlight honest when the
+   * wall clock moves. The pre-fix code read `new Date()` inside
+   * `weekDays` and `isTodayInVisibleWeek`, so a tab left open across
+   * midnight kept showing yesterday's column as today. These tests
+   * pin the new behaviour: a tick past midnight moves the highlight
+   * to the new day's column, and the today-button scroll path follows
+   * the mocked clock.
+   */
+  describe('today reactivity', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2024-01-01T12:00:00Z'))
+    })
+
+    it('moves the .today highlight to the new day across midnight', async () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      expect(cols[0]?.props('isToday')).toBe(true)
+      expect(cols[1]?.props('isToday')).toBe(false)
+
+      // Roll the clock past local midnight. `useTodayISO`'s
+      // 60-second interval picks up the change and the
+      // `weekDays` computed re-runs.
+      vi.setSystemTime(new Date('2024-01-02T00:00:30Z'))
+      vi.advanceTimersByTime(60_000)
+      await nextTick()
+      await nextTick()
+
+      const updated = wrapper.findAllComponents({ name: 'DayColumn' })
+      expect(updated[0]?.props('isToday')).toBe(false)
+      expect(updated[1]?.props('isToday')).toBe(true)
+      // Every other column must NOT be marked.
+      for (let i = 2; i < 7; i++) {
+        expect(updated[i]?.props('isToday')).toBe(false)
+      }
+    })
+
+    it('follows the mocked clock when the Today button fires from a different week', async () => {
+      // Start in a week that does not contain today.
+      const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, currentWeekStart: '2025-01-06' },
+      })
+      await nextTick()
+      await nextTick()
+      expect(scrollSpy).not.toHaveBeenCalled()
+
+      // Advance to mid-week Wed 2024-01-03 (today = index 2 of the
+      // Mon-start week containing 2024-01-01). Advance the
+      // composable's 60s timer too so `useTodayISO` re-reads the
+      // mocked clock — otherwise the computed stays stale.
+      vi.setSystemTime(new Date('2024-01-03T12:00:00Z'))
+      vi.advanceTimersByTime(60_000)
+      await wrapper.setProps({
+        currentWeekStart: '2024-01-01',
+        goToTodayTrigger: 1,
+      })
+      await nextTick()
+      await nextTick()
+
+      expect(scrollSpy).toHaveBeenCalled()
+      const [options] = scrollSpy.mock.calls.at(-1) ?? []
+      expect(options).toMatchObject({ inline: 'start', block: 'nearest' })
+
+      // Sanity: the Wed column (index 2) is now `isToday`.
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      expect(cols[2]?.props('isToday')).toBe(true)
+      scrollSpy.mockRestore()
+    })
+  })
+
+  /**
+   * Spec §8: today-orientation pill. The pill is computed inside
+   * WeekView (so the calendar logic stays put) and exposed to the
+   * parent via `defineExpose`. The parent reads the computed through
+   * a template ref. We exercise the seam here so a future refactor
+   * that drops the expose (or breaks reactivity) is caught.
+   *
+   * Vue 3 auto-unwraps refs/computeds on the public instance, so
+   * `wrapper.vm.currentDayLabel` is the resolved string (or `null`),
+   * not a `Ref` object.
+   */
+  describe('currentDayLabel (spec §8)', () => {
+    it('returns null when today is not in the visible week', () => {
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, currentWeekStart: '2025-01-06' },
+      })
+      const exposed = wrapper.vm as unknown as {
+        currentDayLabel: string | null
+      }
+      expect(exposed.currentDayLabel).toBeNull()
+    })
+
+    it('returns the in-week label of the today column', () => {
+      // Today is pinned to Mon 2024-01-01 (the first day of the
+      // week). Label is weekday short + zero-padded day-of-month.
+      const wrapper = mount(WeekView, { props: baseProps })
+      const exposed = wrapper.vm as unknown as {
+        currentDayLabel: string | null
+      }
+      expect(exposed.currentDayLabel).toBe('Mon 01')
+    })
+
+    it('tracks the today column when the wall clock moves', async () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      const exposed = wrapper.vm as unknown as {
+        currentDayLabel: string | null
+      }
+      expect(exposed.currentDayLabel).toBe('Mon 01')
+
+      // Move today to Wed 2024-01-03 (mid-week).
+      vi.setSystemTime(new Date('2024-01-03T12:00:00Z'))
+      vi.advanceTimersByTime(60_000)
+      await nextTick()
+      await nextTick()
+
+      expect(exposed.currentDayLabel).toBe('Wed 03')
+    })
+  })
+
+  /**
+   * Spec §15 step 2: cards in a day column are sorted active
+   * first, then completed, then cancelled; ties broken by
+   * `createdAt` then `id` so unrelated edits don't reshuffle.
+   *
+   * Read the rendered DOM order rather than poking at the
+   * `tasksByDate` computed directly — that's how the user sees the
+   * order, and the existing event-forwarding tests rely on the
+   * `wrapper.findAll('.task-title')` ordering already.
+   */
+  describe('column ordering (spec §15 step 2)', () => {
+    const t = (id: string, status: Task['status'], createdAt: number): Task => ({
+      id,
+      projectId: 'p1',
+      title: `Task ${id}`,
+      description: '',
+      date: '2024-01-01',
+      status,
+      notes: '',
+      createdAt,
+      updatedAt: createdAt,
+    })
+
+    it('orders cards as active, completed, cancelled', () => {
+      // Created in an arbitrary order so the test would fail if
+      // creation order leaked through.
+      const tasks = [
+        t('t-cancelled-1', 'cancelled', 100),
+        t('t-completed-1', 'completed', 200),
+        t('t-active-1', 'active', 50),
+        t('t-cancelled-2', 'cancelled', 300),
+        t('t-completed-2', 'completed', 400),
+        t('t-active-2', 'active', 500),
+      ]
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, tasks },
+      })
+      const titles = wrapper.findAll('.task-title').map(n => n.text())
+      // Group order: t-active-1 (oldest active), t-active-2 (newer
+      // active), then completed (oldest first), then cancelled
+      // (oldest first). `createdAt` ascends within each status.
+      expect(titles).toEqual([
+        'Task t-active-1',
+        'Task t-active-2',
+        'Task t-completed-1',
+        'Task t-completed-2',
+        'Task t-cancelled-1',
+        'Task t-cancelled-2',
+      ])
+    })
+
+    it('keeps the active sequence stable when one task is completed', async () => {
+      // The classic regression: toggling one task to completed must
+      // move only that task down — the other actives' relative
+      // order is preserved.
+      const tasks = [
+        t('a', 'active', 100),
+        t('b', 'active', 200),
+        t('c', 'active', 300),
+      ]
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, tasks },
+      })
+      expect(wrapper.findAll('.task-title').map(n => n.text())).toEqual([
+        'Task a',
+        'Task b',
+        'Task c',
+      ])
+
+      // Toggle `b` to completed via setProps (the real flow is
+      // `updateTask`, but `setProps` exercises the same computed).
+      await wrapper.setProps({
+        tasks: [
+          t('a', 'active', 100),
+          t('b', 'completed', 200),
+          t('c', 'active', 300),
+        ],
+      })
+
+      expect(wrapper.findAll('.task-title').map(n => n.text())).toEqual([
+        'Task a',
+        'Task c',
+        'Task b',
+      ])
+    })
+
+    it('uses id as a final tiebreaker when createdAt matches', () => {
+      const tasks = [
+        t('c', 'active', 100),
+        t('a', 'active', 100),
+        t('b', 'active', 100),
+      ]
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, tasks },
+      })
+      const titles = wrapper.findAll('.task-title').map(n => n.text())
+      // id ascends alphabetically when createdAt ties.
+      expect(titles).toEqual(['Task a', 'Task b', 'Task c'])
+    })
+  })
+
+  /**
+   * Spec §18: `isPast` is derived from the §3 clock and forwarded
+   * to each `DayColumn`. Today stays loudest (no .past); days
+   * strictly before today carry the flag; days after today don't.
+   */
+  describe('isPast (spec §18)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      // Wednesday 2024-01-03 is the "today" for this block.
+      vi.setSystemTime(new Date('2024-01-03T12:00:00Z'))
+    })
+
+    it('marks only the days strictly before today as isPast', () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      const cols = wrapper.findAllComponents({ name: 'DayColumn' })
+      // baseProps starts at Mon 2024-01-01. So:
+      //   Mon 01 — past
+      //   Tue 02 — past
+      //   Wed 03 — today (not past)
+      //   Thu 04..Sun 07 — future (not past)
+      const expected = [true, true, false, false, false, false, false]
+      cols.forEach((col, i) => {
+        expect(col.props('isPast')).toBe(expected[i])
+      })
+    })
+
+    it('flips isPast across midnight', async () => {
+      const wrapper = mount(WeekView, { props: baseProps })
+      expect(
+        wrapper.findAllComponents({ name: 'DayColumn' })[2]?.props('isPast'),
+      ).toBe(false)
+
+      // Roll the clock forward to Thu 2024-01-04 (Wed → Thu flips
+      // Wed from "today" to "past").
+      vi.setSystemTime(new Date('2024-01-04T00:00:30Z'))
+      vi.advanceTimersByTime(60_000)
+      await nextTick()
+      await nextTick()
+      expect(
+        wrapper.findAllComponents({ name: 'DayColumn' })[2]?.props('isPast'),
+      ).toBe(true)
     })
   })
 })

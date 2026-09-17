@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type {
   Task,
   Project,
@@ -8,8 +8,9 @@ import type {
   DayNote,
   Calendar,
 } from '../../types'
-import { fromLocalISODate, toLocalISODate } from '../../utils/date'
-import { toJalaliYMD, JALALI_MONTH_LABELS, JALALI_WEEKDAY_LABELS } from '../../utils/jalali'
+import { fromLocalISODate, monthMarkerFor, toLocalISODate } from '../../utils/date'
+import { toJalaliYMD, JALALI_WEEKDAY_LABELS_LONG } from '../../utils/jalali'
+import { useTodayISO } from '../../composables/useTodayISO'
 import DayColumn from './DayColumn.vue'
 
 const props = defineProps<{
@@ -37,28 +38,13 @@ const props = defineProps<{
    * double-scroll on mount (the `onMounted` hook handles that).
    */
   goToTodayTrigger: number
-}>()
-
-/**
- * Day-level emits forwarded from each `DayColumn`.
- * Task-level emits are also forwarded because they're the same shape
- * the parent needs to dispatch — keeping the API symmetric with
- * `DayColumn` means the parent can pass either level's events to the
- * same handlers.
- */
-const emit = defineEmits<{
-  (e: 'add-task', date: string): void
-  (e: 'open-day', date: string): void
-  (e: 'update-day-note', date: string, note: string): void
-  (e: 'update-property-value', date: string, propertyId: string, value: number): void
-  (e: 'drop-task', event: DragEvent, date: string): void
-  (e: 'edit-task', task: Task): void
-  (e: 'move-task', task: Task): void
-  (e: 'toggle-task-status', task: Task): void
-  (e: 'cancel-task', task: Task): void
-  (e: 'restore-task', task: Task): void
-  (e: 'delete-task', task: Task): void
-  (e: 'update-task-notes', task: Task, notes: string): void
+  /**
+   * Set of task IDs whose `updateTask` save is currently in flight.
+   * Spec §14: each `DayColumn` marks its `TaskCard`s in the set
+   * with a pending state so the user gets visible feedback that
+   * the drop hasn't been silently lost on a slow network.
+   */
+  pendingTaskIds: Set<string>
 }>()
 
 /* ------------------------------------------------------------------ */
@@ -75,30 +61,50 @@ interface DayCell {
   name: string
   dayNum: number
   isToday: boolean
+  /**
+   * True when the calendar day is strictly before today (in local
+   * time). Spec §18: past days in the current week need a visual
+   * distinction so the user can orient themselves without counting
+   * back from the today ring.
+   */
+  isPast: boolean
   dayNumJalali?: number
-  monthLabelJalali?: string
 }
 
 const weekDays = computed<DayCell[]>(() => {
   const days: DayCell[] = []
   const start = fromLocalISODate(props.currentWeekStart)
-  const today = new Date().toDateString()
+  // Read `todayISO` *inside* the computed body so the reactivity
+  // system tracks the dependency and the computed re-runs on each
+  // tick. The composable ticks once a minute and on
+  // `visibilitychange`, so a tab left open across midnight re-renders
+  // with the new day's `isToday`.
+  const today = fromLocalISODate(todayISO.value)
+  const todayKey = today.toDateString()
   for (let i = 0; i < 7; i++) {
     const d = new Date(start)
     d.setDate(d.getDate() + i)
     const gregIso = toLocalISODate(d)
     const entry: DayCell = {
       date: gregIso,
+      // Spec §26: the header uses the FULL Persian weekday name
+      // (`Shanbe`, not `Shan`) — the same strings `formatDayTitle`
+      // renders. Gregorian stays `weekday: 'short'`. The short labels
+      // remain in use by `JalaliDatePicker`, whose grid columns are
+      // too narrow for the long form.
       name: props.calendar === 'jalali'
-        ? (JALALI_WEEKDAY_LABELS[d.getDay()] ?? '')
+        ? (JALALI_WEEKDAY_LABELS_LONG[d.getDay()] ?? '')
         : d.toLocaleDateString('en-US', { weekday: 'short' }),
       dayNum: d.getDate(),
-      isToday: d.toDateString() === today,
+      isToday: d.toDateString() === todayKey,
+      // Past = strictly before today (today itself stays loudest).
+      // The comparison uses local-midnight `Date`s so a day that is
+      // today in the user's timezone is never counted as past.
+      isPast: d.getTime() < today.getTime(),
     }
     if (props.calendar === 'jalali') {
       const j = toJalaliYMD(gregIso)
       entry.dayNumJalali = j.jd
-      entry.monthLabelJalali = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
     }
     days.push(entry)
   }
@@ -133,6 +139,13 @@ const filteredTasks = computed<Task[]>(() => {
  * change so each `DayColumn` reads from the map in O(1). Without the
  * memoisation each `DayColumn` invocation would re-filter all tasks,
  * turning the per-week render cost into O(days × tasks).
+ *
+ * Spec §15 step 2: each bucket is sorted by `(status bucket, createdAt,
+ * id)` so completed tasks sink below active ones, cancelled sinks to
+ * the bottom, and the secondary key (createdAt, then id) keeps the
+ * relative order stable when a single task's status toggles. Without
+ * the secondary key, toggling one task could re-shuffle every other
+ * card in the column.
  */
 const tasksByDate = computed<Map<string, Task[]>>(() => {
   const grouped = new Map<string, Task[]>()
@@ -143,6 +156,22 @@ const tasksByDate = computed<Map<string, Task[]>>(() => {
     } else {
       grouped.set(task.date, [task])
     }
+  }
+  // Sort each bucket in place. Status bucket: active < completed <
+  // cancelled. Ties broken by `createdAt` (older first) then `id` for
+  // a fully deterministic order.
+  const statusBucket = (t: Task): number => {
+    if (t.status === 'active') return 0
+    if (t.status === 'completed') return 1
+    return 2 // cancelled
+  }
+  for (const bucket of grouped.values()) {
+    bucket.sort((a, b) => {
+      const sb = statusBucket(a) - statusBucket(b)
+      if (sb !== 0) return sb
+      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    })
   }
   return grouped
 })
@@ -155,6 +184,21 @@ function tasksForDay(date: string): Task[] {
   return tasksByDate.value.get(date) ?? []
 }
 
+/**
+ * Spec §17: per-day inline month marker label. Resolved centrally
+ * (rather than per-column) so the helper's calendar arithmetic lives
+ * in `utils/date.ts` and the column just renders whatever it gets.
+ * Returns `null` when no marker applies; the column hides the badge
+ * in that case.
+ */
+const monthMarkers = computed<Map<string, string | null>>(() => {
+  return monthMarkerFor(weekDays.value, props.calendar)
+})
+
+function monthMarkerForDay(date: string): string | null {
+  return monthMarkers.value.get(date) ?? null
+}
+
 /** Resolves the day's note text (or '' when none stored). */
 function noteForDay(date: string): string {
   return props.dayNotes.find(d => d.date === date)?.note ?? ''
@@ -163,6 +207,15 @@ function noteForDay(date: string): string {
 /* ------------------------------------------------------------------ */
 /* Auto-scroll to "today" on page load                                  */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Shared reactive "today" clock. Driven by `useTodayISO` so a tab
+ * left open across midnight re-renders the highlight on the new
+ * day's column without a manual reload. Only `WeekView` reads it;
+ * `DayColumn` continues to receive `isToday` as a prop, which keeps
+ * the leaf free of any timer or listener.
+ */
+const { todayISO } = useTodayISO()
 
 /**
  * Ref to the scrollable week-grid container. Used to query for the
@@ -201,7 +254,12 @@ function isTodayInVisibleWeek(): boolean {
   // string (which is unreliable near midnight).
   const end = new Date(start)
   end.setDate(end.getDate() + 7)
-  const now = new Date()
+  // `todayISO` is local-midnight ISO; convert back to a `Date` at
+  // local midnight via `fromLocalISODate` so the `>= start && < end`
+  // comparison doesn't drift by ±1 day in non-UTC timezones. Reading
+  // `todayISO.value` (instead of capturing at module scope) keeps the
+  // dependency tracked by Vue's reactivity system.
+  const now = fromLocalISODate(todayISO.value)
   return now >= start && now < end
 }
 
@@ -263,6 +321,113 @@ onMounted(() => {
 })
 
 /**
+ * Returns the today's column label inside the visible week, or null
+ * when today isn't in the week. Spec §8: surface the current day in
+ * the toolbar so the user can re-find today's column even after
+ * scrolling it out of the viewport on mobile.
+ *
+ * The label combines the weekday short name (matching `weekDays[].name`)
+ * with the day-of-month — the same shape the column header shows —
+ * so the pill and the column header read as one anchor.
+ */
+const currentDayLabel = computed<string | null>(() => {
+  if (!isTodayInVisibleWeek()) return null
+  // The week uses `weekDays` for everything else; find today's cell
+  // by matching `isToday`. `props.calendar` matches because
+  // `weekDays` is keyed off it.
+  const today = weekDays.value.find(d => d.isToday)
+  if (!today) return null
+  // "Wed 03" — weekday short + zero-padded day-of-month so the label
+  // is the same width whether today is "3" or "31".
+  const paddedDay = String(
+    today.dayNumJalali ?? today.dayNum,
+  ).padStart(2, '0')
+  return `${today.name} ${paddedDay}`
+})
+
+/**
+ * Re-scroll whenever the parent navigates to a week containing today
+ * (e.g. when the user clicks the header's "Today" button). When the
+
+/**
+ * Scroll affordance (spec §8). Position-driven visibility for the
+ * left + right edge fades. `false` when the grid fits without
+ * overflow, so on a wide desktop the fades stay invisible. The two
+ * scroll/overflow listeners are passive so they don't fight the
+ * grid's snap container.
+ */
+const showLeftFade = ref<boolean>(false)
+const showRightFade = ref<boolean>(false)
+
+/**
+ * Recompute fade visibility from the current scroll metrics. Reads
+ * `scrollLeft` and the rendered scroll dimensions off the grid
+ * container; only touches refs, so it's safe to call from a
+ * `scroll`/`resize` listener without coalescing.
+ */
+function recomputeFades(): void {
+  const el = weekGridRef.value
+  if (!el) {
+    showLeftFade.value = false
+    showRightFade.value = false
+    return
+  }
+  // `scrollLeft` > 0 means the user has moved away from the left
+  // edge, so the left edge is no longer under the gradient — show
+  // a fade so they know they can scroll back.
+  showLeftFade.value = el.scrollLeft > 4
+  // `scrollLeft + clientWidth < scrollWidth - threshold` means there
+  // is hidden content to the right. The 4px tolerance matches the
+  // snap container's snap tolerance on iOS / Android, where a
+  // pixel-perfect scroll can leave 1-2px un-scrolled even when the
+  // snap point says "fully right".
+  showRightFade.value =
+    el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+
+let scrollListenerBound = false
+function bindScrollListeners(): void {
+  if (scrollListenerBound) return
+  scrollListenerBound = true
+  window.addEventListener('resize', recomputeFades, { passive: true })
+}
+function unbindScrollListeners(): void {
+  if (!scrollListenerBound) return
+  scrollListenerBound = false
+  window.removeEventListener('resize', recomputeFades)
+}
+
+watch(weekGridRef, (el, prev) => {
+  if (prev) prev.removeEventListener('scroll', recomputeFades)
+  if (el) {
+    el.addEventListener('scroll', recomputeFades, { passive: true })
+    // Run once after mount in case the grid is initially overflowing
+    // (e.g. on mobile) so the fades show up immediately rather than
+    // after the first user scroll.
+    nextTick().then(recomputeFades)
+  }
+})
+
+onMounted(() => {
+  bindScrollListeners()
+  recomputeFades()
+})
+
+onBeforeUnmount(() => {
+  unbindScrollListeners()
+  const el = weekGridRef.value
+  if (el) el.removeEventListener('scroll', recomputeFades)
+})
+
+/**
+ * Expose `currentDayLabel` to the parent (App.vue) so the toolbar
+ * `WeekNavigation` can render the today-orientation pill. Spec §8.
+ * No other internals are exposed — the parent's existing emit
+ * contract remains the only way to drive mutations.
+ */
+defineExpose({ currentDayLabel })
+
+/**
  * Re-scroll whenever the parent navigates to a week containing today
  * (e.g. when the user clicks the header's "Today" button). When the
  * parent navigates to a week that doesn't contain today, the
@@ -313,6 +478,26 @@ watch(
 <template>
   <div ref="weekGridRef" class="week-grid">
     <!--
+      Edge fades (spec §8). Absolutely positioned overlays with a
+      linear gradient so the column edges fade into the page
+      background; `pointer-events: none` so they never intercept
+      drag, tap, or scroll. Visibility is driven by the
+      `showLeftFade` / `showRightFade` refs computed from the grid's
+      current scroll position. The mobile negative margins on
+      `.week-grid` (see style block) extend the fade past the
+      viewport padding.
+    -->
+    <div
+      class="grid-fade grid-fade-left"
+      :class="{ visible: showLeftFade }"
+      aria-hidden="true"
+    ></div>
+    <div
+      class="grid-fade grid-fade-right"
+      :class="{ visible: showRightFade }"
+      aria-hidden="true"
+    ></div>
+    <!--
       `DayColumn` instances are keyed by date so Vue re-mounts them on
       week changes. This guarantees the internal `dayNotesExpanded`
       state, any in-flight textarea edits, etc. are reset per day.
@@ -324,25 +509,15 @@ watch(
       :day-name="day.name"
       :day-num="day.dayNum"
       :day-num-jalali="day.dayNumJalali"
-      :month-label-jalali="day.monthLabelJalali"
+      :month-marker="monthMarkerForDay(day.date)"
       :is-today="day.isToday"
+      :is-past="day.isPast"
       :tasks="tasksForDay(day.date)"
       :projects="projectsMap"
       :properties="properties"
       :property-values="propertyValues"
       :day-note-value="noteForDay(day.date)"
-      @add-task="(date) => emit('add-task', date)"
-      @open-day="(date) => emit('open-day', date)"
-      @update-day-note="(date, note) => emit('update-day-note', date, note)"
-      @update-property-value="(date, propertyId, value) => emit('update-property-value', date, propertyId, value)"
-      @drop-task="(event, date) => emit('drop-task', event, date)"
-      @edit-task="(task) => emit('edit-task', task)"
-      @move-task="(task) => emit('move-task', task)"
-      @toggle-task-status="(task) => emit('toggle-task-status', task)"
-      @cancel-task="(task) => emit('cancel-task', task)"
-      @restore-task="(task) => emit('restore-task', task)"
-      @delete-task="(task) => emit('delete-task', task)"
-      @update-task-notes="(task, notes) => emit('update-task-notes', task, notes)"
+      :pending-task-ids="pendingTaskIds"
     />
   </div>
 </template>
@@ -358,6 +533,8 @@ watch(
   -webkit-overflow-scrolling: touch;
   min-height: 300px;
   margin-top: var(--space-6);
+  /* Spec §8: position context for the absolute edge fades. */
+  position: relative;
 }
 
 @media (max-width: 768px) {
@@ -367,6 +544,56 @@ watch(
     margin-top: var(--space-6);
     padding: 0 var(--space-4) var(--space-2) var(--space-4);
     min-height: 250px;
+    /* Spec §11: a phone is part of a vertically-scrolling page;
+     * mandatory horizontal snapping forces a diagonal swipe to
+     * pick a side (it always snaps to a column boundary), so a
+     * user mid-finger on a tall column sees the grid jump sideways
+     * while they're trying to scroll the page down. `proximity`
+     * keeps day-aligned positioning when the user *intends* a
+     * horizontal flick (Today scroll-to-position still works
+     * because `scroll-snap-align: start` on each column is
+     * unchanged), but doesn't force it on every touch. */
+    scroll-snap-type: x proximity;
+  }
+}
+
+/* Edge fades (spec §8). Positioned inside the grid container so
+ * they scroll with the content; the gradient extends into the
+ * padding so on mobile the fade reaches the viewport edge even
+ * when `.week-grid` carries negative horizontal margins. */
+.grid-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1;
+}
+
+.grid-fade.visible {
+  opacity: 1;
+}
+
+.grid-fade-left {
+  left: 0;
+  background: linear-gradient(to right, var(--bg), transparent);
+}
+
+.grid-fade-right {
+  right: 0;
+  background: linear-gradient(to left, var(--bg), transparent);
+}
+
+/* On mobile the grid carries a negative margin; pull the right-edge
+ * fade past the margin so the gradient reaches the viewport edge. */
+@media (max-width: 768px) {
+  .grid-fade-right {
+    right: calc(-1 * var(--space-4));
+  }
+  .grid-fade-left {
+    left: calc(-1 * var(--space-4));
   }
 }
 </style>

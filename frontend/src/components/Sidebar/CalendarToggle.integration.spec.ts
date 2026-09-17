@@ -69,6 +69,7 @@ const Harness = defineComponent({
         // `0` is the composable's initial value; the trigger watcher
         // skips it so no scroll fires on mount.
         goToTodayTrigger: 0,
+        pendingTaskIds: new Set<string>(),
         // No-op handlers for events we don't exercise here.
         onAddTask: () => {},
         onUpdateDayNote: () => {},
@@ -95,7 +96,6 @@ describe('Calendar toggle (SettingsSection → WeekView)', () => {
     // therefore be undefined.
     for (const col of cols) {
       expect(col.props('dayNumJalali')).toBeUndefined()
-      expect(col.props('monthLabelJalali')).toBeUndefined()
     }
   })
 
@@ -111,7 +111,6 @@ describe('Calendar toggle (SettingsSection → WeekView)', () => {
     const cols = wrapper.findAllComponents({ name: 'DayColumn' })
     const firstCol = cols[0]
     expect(firstCol?.props('dayNumJalali')).toBe(11)
-    expect(firstCol?.props('monthLabelJalali')).toBe('Dey')
   })
 
   it('reverts to Gregorian when the user switches back', async () => {
@@ -127,7 +126,6 @@ describe('Calendar toggle (SettingsSection → WeekView)', () => {
     await calSelect.trigger('change')
     firstCol = wrapper.findAllComponents({ name: 'DayColumn' })[0]
     expect(firstCol?.props('dayNumJalali')).toBeUndefined()
-    expect(firstCol?.props('monthLabelJalali')).toBeUndefined()
   })
 
   it('Tasks grouped by day still land in the correct Gregorian column under Jalali mode', async () => {
@@ -161,6 +159,7 @@ describe('Calendar toggle (SettingsSection → WeekView)', () => {
             // `0` is the composable's initial value; the trigger
             // watcher skips it so no scroll fires on mount.
             goToTodayTrigger: 0,
+            pendingTaskIds: new Set<string>(),
             onAddTask: () => {},
             onUpdateDayNote: () => {},
             onUpdatePropertyValue: () => {},
