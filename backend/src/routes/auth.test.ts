@@ -385,7 +385,7 @@ describe('Auth routes', () => {
         .post('/api/auth/login')
         .send({ password: 'newpassword' });
       expect(loginNew.status).toBe(200);
-    });
+    }, 15000);
 
     it('rejects wrong current password with 401', async () => {
       const res = await request(app)

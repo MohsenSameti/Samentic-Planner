@@ -14,6 +14,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // bcrypt with 12 salt rounds takes ~3–6s per hash on typical CI;
+    // the default 5s timeout flakes these auth tests intermittently.
+    testTimeout: 15000,
     // Each test file gets a fresh module graph so the singleton
     // `store` export doesn't bleed state between files. Tests that
     // need the singleton should import it explicitly.

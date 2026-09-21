@@ -1,0 +1,19 @@
+services:
+  planner:
+    build: .
+    restart: unless-stopped
+    ports:
+      # Bound to localhost (127.0.0.1) so traffic is routed through Nginx reverse proxy
+      - "127.0.0.1:${PORT:-6798}:${PORT:-6798}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-6798}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
+      - DATABASE_URL=${DATABASE_URL:-./data/planner.db}
+    volumes:
+      # Persist SQLite database and WAL files across container recreates
+      - ./data:/app/backend/data

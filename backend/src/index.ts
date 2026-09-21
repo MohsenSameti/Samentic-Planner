@@ -1,7 +1,7 @@
-// Side-effect import: loads `.env` from the backend's CWD into
+// Side-effect import: loads `.env` from ./.env or ../.env into
 // `process.env` BEFORE any other module reads `DATABASE_URL`.
 // Must be the first import in this file.
-import 'dotenv/config';
+import './env.js';
 
 import express from 'express';
 import cors from 'cors';
@@ -12,9 +12,14 @@ import routes from './routes.js';
 import { createAuthRouter } from './routes/auth.js';
 import { store as defaultStore } from './db/store.js';
 import { requireAuth, errorHandler, notFoundHandler } from './middleware.js';
+import { getPort, shouldTrustProxy } from './env.js';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = getPort(process.env.PORT);
+
+if (shouldTrustProxy(process.env.TRUST_PROXY)) {
+  app.set('trust proxy', 1);
+}
 
 // Migrations are applied by the `DbStore` singleton's
 // constructor (see `./db/store.ts`), which `routes.js`
