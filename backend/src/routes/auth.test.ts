@@ -9,14 +9,18 @@
  * The `supertest` agent jar carries the session cookie across
  * requests so we can verify login/logout/state transitions.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import cors from 'cors';
 import expressSession from 'express-session';
 import request from 'supertest';
 import { DbStore } from '../db/store.js';
 import { SQLiteSessionStore } from '../db/session-store.js';
-import { createAuthRouter } from './auth.js';
+import {
+  createAuthRouter,
+  defaultSaltRounds,
+  type AuthRouterOptions,
+} from './auth.js';
 import { createRouter } from '../routes.js';
 import { requireAuth, errorHandler, notFoundHandler } from '../middleware.js';
 
@@ -25,7 +29,7 @@ import { requireAuth, errorHandler, notFoundHandler } from '../middleware.js';
  * (unprotected), and protected API routes — identical to the
  * production wiring in `index.ts` but against an in-memory DB.
  */
-function buildApp(): { app: express.Express; store: DbStore } {
+function buildApp(options?: AuthRouterOptions): { app: express.Express; store: DbStore } {
   const store = new DbStore({ dbPath: ':memory:' });
   const sessionStore = new SQLiteSessionStore(store.getUnderlyingClient());
 
@@ -48,7 +52,7 @@ function buildApp(): { app: express.Express; store: DbStore } {
   );
 
   // Auth routes (unprotected) — same order as production.
-  app.use('/api/auth', createAuthRouter(store));
+  app.use('/api/auth', createAuthRouter(store, options));
   // Protected API routes.
   app.use('/api', requireAuth, createRouter(store));
   // Error pipeline.
@@ -156,8 +160,21 @@ describe('Auth routes', () => {
       expect(res.status).toBe(201);
       expect(res.body).toEqual({ success: true });
 
-      // The hash should now exist in the store.
-      expect(store.getPasswordHash()).toBeTruthy();
+      // The hash should now exist in the store with 4 salt rounds in test environment.
+      expect(store.getPasswordHash()).toMatch(/^\$2b\$04\$/);
+    });
+
+    it('honors custom salt rounds passed in options', async () => {
+      const { app: customApp, store: customStore } = buildApp({ saltRounds: 6 });
+      try {
+        const res = await request(customApp)
+          .post('/api/auth/setup')
+          .send({ password: 'password123' });
+        expect(res.status).toBe(201);
+        expect(customStore.getPasswordHash()).toMatch(/^\$2b\$06\$/);
+      } finally {
+        customStore.shutdown();
+      }
     });
 
     it('auto-logs in after setup (session is authenticated)', async () => {
@@ -373,6 +390,7 @@ describe('Auth routes', () => {
         .send({ currentPassword: 'oldpassword', newPassword: 'newpassword' });
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ success: true });
+      expect(store.getPasswordHash()).toMatch(/^\$2b\$04\$/);
 
       // Old password should no longer work.
       const loginOld = await request(app)
@@ -415,6 +433,117 @@ describe('Auth routes', () => {
         // `shutdown()` is a documented no-op for DbStore; the in-memory
         // connection is GC'd when the test ends.
         freshStore.shutdown();
+      }
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bcrypt cost factor
+//
+// The value is resolved when the router is built, so these tests assert the
+// resolution rule directly (fast, no hashing) and assert the wiring separately
+// through the `$2b$NN$` prefix of a real hash in the route tests above.
+// Hashing at the production default (12) is far too slow to run in the suite.
+// ---------------------------------------------------------------------------
+
+describe('bcrypt salt rounds', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  describe('defaultSaltRounds', () => {
+    it('returns 4 when NODE_ENV is test', () => {
+      expect(defaultSaltRounds({ NODE_ENV: 'test' })).toBe(4);
+    });
+
+    it('returns 12 when NODE_ENV is production', () => {
+      expect(defaultSaltRounds({ NODE_ENV: 'production' })).toBe(12);
+    });
+
+    it('returns 12 when NODE_ENV is development', () => {
+      expect(defaultSaltRounds({ NODE_ENV: 'development' })).toBe(12);
+    });
+
+    it('returns 12 when NODE_ENV is unset', () => {
+      expect(defaultSaltRounds({})).toBe(12);
+    });
+
+    it('defaults to the live process environment', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      expect(defaultSaltRounds()).toBe(12);
+    });
+  });
+
+  describe('createAuthRouter options validation', () => {
+    let store: DbStore;
+
+    beforeEach(() => {
+      store = new DbStore({ dbPath: ':memory:' });
+    });
+
+    afterEach(() => {
+      store.shutdown();
+    });
+
+    it('accepts the boundary values 4 and 31', () => {
+      expect(() => createAuthRouter(store, { saltRounds: 4 })).not.toThrow();
+      expect(() => createAuthRouter(store, { saltRounds: 31 })).not.toThrow();
+    });
+
+    it('accepts an absent options argument', () => {
+      expect(() => createAuthRouter(store)).not.toThrow();
+    });
+
+    // bcryptjs clamps low values silently (3 becomes 4) and treats high ones
+    // as real work — `saltRounds: 32` computes 2^32 iterations and hangs the
+    // process instead of erroring. Both must be rejected up front.
+    it.each([
+      ['below the minimum', 3],
+      ['above the maximum', 32],
+      ['far above the maximum', 64],
+      ['non-integer', 4.5],
+    ])('rejects saltRounds %s (%s)', (_label, saltRounds) => {
+      expect(() => createAuthRouter(store, { saltRounds })).toThrow();
+    });
+
+    it('rejects a non-numeric saltRounds', () => {
+      // Bypasses the type system to prove the runtime check is real.
+      const bad = { saltRounds: '4' } as unknown as AuthRouterOptions;
+      expect(() => createAuthRouter(store, bad)).toThrow();
+    });
+
+    it('rejects unknown keys rather than silently ignoring them', () => {
+      const bad = { saltRound: 4 } as unknown as AuthRouterOptions;
+      expect(() => createAuthRouter(store, bad)).toThrow();
+    });
+  });
+
+  describe('createAuthRouter default wiring', () => {
+    it('hashes at 4 rounds when the process env is test', async () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      const { app: localApp, store: localStore } = buildApp();
+      try {
+        const res = await request(localApp)
+          .post('/api/auth/setup')
+          .send({ password: 'password123' });
+        expect(res.status).toBe(201);
+        expect(localStore.getPasswordHash()).toMatch(/^\$2b\$04\$/);
+      } finally {
+        localStore.shutdown();
+      }
+    });
+
+    it('accepts the lowest supported cost factor', async () => {
+      const { app: localApp, store: localStore } = buildApp({ saltRounds: 4 });
+      try {
+        const res = await request(localApp)
+          .post('/api/auth/setup')
+          .send({ password: 'password123' });
+        expect(res.status).toBe(201);
+        expect(localStore.getPasswordHash()).toMatch(/^\$2b\$04\$/);
+      } finally {
+        localStore.shutdown();
       }
     });
   });

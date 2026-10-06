@@ -8,6 +8,7 @@
  */
 import { Router, type Router as ExpressRouter } from 'express';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import type { DbStore } from '../db/store.js';
 import {
   LoginSchema,
@@ -15,13 +16,70 @@ import {
   ChangePasswordSchema,
 } from '../validation.js';
 
-const BCRYPT_SALT_ROUNDS = 12;
+/**
+ * Bcrypt cost factor used in tests. Kept low so the suite stays fast —
+ * a 4-round hash is ~256x cheaper than the production default.
+ * Test-only: this is not a security posture for real passwords.
+ */
+export const TEST_BCRYPT_SALT_ROUNDS = 4;
+
+/** Bcrypt cost factor used everywhere except tests. */
+export const PROD_BCRYPT_SALT_ROUNDS = 12;
+
+/**
+ * Bounds accepted for an explicit `saltRounds`. bcryptjs clamps values below 4
+ * silently (so a `3` would quietly weaken a hash), and happily accepts values
+ * above 31 — `32` means 2^32 iterations, which hangs the process instead of
+ * erroring. Validating here turns both mistakes into an immediate throw.
+ */
+export const BCRYPT_SALT_ROUNDS_MIN = 4;
+export const BCRYPT_SALT_ROUNDS_MAX = 31;
+
+export const AuthRouterOptionsSchema = z
+  .object({
+    saltRounds: z
+      .number()
+      .int()
+      .min(BCRYPT_SALT_ROUNDS_MIN)
+      .max(BCRYPT_SALT_ROUNDS_MAX)
+      .optional(),
+  })
+  // Strict so a misspelled key (`saltRound`) is an error rather than a
+  // silently dropped option that falls back to the default cost factor.
+  .strict();
+
+export type AuthRouterOptions = z.infer<typeof AuthRouterOptionsSchema>;
+
+/**
+ * Resolve the bcrypt cost factor for the given environment.
+ *
+ * Takes the environment as an argument rather than reading `process.env` at
+ * module load: import order (e.g. whether `dotenv/config` has run yet) would
+ * otherwise silently decide the value, and tests could not exercise the
+ * production branch.
+ */
+export function defaultSaltRounds(
+  env: NodeJS.ProcessEnv = process.env
+): number {
+  return env.NODE_ENV === 'test'
+    ? TEST_BCRYPT_SALT_ROUNDS
+    : PROD_BCRYPT_SALT_ROUNDS;
+}
 
 /**
  * Build an Express router for auth endpoints backed by the given store.
  * Same factory pattern as `routes.ts` so tests can use an in-memory DB.
+ *
+ * Throws (at construction, before any request is served) if `options` carries
+ * an invalid `saltRounds` — see `AuthRouterOptionsSchema`.
  */
-export function createAuthRouter(store: DbStore): ExpressRouter {
+export function createAuthRouter(
+  store: DbStore,
+  options?: AuthRouterOptions
+): ExpressRouter {
+  const { saltRounds = defaultSaltRounds() } = AuthRouterOptionsSchema.parse(
+    options ?? {}
+  );
   const router: ExpressRouter = Router();
 
   // --- GET /auth/status --------------------------------------------------
@@ -64,7 +122,7 @@ export function createAuthRouter(store: DbStore): ExpressRouter {
         return;
       }
 
-      const hash = bcrypt.hashSync(password, BCRYPT_SALT_ROUNDS);
+      const hash = bcrypt.hashSync(password, saltRounds);
       store.setPasswordHash(hash);
 
       // Regenerate the session to prevent session fixation, then
@@ -155,7 +213,7 @@ export function createAuthRouter(store: DbStore): ExpressRouter {
         return;
       }
 
-      const newHash = bcrypt.hashSync(newPassword, BCRYPT_SALT_ROUNDS);
+      const newHash = bcrypt.hashSync(newPassword, saltRounds);
       store.setPasswordHash(newHash);
 
       res.json({ success: true });

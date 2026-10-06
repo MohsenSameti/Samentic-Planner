@@ -26,6 +26,16 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// ── Startup guards ─────────────────────────────────────────────────
+// The server must never run with `NODE_ENV=test`: that would silently drop
+// the bcrypt cost factor to 4 (see `routes/auth.ts`) and serve weak hashes.
+// Tests build their app inline and never import this file.
+if (process.env.NODE_ENV === 'test') {
+  throw new Error(
+    'Refusing to start the server with NODE_ENV=test; use NODE_ENV=development or production'
+  );
+}
+
 // ── Session middleware ──────────────────────────────────────────────
 // Uses the custom SQLite-backed session store. The session cookie is
 // signed with the `SESSION_SECRET` env var (throws in production
