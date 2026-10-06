@@ -39,6 +39,8 @@ function makeSpyBag(): DayActionsSpies {
     restoreTask: vi.fn(),
     deleteTask: vi.fn(),
     updateTaskNotes: vi.fn(),
+    skipTask: vi.fn(),
+    unskipTask: vi.fn(),
   }
 }
 

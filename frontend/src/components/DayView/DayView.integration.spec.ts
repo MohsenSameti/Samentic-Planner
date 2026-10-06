@@ -117,6 +117,7 @@ const Harness = defineComponent({
             summary: {
               active: 1,
               completed: 0,
+              skipped: 0,
               cancelled: 0,
               propertyValues: [],
             },

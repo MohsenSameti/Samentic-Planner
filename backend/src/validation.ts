@@ -33,7 +33,7 @@ export const TaskSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string(),
   date: z.string().regex(ISO_DATE, 'Must be ISO date (YYYY-MM-DD)'),
-  status: z.enum(['active', 'completed', 'cancelled']),
+  status: z.enum(['active', 'completed', 'skipped', 'cancelled']),
   notes: z.string(),
   createdAt: z.number().int().positive(),
   updatedAt: z.number().int().positive(),

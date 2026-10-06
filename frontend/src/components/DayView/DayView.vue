@@ -8,6 +8,7 @@ import type {
   Task,
 } from '../../types'
 import TaskCard from '../WeekView/TaskCard.vue'
+import { compareTasksByStatus } from '../../utils/taskSort'
 import DayNotes from '../Notes/DayNotes.vue'
 import DatePickerPopover from '../common/DatePickerPopover.vue'
 
@@ -31,6 +32,7 @@ interface SummaryPropertyValue {
 interface Summary {
   active: number
   completed: number
+  skipped: number
   cancelled: number
   propertyValues: SummaryPropertyValue[]
 }
@@ -115,7 +117,9 @@ const tasksForDay = computed<Task[]>(() => {
     if (props.selectedProject !== 'all' && t.projectId !== props.selectedProject) continue
     filtered.push(t)
   }
-  return filtered
+  // Apply the canonical status-bucket order so the focused day
+  // matches the per-day column in `WeekView`. See utils/taskSort.ts.
+  return filtered.sort(compareTasksByStatus)
 })
 
 /** Resolves the current value of this day's property (or 0 when unset). */
@@ -299,6 +303,8 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
         <span class="day-view-summary-count">{{ summary.active }} active</span>
         <span class="day-view-summary-sep" aria-hidden="true">·</span>
         <span class="day-view-summary-count">{{ summary.completed }} done</span>
+        <span class="day-view-summary-sep" aria-hidden="true">·</span>
+        <span class="day-view-summary-count">{{ summary.skipped }} skipped</span>
         <span class="day-view-summary-sep" aria-hidden="true">·</span>
         <span class="day-view-summary-count">{{ summary.cancelled }} cancelled</span>
       </span>

@@ -104,8 +104,8 @@ describe('Task schemas', () => {
       ).toThrow()
     })
 
-    it('accepts all three valid statuses', () => {
-      for (const status of ['active', 'completed', 'cancelled']) {
+    it('accepts all four valid statuses', () => {
+      for (const status of ['active', 'completed', 'skipped', 'cancelled']) {
         expect(() =>
           CreateTaskSchema.parse({
             projectId: 'p1',
@@ -117,6 +117,13 @@ describe('Task schemas', () => {
           })
         ).not.toThrow()
       }
+    })
+
+    it('accepts "skipped" as a status on UpdateTaskSchema', () => {
+      // Mirrors the create-path coverage so a partial update can
+      // move a task into the skipped state without round-tripping
+      // through the full task body.
+      expect(() => UpdateTaskSchema.parse({ status: 'skipped' })).not.toThrow()
     })
 
     it('rejects a title longer than 500 characters', () => {

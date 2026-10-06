@@ -120,11 +120,11 @@ describe('style.css — dark-mode token contract', () => {
     })
   })
 
-  describe('--text-completed / --text-cancelled tokens (spec §4)', () => {
-    // Tokens that replace container-level opacity for `.task-card.completed`
-    // and `.task-card.cancelled`. The old CSS halved the card's contrast
-    // against the page background; these foreground tokens keep the
-    // visual signal while staying readable.
+  describe('--text-completed / --text-cancelled / --text-skipped tokens (spec §4, §9)', () => {
+    // Tokens that replace container-level opacity for `.task-card.completed`,
+    // `.task-card.cancelled`, and `.task-card.skipped`. The old CSS halved the card's
+    // contrast against the page background; these foreground tokens keep the
+    // visual signal while staying readable and distinguishable from each other.
     it('declares --text-completed in :root', () => {
       const body = ruleBody(/^:root\s*/)
       expect(body).toMatch(/--text-completed\s*:\s*[^;]+;/)
@@ -145,22 +145,40 @@ describe('style.css — dark-mode token contract', () => {
       expect(body).toMatch(/--text-cancelled\s*:\s*[^;]+;/)
     })
 
-    it('uses distinct light values for completed vs cancelled', () => {
+    it('declares --text-skipped in :root', () => {
+      const body = ruleBody(/^:root\s*/)
+      expect(body).toMatch(/--text-skipped\s*:\s*[^;]+;/)
+    })
+
+    it('re-declares --text-skipped in :root[data-theme="dark"]', () => {
+      const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+      expect(body).toMatch(/--text-skipped\s*:\s*[^;]+;/)
+    })
+
+    it('uses distinct light values for completed, cancelled, and skipped', () => {
       const body = ruleBody(/^:root\s*/)
       const completed = body.match(/--text-completed\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
       const cancelled = body.match(/--text-cancelled\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const skipped = body.match(/--text-skipped\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
       expect(completed).not.toBe('')
       expect(cancelled).not.toBe('')
+      expect(skipped).not.toBe('')
       expect(completed).not.toBe(cancelled)
+      expect(skipped).not.toBe(completed)
+      expect(skipped).not.toBe(cancelled)
     })
 
-    it('uses distinct dark values for completed vs cancelled', () => {
+    it('uses distinct dark values for completed, cancelled, and skipped', () => {
       const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
       const completed = body.match(/--text-completed\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
       const cancelled = body.match(/--text-cancelled\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const skipped = body.match(/--text-skipped\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
       expect(completed).not.toBe('')
       expect(cancelled).not.toBe('')
+      expect(skipped).not.toBe('')
       expect(completed).not.toBe(cancelled)
+      expect(skipped).not.toBe(completed)
+      expect(skipped).not.toBe(cancelled)
     })
   })
 

@@ -41,6 +41,7 @@ import { resolve } from 'node:path'
 const HARD_FORBIDDEN_SELECTORS: ReadonlyArray<string> = [
   '.task-card.completed',
   '.task-card.cancelled',
+  '.task-card.skipped',
 ]
 const RAW_LITERAL_FORBIDDEN_SELECTORS: ReadonlyArray<string> = [
   '.empty-state svg',

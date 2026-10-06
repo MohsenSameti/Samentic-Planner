@@ -111,6 +111,49 @@ describe('useTasks', () => {
     expect(api.updateTask).toHaveBeenLastCalledWith('t1', { status: 'active' })
   })
 
+  it('toggleTaskStatus overrides skipped -> completed (one-click)', async () => {
+    // Skip and complete are mutually exclusive: clicking the checkbox
+    // on a skipped task completes it directly, no need to unskip
+    // first. See spec acceptance criteria for state transitions.
+    vi.mocked(api.updateTask).mockResolvedValue(mockTask({ id: 't1', status: 'completed' }))
+    const { toggleTaskStatus } = useTasks()
+    await toggleTaskStatus(mockTask({ id: 't1', status: 'skipped' }))
+    expect(api.updateTask).toHaveBeenCalledWith('t1', { status: 'completed' })
+  })
+
+  it('toggleTaskStatus on a cancelled task restores it to active', async () => {
+    // Regression: clicking the checkbox on a cancelled task has
+    // historically un-cancelled it (set to active). The kebab
+    // `Restore` is the documented affordance, but the checkbox click
+    // should keep working as a fallback. Don't route cancelled
+    // straight to completed (which would skip the active state).
+    vi.mocked(api.updateTask).mockResolvedValue(mockTask({ id: 't1', status: 'active' }))
+    const { toggleTaskStatus } = useTasks()
+    await toggleTaskStatus(mockTask({ id: 't1', status: 'cancelled' }))
+    expect(api.updateTask).toHaveBeenCalledWith('t1', { status: 'active' })
+  })
+
+  it('skipTask sets status to skipped', async () => {
+    vi.mocked(api.updateTask).mockResolvedValue(mockTask({ id: 't1', status: 'skipped' }))
+    const { skipTask } = useTasks()
+    await skipTask(mockTask({ id: 't1', status: 'active' }))
+    expect(api.updateTask).toHaveBeenCalledWith('t1', { status: 'skipped' })
+  })
+
+  it('skipTask sets status to skipped on a completed task (one-click override)', async () => {
+    vi.mocked(api.updateTask).mockResolvedValue(mockTask({ id: 't1', status: 'skipped' }))
+    const { skipTask } = useTasks()
+    await skipTask(mockTask({ id: 't1', status: 'completed' }))
+    expect(api.updateTask).toHaveBeenCalledWith('t1', { status: 'skipped' })
+  })
+
+  it('unskipTask sets status back to active', async () => {
+    vi.mocked(api.updateTask).mockResolvedValue(mockTask({ id: 't1', status: 'active' }))
+    const { unskipTask } = useTasks()
+    await unskipTask(mockTask({ id: 't1', status: 'skipped' }))
+    expect(api.updateTask).toHaveBeenCalledWith('t1', { status: 'active' })
+  })
+
   it('cancelTask sets status to cancelled', async () => {
     vi.mocked(api.updateTask).mockResolvedValue(mockTask({ id: 't1', status: 'cancelled' }))
     const { cancelTask } = useTasks()

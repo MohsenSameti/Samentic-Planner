@@ -51,9 +51,45 @@ watch(
 
 const statusClass = computed(() => ({
   completed: props.task.status === 'completed',
+  skipped: props.task.status === 'skipped',
   cancelled: props.task.status === 'cancelled',
   pending: Boolean(props.pending),
 }))
+
+/**
+ * Three-way visual state for the checkbox:
+ * - `checked` when the task is `completed` (a filled checkmark).
+ * - `indeterminate` when the task is `skipped` (a dash — neither
+ *   active nor completed). `aria-checked="mixed"` announces the same.
+ * - off (empty box) for everything else.
+ */
+const checkboxState = computed<'checked' | 'indeterminate' | 'empty'>(() => {
+  if (props.task.status === 'completed') return 'checked'
+  if (props.task.status === 'skipped') return 'indeterminate'
+  return 'empty'
+})
+
+const ariaChecked = computed<'true' | 'mixed' | 'false'>(() => {
+  if (props.task.status === 'completed') return 'true'
+  if (props.task.status === 'skipped') return 'mixed'
+  return 'false'
+})
+
+/** Label for the Skip / Unskip menu item. Toggles by status. */
+const skipLabel = computed<string>(() =>
+  props.task.status === 'skipped' ? 'Unskip' : 'Skip',
+)
+
+/**
+ * Spec §Out of scope (cross-state transitions):
+ * `skipped → cancelled` and `cancelled → skipped` require going through
+ * `active` first (two clicks). Cancelled is treated as a terminal state;
+ * no single misclick should let a user accidentally hide a task they
+ * only meant to defer. Therefore, Cancel is hidden for skipped tasks.
+ */
+const canCancel = computed<boolean>(
+  () => props.task.status === 'active' || props.task.status === 'completed',
+)
 
 /* ------------------------------------------------------------------ */
 /* Drag start                                                           */
@@ -195,12 +231,25 @@ function handleMove(): void {
 }
 
 function handleCancel(): void {
+  if (!canCancel.value) return
   actions?.cancelTask(props.task)
   closeMenu()
 }
 
 function handleRestore(): void {
   actions?.restoreTask(props.task)
+  closeMenu()
+}
+
+function handleSkip(): void {
+  // Cancelled tasks cannot be skipped directly (acceptance criterion).
+  // The outer template already hides this item for cancelled tasks.
+  if (props.task.status === 'cancelled') return
+  if (props.task.status === 'skipped') {
+    actions?.unskipTask(props.task)
+  } else {
+    actions?.skipTask(props.task)
+  }
   closeMenu()
 }
 
@@ -230,15 +279,16 @@ function handleToggleStatus(): void {
     <div class="task-main">
       <div
         class="task-checkbox"
-        :class="{ checked: task.status === 'completed' }"
+        :class="{ checked: checkboxState === 'checked', indeterminate: checkboxState === 'indeterminate' }"
         role="checkbox"
-        :aria-checked="task.status === 'completed'"
+        :aria-checked="ariaChecked"
         tabindex="0"
         @click="handleToggleStatus"
         @keydown.enter.prevent="handleToggleStatus"
         @keydown.space.prevent="handleToggleStatus"
       >
         <svg
+          v-if="checkboxState === 'checked'"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
           fill="none"
@@ -249,6 +299,19 @@ function handleToggleStatus(): void {
           aria-hidden="true"
         >
           <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <svg
+          v-else-if="checkboxState === 'indeterminate'"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="6" y1="12" x2="18" y2="12" />
         </svg>
       </div>
       <div class="task-content">
@@ -318,7 +381,23 @@ function handleToggleStatus(): void {
                 </svg>
                 Move to...
               </div>
-              <div class="task-menu-item danger" role="menuitem" @click="handleCancel">
+              <div
+                class="task-menu-item"
+                role="menuitem"
+                @click="handleSkip"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="5 4 15 12 5 20 5 4" />
+                  <line x1="19" y1="5" x2="19" y2="19" />
+                </svg>
+                {{ skipLabel }}
+              </div>
+              <div
+                v-if="canCancel"
+                class="task-menu-item danger"
+                role="menuitem"
+                @click="handleCancel"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="15" y1="9" x2="9" y2="15" />
@@ -404,6 +483,19 @@ function handleToggleStatus(): void {
   text-decoration: line-through;
 }
 
+/* Skipped — visible but de-emphasized. Same accessibility pattern
+ * as `.completed` / `.cancelled`: foreground token + strike-through,
+ * no container opacity (which used to drop text contrast below AA
+ * for the completed / cancelled cases). The card stays full-opacity;
+ * the visual signal is the muted foreground colour + line-through
+ * on title, description, and project name (spec §9). */
+.task-card.skipped .task-title,
+.task-card.skipped .task-description,
+.task-card.skipped .task-project-name {
+  color: var(--text-skipped);
+  text-decoration: line-through;
+}
+
 /* Spec §14: pending save state. A subtle dashed outline + a muted
  * cursor signal "in flight" without hiding the content or fighting
  * the cancelled/completed colour tokens. `aria-busy="true"` on the
@@ -448,6 +540,16 @@ function handleToggleStatus(): void {
   border-color: var(--success);
 }
 
+/* Indeterminate (skipped) — filled background like `.checked`, but
+ * renders a horizontal dash instead of a checkmark. The visual
+ * rhymes with `.checked` so users learn the binary "filled vs empty"
+ * affordance, while `aria-checked="mixed"` distinguishes the meaning
+ * for assistive tech. */
+.task-checkbox.indeterminate {
+  background: var(--text-skipped);
+  border-color: var(--text-skipped);
+}
+
 .task-checkbox svg {
   width: 12px;
   height: 12px;
@@ -455,7 +557,8 @@ function handleToggleStatus(): void {
   opacity: 0;
 }
 
-.task-checkbox.checked svg {
+.task-checkbox.checked svg,
+.task-checkbox.indeterminate svg {
   opacity: 1;
 }
 

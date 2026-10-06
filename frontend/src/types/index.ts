@@ -12,7 +12,7 @@ export interface Task {
   title: string
   description: string
   date: string
-  status: 'active' | 'completed' | 'cancelled'
+  status: 'active' | 'completed' | 'skipped' | 'cancelled'
   notes: string
   createdAt: number
   updatedAt: number

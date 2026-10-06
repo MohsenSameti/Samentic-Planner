@@ -92,7 +92,7 @@ planner/
   projectId: string
   title: string
   date: string (YYYY-MM-DD)
-  status: 'active' | 'completed' | 'cancelled'
+  status: 'active' | 'completed' | 'skipped' | 'cancelled'
   notes: string
   createdAt: number
   updatedAt: number
@@ -115,6 +115,7 @@ planner/
 ### Tasks (Daily)
 - Add tasks to any day
 - Complete tasks with checkbox
+- Skip tasks (defer for today, still visible)
 - Cancel tasks (soft delete)
 - Restore cancelled tasks
 - Delete tasks permanently

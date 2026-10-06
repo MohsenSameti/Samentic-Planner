@@ -39,7 +39,7 @@ const taskFor = (
   projectId: string,
   date: string,
   id: string,
-  status: 'active' | 'completed' | 'cancelled' = 'active',
+  status: Task['status'] = 'active',
 ): Task => ({
   id,
   projectId,
@@ -55,6 +55,7 @@ const taskFor = (
 interface SummaryFixture {
   active: number
   completed: number
+  skipped: number
   cancelled: number
   propertyValues: Array<{ id: string; name: string; unit: string; value: number }>
 }
@@ -73,6 +74,7 @@ const baseProps = {
   summary: {
     active: 0,
     completed: 0,
+    skipped: 0,
     cancelled: 0,
     propertyValues: [],
   } as SummaryFixture,
@@ -129,13 +131,14 @@ describe('DayView', () => {
   })
 
   describe('summary line', () => {
-    it('renders the active/done/cancelled counts', () => {
+    it('renders the active/done/skipped/cancelled counts', () => {
       const wrapper = mount(DayView, {
         props: {
           ...baseProps,
           summary: {
             active: 2,
             completed: 1,
+            skipped: 3,
             cancelled: 0,
             propertyValues: [],
           } as SummaryFixture,
@@ -147,6 +150,8 @@ describe('DayView', () => {
       expect(summary.text()).toContain('active')
       expect(summary.text()).toContain('1')
       expect(summary.text()).toContain('done')
+      expect(summary.text()).toContain('3')
+      expect(summary.text()).toContain('skipped')
     })
 
     it('renders one badge per property with the day\'s value', () => {
@@ -156,6 +161,7 @@ describe('DayView', () => {
           summary: {
             active: 0,
             completed: 0,
+            skipped: 0,
             cancelled: 0,
             propertyValues: [
               { id: 'pr1', name: 'Hours', unit: 'h', value: 2.5 },
@@ -171,11 +177,12 @@ describe('DayView', () => {
       expect(summary.text()).toContain('30')
     })
 
-    it('renders 0/0/0 counts when the day has no tasks', () => {
+    it('renders 0/0/0/0 counts when the day has no tasks', () => {
       const wrapper = mount(DayView, { props: baseProps })
       const summary = wrapper.find('.day-view-summary')
       expect(summary.text()).toContain('0 active')
       expect(summary.text()).toContain('0 done')
+      expect(summary.text()).toContain('0 skipped')
       expect(summary.text()).toContain('0 cancelled')
     })
   })
@@ -253,6 +260,34 @@ describe('DayView', () => {
       expect(wrapper.findAll('.task-title')).toHaveLength(2)
       await wrapper.setProps({ selectedProject: 'no-such-project' })
       expect(wrapper.findAll('.task-title')).toHaveLength(0)
+    })
+
+    it('orders tasks as active, completed, skipped, cancelled', () => {
+      // Mirrors WeekView's `statusBucket` so both views show the
+      // same day in the same order. Skipped sits between completed
+      // and cancelled — visible but de-emphasized at the bottom.
+      const tasks = [
+        taskFor('p1', '2024-01-15', 't-cancelled-1', 'cancelled'),
+        taskFor('p1', '2024-01-15', 't-skipped-1', 'skipped'),
+        taskFor('p1', '2024-01-15', 't-completed-1', 'completed'),
+        taskFor('p1', '2024-01-15', 't-active-1', 'active'),
+        taskFor('p1', '2024-01-15', 't-skipped-2', 'skipped'),
+        taskFor('p1', '2024-01-15', 't-cancelled-2', 'cancelled'),
+        taskFor('p1', '2024-01-15', 't-completed-2', 'completed'),
+        taskFor('p1', '2024-01-15', 't-active-2', 'active'),
+      ]
+      const wrapper = mount(DayView, { props: { ...baseProps, tasks } })
+      const titles = wrapper.findAll('.task-title').map(n => n.text())
+      expect(titles).toEqual([
+        'Task t-active-1',
+        'Task t-active-2',
+        'Task t-completed-1',
+        'Task t-completed-2',
+        'Task t-skipped-1',
+        'Task t-skipped-2',
+        'Task t-cancelled-1',
+        'Task t-cancelled-2',
+      ])
     })
   })
 
