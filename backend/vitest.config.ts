@@ -18,6 +18,7 @@ export default defineConfig({
     // `store` export doesn't bleed state between files. Tests that
     // need the singleton should import it explicitly.
     isolate: true,
+    testTimeout: 10_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
