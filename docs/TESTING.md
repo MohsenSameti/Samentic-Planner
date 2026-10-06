@@ -1,7 +1,7 @@
 # Testing
 
 pnpm workspace, two Vitest 4 suites: `backend`, `frontend`.
-496 tests / 31 files (backend 141/5, frontend 355/26). Work test-first.
+964 tests / 47 files (backend 159/5, frontend 805/42). Work test-first.
 
 ## Commands (repo root)
 
@@ -29,7 +29,8 @@ Globs: backend `src/**/*.test.ts`, frontend `src/**/*.{test,spec}.ts`.
 
 ## Backend (`backend/vitest.config.ts`)
 
-- `environment: 'node'`, `isolate: true` (avoids singleton `store` bleed)
+- `environment: 'node'`, `isolate: true` (avoids singleton `store` bleed),
+  `testTimeout: 10_000` (a ceiling for slow hardware, not a target)
 - Fresh DB per test: `new DbStore({ dbPath: ':memory:' })` (runs
   migrations + seed); `store.shutdown()` in `afterEach`
 - HTTP: build a real Express app (cors, json, `createRouter(store)`,
@@ -38,6 +39,10 @@ Globs: backend `src/**/*.test.ts`, frontend `src/**/*.{test,spec}.ts`.
 - Auth (`src/routes/auth.test.ts`): adds `express-session` +
   `SQLiteSessionStore`; use a `supertest` **agent** so the session
   cookie persists across requests.
+- Bcrypt cost is 4 under tests (`defaultSaltRounds` in `src/routes/auth.ts`),
+  12 otherwise. Don't assert on a real 12-round hash in a test — it takes
+  seconds. Test the resolution rule directly, and assert wiring through the
+  `$2b$NN$` prefix of a hash made at a low cost.
 - Use/extend the typed fixture builders (`makeProject`, `makeTask`).
 
 ## Frontend (`frontend/vitest.config.ts`)
