@@ -65,6 +65,10 @@ export interface DayActions {
   cancelTask: (task: Task) => void
   /** Restore a cancelled task back to active. */
   restoreTask: (task: Task) => void
+  /** Mark a task as skipped (deferred for today, still visible). */
+  skipTask: (task: Task) => void
+  /** Move a skipped task back to active. */
+  unskipTask: (task: Task) => void
   /** Permanently delete a task (after confirmation). */
   deleteTask: (task: Task) => void
   /** Save the in-card notes textarea value. */

@@ -108,6 +108,30 @@ describe('TaskCard', () => {
       expect(wrapper.find('.task-checkbox').classes()).toContain('checked')
       expect(wrapper.find('.task-checkbox').attributes('aria-checked')).toBe('true')
     })
+
+    it('applies the .skipped class to a skipped task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-card').classes()).toContain('skipped')
+    })
+
+    it('marks the checkbox as mixed when status is skipped', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').classes()).toContain('indeterminate')
+      expect(wrapper.find('.task-checkbox').attributes('aria-checked')).toBe('mixed')
+    })
+
+    it('does not mark the checkbox as checked when status is skipped', () => {
+      // Skipped and completed are mutually-exclusive visual states; a
+      // skipped card must not carry the `.checked` class.
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').classes()).not.toContain('checked')
+    })
   })
 
   /**
@@ -158,7 +182,7 @@ describe('TaskCard', () => {
       expect(wrapper.find('.task-title').exists()).toBe(true)
     })
 
-    it('reads the resolved --text-completed / --text-cancelled tokens from style.css', () => {
+    it('reads the resolved --text-completed / --text-cancelled / --text-skipped tokens from style.css', () => {
       // Sanity check that the tokens declared in `style.css` are the
       // same ones referenced by the TaskCard — catches accidental
       // divergence between the two layers.
@@ -168,14 +192,26 @@ describe('TaskCard', () => {
       )
       expect(css).toMatch(/--text-completed\s*:\s*#[0-9A-Fa-f]+/)
       expect(css).toMatch(/--text-cancelled\s*:\s*#[0-9A-Fa-f]+/)
+      expect(css).toMatch(/--text-skipped\s*:\s*#[0-9A-Fa-f]+/)
       // The token references in TaskCard must use `var(--text-completed)`
-      // / `var(--text-cancelled)`, not a hex literal of their own.
+      // / `var(--text-cancelled)` / `var(--text-skipped)`, not a hex literal of their own.
       const taskCardCss = readFileSync(
         resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
         'utf8',
       )
       expect(taskCardCss).toMatch(/var\(--text-completed\)/)
       expect(taskCardCss).toMatch(/var\(--text-cancelled\)/)
+      expect(taskCardCss).toMatch(/var\(--text-skipped\)/)
+    })
+
+    it('applies strike-through to title, description, and project name in TaskCard.vue for skipped tasks (spec §9)', () => {
+      const taskCardCss = readFileSync(
+        resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
+        'utf8',
+      )
+      expect(taskCardCss).toMatch(
+        /\.task-card\.skipped\s+\.task-title,\s*\n\.task-card\.skipped\s+\.task-description,\s*\n\.task-card\.skipped\s+\.task-project-name\s*\{[^}]*text-decoration:\s*line-through;/,
+      )
     })
   })
 
@@ -218,6 +254,16 @@ describe('TaskCard', () => {
         props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
       })
       expect(wrapper.find('.task-card').attributes('draggable')).toBe('false')
+    })
+
+    it('is draggable when the task is skipped (deferred, not terminal)', () => {
+      // Skipping is a temporary deferral; the user may still want to
+      // drag the task to another day or reorder within the column.
+      // Only `cancelled` is the drag-disabled state.
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-card').attributes('draggable')).toBe('true')
     })
   })
 
@@ -319,6 +365,32 @@ describe('TaskCard', () => {
       wrapper.unmount()
     })
 
+    it('orders active-menu items as Edit, Notes, Move, Skip, Cancel', async () => {
+      // Locks in the per-item order so a future refactor can't
+      // accidentally bury Skip/Unskip at the bottom or move Cancel
+      // away from the destructive position.
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const labels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => (i.textContent || '').trim())
+      // Find the index of each expected label and assert ordering.
+      const editIdx = labels.findIndex(l => l === 'Edit')
+      const notesIdx = labels.findIndex(l => l === 'Add Notes' || l === 'Hide Notes')
+      const moveIdx = labels.findIndex(l => l === 'Move to...')
+      const skipIdx = labels.findIndex(l => l === 'Skip')
+      const cancelIdx = labels.findIndex(l => l === 'Cancel')
+      expect(editIdx).toBeGreaterThanOrEqual(0)
+      expect(notesIdx).toBeGreaterThan(editIdx)
+      expect(moveIdx).toBeGreaterThan(notesIdx)
+      expect(skipIdx).toBeGreaterThan(moveIdx)
+      expect(cancelIdx).toBeGreaterThan(skipIdx)
+      wrapper.unmount()
+    })
+
     it('shows restore / delete items when the task is cancelled', async () => {
       const wrapper = mount(TaskCard, {
         props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
@@ -331,6 +403,207 @@ describe('TaskCard', () => {
       expect(labels.some(l => l.includes('Delete'))).toBe(true)
       // Active-only items should not appear.
       expect(labels.some(l => l.includes('Move'))).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('shows a Skip item when the task is active', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const labels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => i.textContent || '')
+      expect(labels.some(l => l.trim() === 'Skip')).toBe(true)
+      expect(labels.some(l => l.trim() === 'Unskip')).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('shows a Skip item when the task is completed (one-click override)', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'completed' }, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const labels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => i.textContent || '')
+      expect(labels.some(l => l.trim() === 'Skip')).toBe(true)
+      expect(labels.some(l => l.trim() === 'Unskip')).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('shows an Unskip item when the task is skipped', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const labels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => i.textContent || '')
+      expect(labels.some(l => l.trim() === 'Unskip')).toBe(true)
+      expect(labels.some(l => l.trim() === 'Skip')).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('hides Skip / Unskip when the task is cancelled (must restore first)', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'cancelled' }, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const labels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => i.textContent || '')
+      expect(labels.some(l => l.trim() === 'Skip')).toBe(false)
+      expect(labels.some(l => l.trim() === 'Unskip')).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('hides Cancel when the task is skipped (must unskip to active first)', async () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const labels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => (i.textContent || '').trim())
+      expect(labels.some(l => l === 'Cancel')).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('shows Cancel when the task is active or completed', async () => {
+      const activeWrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'active' }, project: baseProject },
+        attachTo: document.body,
+      })
+      await activeWrapper.find('.task-menu-btn').trigger('click')
+      const activeLabels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => (i.textContent || '').trim())
+      expect(activeLabels.some(l => l === 'Cancel')).toBe(true)
+      activeWrapper.unmount()
+
+      const completedWrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, status: 'completed' }, project: baseProject },
+        attachTo: document.body,
+      })
+      await completedWrapper.find('.task-menu-btn').trigger('click')
+      const completedLabels = Array.from(
+        document.body.querySelectorAll<HTMLElement>('.task-menu-item'),
+      ).map(i => (i.textContent || '').trim())
+      expect(completedLabels.some(l => l === 'Cancel')).toBe(true)
+      completedWrapper.unmount()
+    })
+
+    it('emits the skip action when the Skip menu item is clicked', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').trim() === 'Skip')!.click()
+      await wrapper.vm.$nextTick()
+      expect(actions.skipTask).toHaveBeenCalledWith(baseTask)
+      wrapper.unmount()
+    })
+
+    it('calls skipTask when the Skip menu item is clicked on a completed task', async () => {
+      const completedTask = { ...baseTask, status: 'completed' as const }
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: completedTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').trim() === 'Skip')!.click()
+      await wrapper.vm.$nextTick()
+      expect(actions.skipTask).toHaveBeenCalledWith(completedTask)
+      wrapper.unmount()
+    })
+
+    describe('skipped ↔ cancelled two-step transition enforcement (spec §Out of scope)', () => {
+      it('locks skipped → cancelled into a two-click transition via active', async () => {
+        // Step 1: On a skipped task, Cancel is hidden; user can only Unskip to active.
+        const skippedTask = { ...baseTask, status: 'skipped' as const }
+        const { wrapper, actions } = mountWithActions(TaskCard, {
+          props: { task: skippedTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        let items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+        let labels = items.map(i => (i.textContent || '').trim())
+        expect(labels.includes('Cancel')).toBe(false)
+        expect(labels.includes('Unskip')).toBe(true)
+
+        // Click Unskip -> triggers unskipTask
+        items.find(i => (i.textContent || '').trim() === 'Unskip')!.click()
+        await wrapper.vm.$nextTick()
+        expect(actions.unskipTask).toHaveBeenCalledWith(skippedTask)
+        expect(actions.cancelTask).not.toHaveBeenCalled()
+
+        // Step 2: Once the task returns to active, Cancel becomes available.
+        await wrapper.setProps({ task: { ...skippedTask, status: 'active' } })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+        labels = items.map(i => (i.textContent || '').trim())
+        expect(labels.includes('Cancel')).toBe(true)
+
+        items.find(i => (i.textContent || '').trim() === 'Cancel')!.click()
+        await wrapper.vm.$nextTick()
+        expect(actions.cancelTask).toHaveBeenCalledWith({ ...skippedTask, status: 'active' })
+        wrapper.unmount()
+      })
+
+      it('locks cancelled → skipped into a two-click transition via active', async () => {
+        // Step 1: On a cancelled task, Skip is hidden; user can only Restore to active.
+        const cancelledTask = { ...baseTask, status: 'cancelled' as const }
+        const { wrapper, actions } = mountWithActions(TaskCard, {
+          props: { task: cancelledTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        let items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+        let labels = items.map(i => (i.textContent || '').trim())
+        expect(labels.includes('Skip')).toBe(false)
+        expect(labels.includes('Unskip')).toBe(false)
+        expect(labels.includes('Restore')).toBe(true)
+
+        // Click Restore -> triggers restoreTask
+        items.find(i => (i.textContent || '').trim() === 'Restore')!.click()
+        await wrapper.vm.$nextTick()
+        expect(actions.restoreTask).toHaveBeenCalledWith(cancelledTask)
+        expect(actions.skipTask).not.toHaveBeenCalled()
+
+        // Step 2: Once the task returns to active, Skip becomes available.
+        await wrapper.setProps({ task: { ...cancelledTask, status: 'active' } })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+        labels = items.map(i => (i.textContent || '').trim())
+        expect(labels.includes('Skip')).toBe(true)
+
+        items.find(i => (i.textContent || '').trim() === 'Skip')!.click()
+        await wrapper.vm.$nextTick()
+        expect(actions.skipTask).toHaveBeenCalledWith({ ...cancelledTask, status: 'active' })
+        wrapper.unmount()
+      })
+    })
+
+    it('emits the unskip action when the Unskip menu item is clicked', async () => {
+      const skippedTask = { ...baseTask, status: 'skipped' as const }
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: skippedTask, project: baseProject },
+        attachTo: document.body,
+      })
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').trim() === 'Unskip')!.click()
+      await wrapper.vm.$nextTick()
+      expect(actions.unskipTask).toHaveBeenCalledWith(skippedTask)
       wrapper.unmount()
     })
 

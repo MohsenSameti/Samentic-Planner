@@ -100,6 +100,8 @@ const {
   toggleTaskStatus,
   cancelTask,
   restoreTask,
+  skipTask,
+  unskipTask,
   deleteTask,
   moveTask,
 } = useTasks()
@@ -294,10 +296,11 @@ const dayHeaderInfo = computed<DayHeaderInfo>(() => {
  * instead of recomputing on every render of `DayView`.
  */
 const daySummary = computed(() => {
-  const counts = { active: 0, completed: 0, cancelled: 0 }
+  const counts = { active: 0, completed: 0, skipped: 0, cancelled: 0 }
   for (const t of tasks.value) {
     if (t.date !== currentDay.value) continue
     if (t.status === 'completed') counts.completed++
+    else if (t.status === 'skipped') counts.skipped++
     else if (t.status === 'cancelled') counts.cancelled++
     else counts.active++
   }
@@ -572,6 +575,8 @@ provideDayActions({
   toggleTaskStatus: toggleTaskStatus,
   cancelTask: cancelTask,
   restoreTask: restoreTask,
+  skipTask: skipTask,
+  unskipTask: unskipTask,
   deleteTask: deleteTask,
   updateTaskNotes,
 })

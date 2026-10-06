@@ -49,9 +49,22 @@ export function useTasks() {
    * Throws if the server rejects; the optimistic update is not rolled back
    * here because the next page load will reconcile. Callers can `await`
    * and refresh on failure if needed.
+   *
+   * Per-state targets:
+   * - `active`   → `completed`   (the standard toggle)
+   * - `completed`→ `active`      (the standard toggle)
+   * - `skipped`  → `completed`   (one-click override: skip ↔ complete
+   *                              are mutually exclusive, see spec)
+   * - `cancelled`→ `active`      (preserves the historical un-cancel
+   *                              path; the kebab `Restore` is the
+   *                              documented affordance but the checkbox
+   *                              click still works)
    */
   const toggleTaskStatus = async (task: Task): Promise<void> => {
-    const newStatus = task.status === 'active' ? 'completed' : 'active'
+    let newStatus: Task['status']
+    if (task.status === 'completed') newStatus = 'active'
+    else if (task.status === 'cancelled') newStatus = 'active'
+    else newStatus = 'completed' // active or skipped
     await updateTask(task.id, { status: newStatus })
   }
 
@@ -60,6 +73,16 @@ export function useTasks() {
   }
 
   const restoreTask = async (task: Task): Promise<void> => {
+    await updateTask(task.id, { status: 'active' })
+  }
+
+  /** Mark a task as skipped (deferred for today, still visible). */
+  const skipTask = async (task: Task): Promise<void> => {
+    await updateTask(task.id, { status: 'skipped' })
+  }
+
+  /** Move a skipped task back to active. */
+  const unskipTask = async (task: Task): Promise<void> => {
     await updateTask(task.id, { status: 'active' })
   }
 
@@ -93,6 +116,8 @@ export function useTasks() {
     toggleTaskStatus,
     cancelTask,
     restoreTask,
+    skipTask,
+    unskipTask,
     deleteTask,
     moveTask,
     tasksForProject,

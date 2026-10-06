@@ -23,15 +23,17 @@ const props = defineProps<{
 interface WeekTaskCounts {
   completed: number
   active: number
+  skipped: number
   cancelled: number
 }
 
 const weekTaskCounts = computed<WeekTaskCounts>(() => {
   const weekDateSet = new Set(props.weekDateStrings)
-  const counts: WeekTaskCounts = { completed: 0, active: 0, cancelled: 0 }
+  const counts: WeekTaskCounts = { completed: 0, active: 0, skipped: 0, cancelled: 0 }
   for (const task of props.tasks) {
     if (!weekDateSet.has(task.date)) continue
     if (task.status === 'completed') counts.completed++
+    else if (task.status === 'skipped') counts.skipped++
     else if (task.status === 'cancelled') counts.cancelled++
     else counts.active++
   }
@@ -40,6 +42,7 @@ const weekTaskCounts = computed<WeekTaskCounts>(() => {
 
 const completedCount = computed<number>(() => weekTaskCounts.value.completed)
 const activeCount = computed<number>(() => weekTaskCounts.value.active)
+const skippedCount = computed<number>(() => weekTaskCounts.value.skipped)
 const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
 </script>
 
@@ -74,6 +77,17 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
           {{ activeCount }}
         </div>
         <div class="stat-label">Active</div>
+      </div>
+      <!--
+        Skipped stat renders only when count > 0 so weeks with no
+        skipped tasks keep the row quiet. Matches the existing
+        convention of conditional surfaces for sparse data.
+      -->
+      <div v-if="skippedCount > 0" class="stat-item">
+        <div class="stat-value" style="color: var(--muted)">
+          {{ skippedCount }}
+        </div>
+        <div class="stat-label">Skipped</div>
       </div>
       <div class="stat-item">
         <div class="stat-value" style="color: var(--muted)">

@@ -700,6 +700,37 @@ describe('WeekView', () => {
       ])
     })
 
+    it('places skipped between completed and cancelled', () => {
+      // Skipped is a "deferred" state — visible on the day but not
+      // the user's current focus. Sits below completed and above
+      // cancelled in the per-day bucket.
+      const tasks = [
+        t('t-cancelled-1', 'cancelled', 100),
+        t('t-skipped-1', 'skipped', 200),
+        t('t-completed-1', 'completed', 300),
+        t('t-active-1', 'active', 50),
+        t('t-skipped-2', 'skipped', 400),
+        t('t-cancelled-2', 'cancelled', 500),
+        t('t-completed-2', 'completed', 600),
+        t('t-active-2', 'active', 700),
+      ]
+      const wrapper = mount(WeekView, {
+        props: { ...baseProps, tasks },
+      })
+      const titles = wrapper.findAll('.task-title').map(n => n.text())
+      // active (oldest first) → completed → skipped → cancelled
+      expect(titles).toEqual([
+        'Task t-active-1',
+        'Task t-active-2',
+        'Task t-completed-1',
+        'Task t-completed-2',
+        'Task t-skipped-1',
+        'Task t-skipped-2',
+        'Task t-cancelled-1',
+        'Task t-cancelled-2',
+      ])
+    })
+
     it('keeps the active sequence stable when one task is completed', async () => {
       // The classic regression: toggling one task to completed must
       // move only that task down — the other actives' relative

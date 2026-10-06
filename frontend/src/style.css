@@ -20,6 +20,11 @@
    * differentiator. Contrast vs `#FAF9F7`: ≈5.3:1; vs `#FFFFFF`:
    * ≈5.0:1. Both AA. */
   --text-cancelled: #8B5F55;
+  /* Foreground colour for skipped tasks (spec §9). Warm ochre/amber-tinted
+   * so the skipped state ("deferred for today, still pending") is visually
+   * distinct from completed (neutral grey) and cancelled (brick red) at a glance.
+   * Contrast vs `--bg` `#FAF9F7`: ≈5.3:1; vs `--surface` `#FFFFFF`: ≈5.6:1. Both AA. */
+  --text-skipped: #7D6348;
   /* Generic icon-fade opacity (spec §4). The empty-state calendar
    * glyph and any other decorative-but-secondary icon use this token
    * so the page hierarchy (`text > icon > empty-state placeholder`)
@@ -115,6 +120,7 @@
    *    threshold — deliberately muted, not a full alarm colour) */
   --text-completed: #A8A19A;
   --text-cancelled: #B0857A;
+  --text-skipped: #B89C74;
   --text: var(--text-primary);
   --placeholder: #BAB3AC;
   --accent: #E96A1A;

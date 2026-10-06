@@ -50,7 +50,7 @@ export const tasks = sqliteTable('tasks', {
   title: text('title').notNull(),
   description: text('description').notNull(),
   date: text('date').notNull(),
-  status: text('status', { enum: ['active', 'completed', 'cancelled'] }).notNull(),
+  status: text('status', { enum: ['active', 'completed', 'skipped', 'cancelled'] }).notNull(),
   notes: text('notes').notNull(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

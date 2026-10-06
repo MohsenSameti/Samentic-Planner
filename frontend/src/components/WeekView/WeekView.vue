@@ -8,6 +8,7 @@ import type {
   DayNote,
   Calendar,
 } from '../../types'
+import { compareTasksByStatus } from '../../utils/taskSort'
 import { fromLocalISODate, monthMarkerFor, toLocalISODate } from '../../utils/date'
 import { toJalaliYMD, JALALI_WEEKDAY_LABELS_LONG } from '../../utils/jalali'
 import { useTodayISO } from '../../composables/useTodayISO'
@@ -157,21 +158,11 @@ const tasksByDate = computed<Map<string, Task[]>>(() => {
       grouped.set(task.date, [task])
     }
   }
-  // Sort each bucket in place. Status bucket: active < completed <
-  // cancelled. Ties broken by `createdAt` (older first) then `id` for
-  // a fully deterministic order.
-  const statusBucket = (t: Task): number => {
-    if (t.status === 'active') return 0
-    if (t.status === 'completed') return 1
-    return 2 // cancelled
-  }
+  // Sort each bucket in place. The canonical order lives in
+  // `utils/taskSort.ts` so `WeekView` and `DayView` agree on the
+  // shape of a day.
   for (const bucket of grouped.values()) {
-    bucket.sort((a, b) => {
-      const sb = statusBucket(a) - statusBucket(b)
-      if (sb !== 0) return sb
-      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
-    })
+    bucket.sort(compareTasksByStatus)
   }
   return grouped
 })
