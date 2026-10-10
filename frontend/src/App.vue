@@ -11,7 +11,6 @@ import { useTheme } from './composables/useTheme'
 import { useWeekNavigation } from './composables/useWeekNavigation'
 import {
   DEFAULT_WEEK_START,
-  formatDayTitle,
   formatWeekDisplay,
   fromLocalISODate,
   getWeekStart,
@@ -271,7 +270,6 @@ const currentDay = ref<string>(toLocalISODate(new Date()))
  * list / property inputs / notes.
  */
 interface DayHeaderInfo {
-  title: string
   dayNum: number
   dayNumJalali?: number
 }
@@ -279,7 +277,6 @@ interface DayHeaderInfo {
 const dayHeaderInfo = computed<DayHeaderInfo>(() => {
   const d = fromLocalISODate(currentDay.value)
   const info: DayHeaderInfo = {
-    title: formatDayTitle(currentDay.value, calendar.value),
     dayNum: d.getDate(),
   }
   if (calendar.value === 'jalali') {
@@ -850,7 +847,7 @@ function handlePasswordChanged(): void {
   <ErrorBoundary>
     <!-- 1. Auth check failed -->
     <div v-if="auth.error !== null" class="loading">
-      <p>Couldn't reach server.</p>
+      <p>The planner isn't responding. Try again?</p>
       <button class="btn btn-primary" type="button" @click="auth.retryStatus()">
         Retry
       </button>
@@ -858,7 +855,7 @@ function handlePasswordChanged(): void {
 
     <!-- 2. Auth check in flight -->
     <div v-else-if="auth.loading" class="loading">
-      <p>Loading…</p>
+      <p>Opening planner…</p>
     </div>
 
     <!-- 3. Auth resolved, unauthenticated -->
@@ -869,7 +866,7 @@ function handlePasswordChanged(): void {
 
     <!-- 4. Authenticated, data loading -->
     <div v-else-if="dataLoading" class="loading">
-      <p>Loading…</p>
+      <p>Opening planner…</p>
     </div>
 
     <!-- 5. Authenticated, data loaded -->
@@ -946,7 +943,6 @@ function handlePasswordChanged(): void {
           <DayView
             v-else
             :date="currentDay"
-            :title="dayHeaderInfo.title"
             :day-num="dayHeaderInfo.dayNum"
             :day-num-jalali="dayHeaderInfo.dayNumJalali"
             :tasks="tasks"

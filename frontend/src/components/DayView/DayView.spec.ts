@@ -10,8 +10,8 @@
  * Tests drive the component in isolation (no composables, no API).
  * The fixture style mirrors `DayColumn.spec.ts` for consistency.
  */
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import DayView from './DayView.vue'
 import { mountWithActions } from '../../composables/test-utils'
 import type {
@@ -21,6 +21,8 @@ import type {
   PropertyValue,
   Task,
 } from '../../types/index.js'
+
+enableAutoUnmount(afterEach)
 
 const now = Date.now()
 
@@ -62,7 +64,6 @@ interface SummaryFixture {
 
 const baseProps = {
   date: '2024-01-15',
-  title: '2024-03-04 (Mon)',
   dayNum: 15,
   tasks: [] as Task[],
   projects: projectsMap,
@@ -87,6 +88,7 @@ describe('DayView', () => {
       const back = wrapper.find('button.day-back-btn')
       expect(back.exists()).toBe(true)
       expect(back.attributes('aria-label')).toBe('Back to week')
+      expect(back.text()).toBe('Week')
     })
 
     it('renders the prev-day chevron with the right aria-label', () => {
@@ -103,22 +105,17 @@ describe('DayView', () => {
       expect(next.attributes('aria-label')).toBe('Next day')
     })
 
-    it('renders the date button with formatted date', () => {
+    it('renders one compact, clickable date instead of a duplicate title', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2024, 0, 15))
       const wrapper = mount(DayView, { props: baseProps })
-      const anchor = wrapper.find('.date-anchor')
-      expect(anchor.exists()).toBe(true)
-      const txt = anchor.text()
-      // Anchor label is the new `formatDayTitle` shape: `YYYY-MM-DD (Mon)`.
-      // The focused day is Gregorian 2024-01-15 (a Monday).
-      expect(txt).toBe('2024-01-15 (Mon)')
-    })
-
-    it('renders the new title prop in the header', () => {
-      const wrapper = mount(DayView, { props: baseProps })
-      const title = wrapper.find('.day-view-title')
-      expect(title.exists()).toBe(true)
-      // baseProps.title is the pre-formatted string supplied by App.vue.
-      expect(title.text()).toBe('2024-03-04 (Mon)')
+      const header = wrapper.get('.day-view-header')
+      expect(header.findAll('.date-anchor')).toHaveLength(1)
+      expect(header.get('.date-anchor').text()).toBe('Mon, Jan 15')
+      expect(header.find('.day-view-title').exists()).toBe(false)
+      expect(header.text()).not.toContain(baseProps.date)
+      expect(header.get('.date-anchor').attributes('aria-label')).toBe('Mon, Jan 15 — Pick a date: 2024-01-15 (Mon)')
+      wrapper.unmount()
     })
 
     it('contains a DatePickerPopover anchored to the header date', () => {

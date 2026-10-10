@@ -2,29 +2,29 @@
   /* Light theme palette. Tokens consumed everywhere via var(--name)
    * so re-skinning is a single block. See `:root[data-theme="dark"]`
    * for the dark counterpart. */
-  --bg: #FAF9F7;
-  --surface: #FFFFFF;
-  --border: #E8E5E1;
-  --text-primary: #2D2A26;
-  --text-secondary: #6B6560;
+  --bg: #F0EBE3;
+  --surface: #F8F5F0;
+  --border: #D4C8B8;
+  --text-primary: #1A1612;
+  --text-secondary: #6B5D4D;
   /* Foreground colour for completed tasks (spec §4). Pinned to the
    * same value as `--text-secondary` in light mode for now — the
    * semantic rename is the whole point: if a future contributor
    * tightens `--text-secondary` for legibility, they have to think
    * about whether completed cards should follow. Contrast vs `--bg`
    * `#FAF9F7`: ≈5.4:1, vs `--surface` `#FFFFFF`: ≈5.1:1; both AA. */
-  --text-completed: #6B6560;
+  --text-completed: #8A7D6B;
   /* Foreground colour for cancelled tasks (spec §4). Danger-tinted
    * so the cancelled state is visually distinct from completed at a
    * glance — the line-through is secondary, the hue is the primary
    * differentiator. Contrast vs `#FAF9F7`: ≈5.3:1; vs `#FFFFFF`:
    * ≈5.0:1. Both AA. */
-  --text-cancelled: #8B5F55;
+  --text-cancelled: #7A5240;
   /* Foreground colour for skipped tasks (spec §9). Warm ochre/amber-tinted
    * so the skipped state ("deferred for today, still pending") is visually
    * distinct from completed (neutral grey) and cancelled (brick red) at a glance.
    * Contrast vs `--bg` `#FAF9F7`: ≈5.3:1; vs `--surface` `#FFFFFF`: ≈5.6:1. Both AA. */
-  --text-skipped: #7D6348;
+  --text-skipped: #8B6E4A;
   /* Generic icon-fade opacity (spec §4). The empty-state calendar
    * glyph and any other decorative-but-secondary icon use this token
    * so the page hierarchy (`text > icon > empty-state placeholder`)
@@ -43,21 +43,21 @@
    * a softened `--text-secondary`; dark value (see below) is a
    * half-step lighter so it pops against the dark surface but still
    * reads as "placeholder" rather than typed content. */
-  --placeholder: #8A857F;
-  --accent: #D35400;
+  --placeholder: #A89880;
+  --accent: #C5A065;
   /* Translucent accent so `::selection` and soft accent backgrounds
    * read correctly in both light and dark modes. */
-  --accent-light: rgba(211, 84, 0, 0.12);
-  --accent-hover: #B84700;
-  --success: #27AE60;
-  --success-bg: #E8F5E9;
-  --danger: #E74C3C;
-  --danger-hover: #C0392B;
-  --muted: #9B9B9B;
+  --accent-light: rgba(197, 160, 101, 0.14);
+  --accent-hover: #A88450;
+  --success: #5A7D3A;
+  --success-bg: #EAEFD8;
+  --danger: #8B3A3A;
+  --danger-hover: #6B2D2D;
+  --muted: #A89880;
   /* Slightly raised surface used for icon-button hover backgrounds
    * (e.g. logout, settings, sidebar-toggle). In light mode it matches
    * the page background; in dark mode it's a subtle lift. */
-  --hover-bg: var(--bg);
+  --hover-bg: #EDE8DB;
   /* Shadows that need to feel heavier in dark mode (because there's
    * less contrast against the page background). Both palettes define
    * a value; components never write `rgba(0,0,0,...)` directly. */
@@ -103,35 +103,35 @@
  * Applied via the `data-theme` attribute on `<html>`, written by
  * `useTheme.ts` before the first paint. Warm-leaning values to match
  * the "well-worn leather" feel of the light palette — not pure
- * greys, never pure black. The accent stays burnt orange but is
- * slightly brightened for contrast against the dark surface.
+ * greys, never pure black. The accent stays aged gold but is
+ * slightly softened for warmth against the dark surface.
  */
 :root[data-theme="dark"] {
-  --bg: #1A1816;
-  --surface: #221F1C;
-  --border: #3A3530;
-  --text-primary: #F1ECE5;
-  --text-secondary: #A8A19A;
+  --bg: #2A2520;
+  --surface: #352F28;
+  --border: #5A5248;
+  --text-primary: #EDE8DB;
+  --text-secondary: #A89880;
   /* Dark-mode counterpart of the completed/cancelled tokens. Same
    * rationale as the light values, re-evaluated against
    * `--bg #1A1816` and `--surface #221F1C`:
    *  - completed: ≥5.7:1 on both
    *  - cancelled: ≥4.6:1 on both (brick tint, just over the AA
    *    threshold — deliberately muted, not a full alarm colour) */
-  --text-completed: #A8A19A;
-  --text-cancelled: #B0857A;
-  --text-skipped: #B89C74;
+  --text-completed: #9A8D78;
+  --text-cancelled: #8B6E5A;
+  --text-skipped: #A68A6E;
   --text: var(--text-primary);
-  --placeholder: #BAB3AC;
-  --accent: #E96A1A;
-  --accent-light: rgba(233, 106, 26, 0.16);
-  --accent-hover: #FF7A2A;
-  --success: #4FCB7E;
-  --success-bg: #1F3A2A;
-  --danger: #E96A5A;
-  --danger-hover: #FF7A6A;
-  --muted: #6B6560;
-  --hover-bg: #2C2825;
+  --placeholder: #8A7D70;
+  --accent: #C5A065;
+  --accent-light: rgba(197, 160, 101, 0.18);
+  --accent-hover: #B08D55;
+  --success: #6B8E5A;
+  --success-bg: #2D3A22;
+  --danger: #9A4A3A;
+  --danger-hover: #7A3D2E;
+  --muted: #7A6E5A;
+  --hover-bg: #3D3229;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --modal-backdrop: rgba(0, 0, 0, 0.7);
@@ -282,14 +282,6 @@ input, select, textarea {
  *   no layout / paint) — never `box-shadow`, `filter`, etc.
  */
 
-.task-card,
-.color-option,
-.add-task-btn,
-.today-btn {
-  /* Expected to animate on hover (transform/opacity). Setting the
-   * hint here speeds up the first hover transition. */
-  will-change: transform;
-}
 
 .day-column,
 .sidebar {
@@ -321,7 +313,7 @@ input, select, textarea {
   .color-option,
   .add-task-btn,
   .today-btn {
-    will-change: auto;
+    /* will-change removed */
   }
   *,
   *::before,

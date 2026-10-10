@@ -572,7 +572,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   margin-left: var(--space-2);
   font-size: 0.7rem;
   color: var(--accent);
-  text-transform: uppercase;
+  /* uppercase removed */
   font-weight: 600;
 }
 
@@ -620,7 +620,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 }
 
 .input-label {
-  text-transform: uppercase;
+  /* uppercase removed */
   letter-spacing: 0.5px;
   font-weight: 600;
 }
@@ -658,7 +658,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase;
+  /* uppercase removed */
   padding: var(--space-1) var(--space-0);
   letter-spacing: 0.5px;
 }

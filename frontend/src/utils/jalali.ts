@@ -77,6 +77,12 @@ export const JALALI_MONTH_LABELS: readonly string[] = [
   'Esf',
 ] as const
 
+/** Full month names for the focused day's compact navigation label. */
+export const JALALI_MONTH_LABELS_LONG: readonly string[] = [
+  'Farvardin', 'Ordibehesht', 'Khordad', 'Tir', 'Mordad', 'Shahrivar',
+  'Mehr', 'Aban', 'Azar', 'Dey', 'Bahman', 'Esfand',
+] as const
+
 /**
  * Weekday labels for the Jalali calendar. The Jalali week has the
  * same 7 days as the Gregorian one, so the labels are identical —
@@ -91,6 +97,11 @@ export const JALALI_WEEKDAY_LABELS: readonly string[] = [
   '5 Shan', // Thu (4)
   'Jomeh', // Fri (5)
   'Shan',  // Sat (6)
+] as const
+
+/** Compact day-navigation labels, indexed by Gregorian Date#getDay() (Sunday first). */
+export const JALALI_WEEKDAY_LABELS_COMPACT: readonly string[] = [
+  '1 Sha', '2 Sha', '3 Sha', '4 Sha', '5 Sha', 'Jom', 'Sha',
 ] as const
 
 export const JALALI_WEEKDAY_LABELS_LONG: readonly string[] = [
