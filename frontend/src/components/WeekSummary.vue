@@ -140,7 +140,7 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
 }
 
 .stat-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-heading); font-weight: 600;
   font-size: 1.5rem;
   font-weight: 500;
 }
@@ -148,6 +148,6 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
 .stat-label {
   font-size: 0.75rem;
   color: var(--text-secondary);
-  text-transform: uppercase;
+  
 }
 </style>

@@ -40,8 +40,6 @@ interface Summary {
 const props = defineProps<{
   /** ISO date (`YYYY-MM-DD`) of the focused day. */
   date: string
-  /** Formatted title: `yyyy-MM-dd (Mon)` or `1403-06-14 (2 Shanbe)`. */
-  title: string
   /** Day-of-month number, Gregorian. */
   dayNum: number
   /** Jalali day-of-month when calendar is jalali; `undefined` otherwise. */
@@ -266,7 +264,6 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
           :calendar="calendar"
           @update="handleDatePicked"
         />
-        <span class="day-view-title" aria-hidden="true">{{ title }}</span>
         <button
           class="day-next-btn"
           type="button"
@@ -286,15 +283,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
-        <!--
-          The date picker is inline inside the title group so the
-          popover anchors relative to the title element. The anchor
-          itself is rendered inside the popover; we wrap it here so
-          the popover content appears/disappears via v-if on the
-          popover, not on the title.
-        -->
       </div>
-      <div class="day-view-header-spacer" aria-hidden="true"></div>
     </header>
 
     <!-- Summary line: counts + per-property badges for the day. -->
@@ -428,11 +417,11 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 /* Header ------------------------------------------------------------------ */
 
 .day-view-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) auto minmax(80px, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 56px;
+  gap: var(--space-2);
+  min-height: 44px;
 }
 
 .day-back-btn {
@@ -440,20 +429,20 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   align-items: center;
   gap: var(--space-2);
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-primary);
+  border: 1px solid transparent;
+  color: var(--text-secondary);
   border-radius: 4px;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2);
   font-family: inherit;
   font-size: 0.85rem;
   cursor: pointer;
-  min-height: 36px;
+  min-height: 44px;
+  justify-self: start;
 }
 
 .day-back-btn:hover {
   background: var(--bg);
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .day-back-btn:focus-visible {
@@ -467,24 +456,24 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 }
 
 .day-view-title-group {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
-  gap: var(--space-2);
-  flex: 1;
-  justify-content: center;
+  gap: var(--space-1);
+  min-width: 0;
   position: relative;
 }
 
 .day-prev-btn,
 .day-next-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-primary);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
   border-radius: 4px;
   cursor: pointer;
   padding: 0;
@@ -492,8 +481,8 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 
 .day-prev-btn:hover,
 .day-next-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--bg);
+  color: var(--text-primary);
 }
 
 .day-prev-btn:focus-visible,
@@ -508,22 +497,8 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   height: 18px;
 }
 
-.day-view-title {
-  font-family: var(--font-heading);
-  font-size: 1.50rem;
-  font-weight: normal;
-  margin: 0;
-  white-space: nowrap;
-}
-
-.day-view-header-spacer {
-  width: 88px; /* mirrors day-back-btn width so the title stays centred */
-}
-
 .day-view-date-picker {
-  /* Position the popover absolutely below the title; the popover
-     component itself handles its positioning. Keeping the wrapper
-     here ensures the popover anchors to the title row. */
+  /* Anchor the popover to the full navigation group, not the narrow label. */
   position: static;
 }
 
@@ -607,7 +582,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-view-notes h3 {
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
+  /* uppercase removed */
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   margin: 0;
@@ -712,30 +687,14 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 
 @media (max-width: 768px) {
   .day-view-header {
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-height: auto;
-  }
-  .day-back-btn {
-    order: 2;
+    grid-template-columns: 1fr;
+    gap: 0;
   }
   .day-view-title-group {
-    order: 1;
     width: 100%;
-    flex: 1 0 100%;
-    justify-content: center;
-  }
-  .day-view-header-spacer {
-    display: none;
-  }
-  .day-back-btn-label {
-    display: none;
   }
   .day-view-body {
     grid-template-columns: 1fr;
-  }
-  .day-view-title {
-    font-size: 1.2rem;
   }
   .day-view-summary {
     font-size: 0.8rem;

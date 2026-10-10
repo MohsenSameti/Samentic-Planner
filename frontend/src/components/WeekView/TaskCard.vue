@@ -454,9 +454,8 @@ function handleToggleStatus(): void {
 }
 
 .task-card.completed {
-  /* Foreground tokens only — container-level `opacity` would blend
-   * the card's `--bg` into the page's `--surface` and drop the
-   * text contrast below AA. Spec §4. */
+  border-left: 3px solid var(--text-completed);
+  background: linear-gradient(to right, #EBE7DE 0%, var(--bg) 60%);
 }
 
 .task-card.completed .task-title,
@@ -470,7 +469,8 @@ function handleToggleStatus(): void {
 }
 
 .task-card.cancelled {
-  /* Same rationale as `.task-card.completed`. */
+  border-left: 3px solid var(--text-cancelled);
+  background: linear-gradient(to right, #EAE3DB 0%, var(--bg) 60%);
 }
 
 .task-card.cancelled .task-title,
@@ -489,6 +489,10 @@ function handleToggleStatus(): void {
  * for the completed / cancelled cases). The card stays full-opacity;
  * the visual signal is the muted foreground colour + line-through
  * on title, description, and project name (spec §9). */
+.task-card.skipped {
+  border-left: 3px solid var(--text-skipped);
+  background: linear-gradient(to right, #EDE6D6 0%, var(--bg) 60%);
+}
 .task-card.skipped .task-title,
 .task-card.skipped .task-description,
 .task-card.skipped .task-project-name {

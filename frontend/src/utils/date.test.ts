@@ -11,6 +11,7 @@ import {
   DEFAULT_WEEK_START,
   WEEKDAY_LABELS,
   formatDayTitle,
+  formatDayNavigation,
   formatWeekDisplay,
   fromLocalISODate,
   getWeekDays,
@@ -18,6 +19,40 @@ import {
   monthMarkerFor,
   toLocalISODate,
 } from './date.js'
+
+describe('formatDayNavigation', () => {
+  it('uses a compact Gregorian label without the current year', () => {
+    expect(formatDayNavigation('2024-09-04', 'gregorian', '2024-01-01')).toBe('Wed, Sep 4')
+  })
+
+  it('includes a past or future Gregorian year', () => {
+    expect(formatDayNavigation('2024-09-04', 'gregorian', '2025-01-01')).toBe('Wed, Sep 4, 2024')
+    expect(formatDayNavigation('2024-09-04', 'gregorian', '2023-12-31')).toBe('Wed, Sep 4, 2024')
+  })
+
+  it('uses the Jalali day and month, with a short Jalali weekday', () => {
+    expect(formatDayNavigation('2024-09-04', 'jalali', '2024-03-20')).toBe('4 Sha, 14 Shahrivar')
+  })
+
+  it.each([
+    { date: '2024-09-07', jalali: 'Sha, 17 Shahrivar', gregorian: 'Sat, Sep 7' },
+    { date: '2024-09-08', jalali: '1 Sha, 18 Shahrivar', gregorian: 'Sun, Sep 8' },
+    { date: '2024-09-09', jalali: '2 Sha, 19 Shahrivar', gregorian: 'Mon, Sep 9' },
+    { date: '2024-09-10', jalali: '3 Sha, 20 Shahrivar', gregorian: 'Tue, Sep 10' },
+    { date: '2024-09-11', jalali: '4 Sha, 21 Shahrivar', gregorian: 'Wed, Sep 11' },
+    { date: '2024-09-12', jalali: '5 Sha, 22 Shahrivar', gregorian: 'Thu, Sep 12' },
+    { date: '2024-09-13', jalali: 'Jom, 23 Shahrivar', gregorian: 'Fri, Sep 13' },
+  ])('uses the selected calendar weekday for $date', ({ date, jalali, gregorian }) => {
+    expect(formatDayNavigation(date, 'jalali', '2024-09-04')).toBe(jalali)
+    expect(formatDayNavigation(date, 'gregorian', '2024-09-04')).toBe(gregorian)
+  })
+
+  it('compares Jalali years rather than Gregorian years', () => {
+    expect(formatDayNavigation('2024-03-19', 'jalali', '2024-03-20')).toBe('3 Sha, 29 Esfand 1402')
+    expect(formatDayNavigation('2024-03-20', 'jalali', '2024-03-19')).toBe('4 Sha, 1 Farvardin 1403')
+    expect(formatDayNavigation('2025-01-01', 'jalali', '2024-09-04')).toBe('4 Sha, 12 Dey')
+  })
+})
 
 describe('getWeekStart', () => {
   it('returns the same date for a Monday when week starts on Monday', () => {

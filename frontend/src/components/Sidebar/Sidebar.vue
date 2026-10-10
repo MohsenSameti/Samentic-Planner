@@ -127,7 +127,8 @@ const totalActiveTasks = computed<number>(() =>
 .sidebar-section h3 {
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
+  /* upper labels removed per design spec */
+  /*  */
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   margin-bottom: var(--space-3);
@@ -148,7 +149,7 @@ const totalActiveTasks = computed<number>(() =>
 }
 
 .sum-card .sum-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-heading);
   font-size: 1.25rem;
   font-weight: 500;
   color: var(--accent);
@@ -157,7 +158,8 @@ const totalActiveTasks = computed<number>(() =>
 .sum-card .sum-label {
   font-size: 0.7rem;
   color: var(--text-secondary);
-  text-transform: uppercase;
+  /* upper labels removed per design spec */
+  /*  */
   margin-top: var(--space-1);
 }
 

@@ -30,7 +30,7 @@ async function handleSubmit(): Promise<void> {
     if (err instanceof Error) {
       error.value = err.message
     } else {
-      error.value = 'An unknown error occurred.'
+      error.value = 'Something went wrong. Try again.'
     }
   } finally {
     submitting.value = false
@@ -41,7 +41,7 @@ async function handleSubmit(): Promise<void> {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h1 class="login-title">Sign in</h1>
+      <h1 class="login-title">Open planner</h1>
 
       <form @submit.prevent="handleSubmit">
         <div class="field">
@@ -67,7 +67,7 @@ async function handleSubmit(): Promise<void> {
           class="btn btn-primary submit-btn"
           :disabled="submitting"
         >
-          {{ submitting ? 'Signing in…' : 'Sign in' }}
+          {{ submitting ? 'Opening…' : 'Open planner' }}
         </button>
       </form>
     </div>

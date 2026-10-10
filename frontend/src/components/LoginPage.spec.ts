@@ -62,9 +62,9 @@ describe('LoginPage', () => {
 
   it('renders a password input and submit button with "Sign in" heading', () => {
     const wrapper = mount(LoginPage)
-    expect(wrapper.find('h1.login-title').text()).toBe('Sign in')
+    expect(wrapper.find('h1.login-title').text()).toBe('Open planner')
     expect(wrapper.find('input#password').exists()).toBe(true)
-    expect(wrapper.find('button[type="submit"]').text()).toBe('Sign in')
+    expect(wrapper.find('button[type="submit"]').text()).toBe('Open planner')
   })
 
   it('autofocuses the password field on mount', async () => {

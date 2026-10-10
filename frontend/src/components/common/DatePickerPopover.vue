@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import JalaliDatePicker from './JalaliDatePicker.vue'
-import { formatDayTitle } from '../../utils/date'
+import { formatDayNavigation, formatDayTitle } from '../../utils/date'
+import { useTodayISO } from '../../composables/useTodayISO'
 import type { Calendar } from '../../types'
 
 const props = defineProps<{
@@ -42,15 +43,12 @@ const popoverRef = ref<HTMLElement | null>(null)
 /* Anchor label                                                          */
 /* ------------------------------------------------------------------ */
 
-/**
- * User-facing label for the anchor button. Respects the active
- * `calendar` preference so the date shown next to the chevrons
- * matches the picker that opens: Gregorian → en-US long format
- * ("Monday, January 15, 2024"), Jalali → the equivalent Jalali
- * weekday + day + month + year. The label is derived purely from
- * `value` so the anchor always reflects the current selection.
- */
-const anchorLabel = computed<string>(() => formatDayTitle(props.value, props.calendar))
+// Keep the current-year abbreviation correct even across midnight / Nowruz.
+const { todayISO } = useTodayISO()
+const anchorLabel = computed<string>(() =>
+  formatDayNavigation(props.value, props.calendar, todayISO.value),
+)
+const fullDateLabel = computed<string>(() => formatDayTitle(props.value, props.calendar))
 
 /* ------------------------------------------------------------------ */
 /* Toggle                                                               */
@@ -182,12 +180,23 @@ void internalInteraction
       ref="anchorRef"
       type="button"
       class="date-anchor"
-      :aria-label="'Pick a date'"
+      :aria-label="`${anchorLabel} — Pick a date: ${fullDateLabel}`"
       :aria-haspopup="'dialog'"
       :aria-expanded="open"
       @click="toggle"
     >
-      {{ anchorLabel }}
+      <span>{{ anchorLabel }}</span>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
     </button>
     <div
       v-if="open"
@@ -217,19 +226,41 @@ void internalInteraction
 .date-picker-popover-wrapper {
   position: relative;
   display: inline-flex;
+  min-width: 0;
 }
 
 .date-anchor {
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-family: var(--font-heading);
-  font-size: 1.4rem;
-  font-weight: normal;
-  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  min-width: 44px;
+  width: 100%;
+  padding: var(--space-1);
   border-radius: 4px;
   cursor: pointer;
   text-align: center;
+}
+
+.date-anchor svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .date-anchor {
+    font-size: 0.9375rem;
+  }
 }
 
 .date-anchor:hover {
@@ -252,6 +283,15 @@ void internalInteraction
   box-shadow: var(--shadow-md);
   z-index: 200;
   padding: var(--space-2);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(100%, calc(100vw - 32px));
+}
+
+.popover :deep(.jalali-picker) {
+  min-width: 0;
+  width: 280px;
+  max-width: 100%;
 }
 
 .popover-input {

@@ -15,41 +15,72 @@
  * synthetic document events for the outside-click / Esc paths so
  * we don't have to mount the parent.
  */
-import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import DatePickerPopover from './DatePickerPopover.vue'
 import type { Calendar } from '../../types/index.js'
 
+enableAutoUnmount(afterEach)
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(2024, 0, 15))
+})
+
 describe('DatePickerPopover', () => {
   describe('anchor rendering', () => {
-    it('renders the anchor as a button labelled "Pick a date"', () => {
+    it('includes the visible label, full date and picker action in the accessible name', () => {
       const wrapper = mount(DatePickerPopover, {
         props: { value: '2024-01-15', calendar: 'gregorian' as Calendar },
       })
       const anchor = wrapper.find('button.date-anchor')
       expect(anchor.exists()).toBe(true)
-      expect(anchor.attributes('aria-label')).toBe('Pick a date')
+      expect(anchor.attributes('aria-label')).toBe('Mon, Jan 15 — Pick a date: 2024-01-15 (Mon)')
     })
 
-    it('renders the anchor text as the new "YYYY-MM-DD (ShortWeekday)" format', () => {
+    it('renders a compact current-year Gregorian date with a dropdown indicator', () => {
       const wrapper = mount(DatePickerPopover, {
         props: { value: '2024-01-15', calendar: 'gregorian' as Calendar },
       })
-      // 2024-01-15 is a Monday — the strict `formatDayTitle` shape is
-      // "2024-01-15 (Mon)".
-      const anchor = wrapper.find('button.date-anchor').text()
-      expect(anchor).toBe('2024-01-15 (Mon)')
+      const anchor = wrapper.get('button.date-anchor')
+      expect(anchor.text()).toBe('Mon, Jan 15')
+      expect(anchor.find('svg[aria-hidden="true"]').exists()).toBe(true)
     })
 
-    it('renders the Jalali anchor text in "jy-MM-dd (LongPersianWeekday)" format', () => {
+    it('renders the compact Jalali date while retaining the full accessible date', () => {
       const wrapper = mount(DatePickerPopover, {
         props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
       })
-      // 2024-01-15 is Jalali 1402-10-25, and Gregorian getDay() is 1
-      // (Monday) → "2 Shanbe".
-      const anchor = wrapper.find('button.date-anchor').text()
-      expect(anchor).toBe('1402-10-25 (2 Shanbe)')
+      const anchor = wrapper.get('button.date-anchor')
+      expect(anchor.text()).toBe('2 Sha, 25 Dey')
+      expect(anchor.attributes('aria-label')).toBe('2 Sha, 25 Dey — Pick a date: 1402-10-25 (2 Shanbe)')
+    })
+
+    it('updates the label when navigating or switching calendars', async () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'gregorian' },
+      })
+      await wrapper.setProps({ value: '2023-09-04' })
+      expect(wrapper.get('.date-anchor').text()).toBe('Mon, Sep 4, 2023')
+      await wrapper.setProps({ calendar: 'jalali' })
+      expect(wrapper.get('.date-anchor').text()).toBe('2 Sha, 13 Shahrivar')
+      await wrapper.setProps({ value: '2024-03-20' })
+      expect(wrapper.get('.date-anchor').text()).toBe('4 Sha, 1 Farvardin 1403')
+      await wrapper.setProps({ calendar: 'gregorian' })
+      expect(wrapper.get('.date-anchor').text()).toBe('Wed, Mar 20')
+    })
+
+    it.each([
+      { calendar: 'gregorian' as const, date: '2024-12-31', now: new Date(2024, 11, 31, 23, 59, 30), after: 'Tue, Dec 31, 2024' },
+      { calendar: 'jalali' as const, date: '2024-03-19', now: new Date(2024, 2, 19, 23, 59, 30), after: '3 Sha, 29 Esfand 1402' },
+    ])('refreshes the year at midnight for $calendar', async ({ calendar, date, now, after }) => {
+      vi.setSystemTime(now)
+      const wrapper = mount(DatePickerPopover, { props: { value: date, calendar } })
+      const before = wrapper.get('.date-anchor').text()
+      expect(before).not.toBe(after)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(wrapper.get('.date-anchor').text()).toBe(after)
     })
 
     it('sets aria-expanded to false when the popover is closed', () => {

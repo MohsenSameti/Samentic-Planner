@@ -1,6 +1,8 @@
 import type { Calendar, WeekStartDay } from '../types'
 import {
   JALALI_MONTH_LABELS,
+  JALALI_MONTH_LABELS_LONG,
+  JALALI_WEEKDAY_LABELS_COMPACT,
   JALALI_WEEKDAY_LABELS_LONG,
   toJalaliYMD,
 } from './jalali'
@@ -187,6 +189,30 @@ export function formatWeekDisplay(
   }
   // Cross-year: include the year on both ends so the range is unambiguous.
   return `${startMonth} ${sDay}, ${startYear} - ${endMonth} ${eDay}, ${endYear}`
+}
+
+/** Compact day navigation; compare years in the displayed calendar, not UTC. */
+export function formatDayNavigation(
+  value: string,
+  calendar: Calendar,
+  todayISO: string,
+): string {
+  const date = fromLocalISODate(value)
+  const weekday = calendar === 'jalali'
+    ? (JALALI_WEEKDAY_LABELS_COMPACT[date.getDay()] ?? '')
+    : date.toLocaleDateString('en-US', { weekday: 'short' })
+  if (calendar === 'jalali') {
+    const selected = toJalaliYMD(value)
+    const today = toJalaliYMD(todayISO)
+    const month = JALALI_MONTH_LABELS_LONG[selected.jm - 1] ?? ''
+    const year = selected.jy === today.jy ? '' : ` ${selected.jy}`
+    return `${weekday}, ${selected.jd} ${month}${year}`
+  }
+  const month = date.toLocaleDateString('en-US', { month: 'short' })
+  const year = date.getFullYear() === fromLocalISODate(todayISO).getFullYear()
+    ? ''
+    : `, ${date.getFullYear()}`
+  return `${weekday}, ${month} ${date.getDate()}${year}`
 }
 
 /**
