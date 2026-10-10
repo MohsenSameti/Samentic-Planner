@@ -63,4 +63,9 @@ Thumbs.db
 # Coverage
 coverage/
 
+# Browser test artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 docs/plans

@@ -1,0 +1,95 @@
+import { test, expect, openPlanner, openSidebar, closeSidebar } from './test/e2e'
+
+test('creates a project and persists a task through editing and completion', async ({ page }) => {
+  await openPlanner(page)
+  await openSidebar(page)
+  await page.getByRole('button', { name: 'Add Project', exact: true }).click()
+  const projectDialog = page.getByRole('dialog', { name: 'Add Project' })
+  await projectDialog.getByLabel('Name', { exact: true }).fill('Launch checklist')
+  await projectDialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(projectDialog).toBeHidden()
+  await expect(page.getByRole('complementary').getByRole('button', { name: /^Launch checklist/ })).toBeVisible()
+  await closeSidebar(page)
+
+  // The current day stays in the visible week, regardless of the start-of-week setting.
+  await page.locator('.day-column.today').getByRole('button', { name: 'Add task', exact: true }).click()
+  const taskDialog = page.getByRole('dialog', { name: 'Add Task', exact: true })
+  await taskDialog.getByLabel('Task', { exact: true }).fill('Prepare release')
+  await taskDialog.getByLabel('Description', { exact: true }).fill('Check the browser suite')
+  await taskDialog.getByLabel('Project', { exact: true }).selectOption({ label: 'Launch checklist' })
+  await taskDialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(taskDialog).toBeHidden()
+
+  const originalCard = page.locator('.task-card').filter({ has: page.getByText('Prepare release', { exact: true }) })
+  await expect(originalCard).toBeVisible()
+  await expect(originalCard.getByText('Launch checklist', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(originalCard).toBeVisible()
+  await expect(originalCard.getByText('Check the browser suite', { exact: true })).toBeVisible()
+
+  await originalCard.getByRole('button', { name: 'Task actions' }).click()
+  await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
+  const editDialog = page.getByRole('dialog', { name: 'Edit Task', exact: true })
+  await expect(editDialog.getByLabel('Task', { exact: true })).toHaveValue('Prepare release')
+  await editDialog.getByLabel('Task', { exact: true }).fill('Release ready')
+  await editDialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(editDialog).toBeHidden()
+
+  const updatedCard = page.locator('.task-card').filter({ has: page.getByText('Release ready', { exact: true }) })
+  await expect(updatedCard).toBeVisible()
+  const [saved] = await Promise.all([
+    page.waitForResponse(response => response.url().includes('/api/tasks/') && response.request().method() === 'PUT'),
+    updatedCard.getByRole('checkbox').click(),
+  ])
+  expect(saved.ok()).toBe(true)
+  await expect(updatedCard.getByRole('checkbox')).toBeChecked()
+  await page.reload()
+  await expect(updatedCard.getByRole('checkbox')).toBeChecked()
+  await expect(updatedCard.getByText('Launch checklist', { exact: true })).toBeVisible()
+  await expect(originalCard).toHaveCount(0)
+})
+
+test('navigation and dialogs remain usable at the configured viewport', async ({ page }) => {
+  await openPlanner(page)
+  await expect(page.getByRole('button', { name: 'Toggle menu' })).toBeInViewport()
+  await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeInViewport()
+  await openSidebar(page)
+  await expect(page.getByRole('complementary').getByRole('combobox', { name: 'Theme', exact: true })).toBeInViewport()
+  await closeSidebar(page)
+
+  const weekLabel = page.getByRole('navigation', { name: 'Week navigation' }).locator('.week-display')
+  const currentWeek = await weekLabel.innerText()
+  await page.getByRole('button', { name: 'Next week', exact: true }).click()
+  await expect(weekLabel).not.toHaveText(currentWeek)
+  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await expect(weekLabel).toHaveText(currentWeek)
+  await expect(page.locator('.day-column.today')).toBeInViewport()
+
+  // The day header is intentionally a pointer target, not an ARIA button.
+  await page.locator('.day-column.today .day-header-text').click()
+  await expect(page.getByRole('button', { name: 'Back to week', exact: true })).toBeInViewport()
+  await expect(page.getByRole('button', { name: 'Next day', exact: true })).toBeInViewport()
+  await page.getByRole('button', { name: 'Add task', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add Task', exact: true })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Task', { exact: true })).toBeInViewport()
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeInViewport()
+  const bounds = await dialog.boundingBox()
+  expect(bounds).not.toBeNull()
+  if (!bounds) throw new Error('Visible task dialog has no bounding box')
+  expect(bounds.x).toBeGreaterThanOrEqual(0)
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize()?.width ?? 0)
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await page.getByRole('button', { name: 'Back to week', exact: true }).click()
+  await expect(weekLabel).toHaveText(currentWeek)
+
+  // Check Escape independently of day view's own Escape-to-week shortcut.
+  await page.locator('.day-column.today').getByRole('button', { name: 'Add task', exact: true }).click()
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(weekLabel).toHaveText(currentWeek)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(1)
+})

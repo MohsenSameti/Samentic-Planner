@@ -8,13 +8,20 @@
     "dev:frontend": "cd frontend && pnpm dev",
     "build": "cd backend && pnpm build && cd ../frontend && pnpm build",
     "start": "cd backend && pnpm start",
-    "test": "pnpm --recursive test",
+    "test": "pnpm test:backend && pnpm test:frontend",
     "test:backend": "cd backend && pnpm test",
     "test:frontend": "cd frontend && pnpm test",
     "test:watch": "cd frontend && pnpm test:watch",
-    "test:coverage": "pnpm --recursive test:coverage"
+    "test:coverage": "pnpm --recursive test:coverage",
+    "test:e2e": "pnpm build && pnpm test:e2e:typecheck && playwright test",
+    "test:e2e:system": "browser=$(command -v chromium-browser || command -v chromium) || { printf '%s\\n' 'Chromium not found: install chromium-browser or chromium on PATH.' >&2; exit 1; }; PLAYWRIGHT_BROWSERS_PATH=0 E2E_BROWSER_EXECUTABLE_PATH=\"$browser\" E2E_BROWSER_ARGS='[\"--no-sandbox\",\"--disable-dev-shm-usage\"]' pnpm test:e2e",
+    "test:e2e:typecheck": "tsc -p tsconfig.e2e.json",
+    "test:e2e:report": "playwright show-report"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^22.20.5",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.9.3"
   }
 }
