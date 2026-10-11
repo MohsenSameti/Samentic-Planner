@@ -390,3 +390,79 @@ describe('primary action contrast and --accent-contrast token (Task 4.1)', () =>
   })
 })
 
+describe('status task card tokens and dark mode contrast (Task 4.2)', () => {
+  it('declares --task-completed-bg, --task-cancelled-bg, and --task-skipped-bg in :root', () => {
+    const body = ruleBody(/^:root\s*/)
+    expect(body).toMatch(/--task-completed-bg\s*:\s*#EBE7DE;/)
+    expect(body).toMatch(/--task-cancelled-bg\s*:\s*#EAE3DB;/)
+    expect(body).toMatch(/--task-skipped-bg\s*:\s*#EDE6D6;/)
+  })
+
+  it('re-declares --task-completed-bg, --task-cancelled-bg, and --task-skipped-bg in :root[data-theme="dark"]', () => {
+    const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+    expect(body).toMatch(/--task-completed-bg\s*:\s*#26231F;/)
+    expect(body).toMatch(/--task-cancelled-bg\s*:\s*#2E2320;/)
+    expect(body).toMatch(/--task-skipped-bg\s*:\s*#2B251B;/)
+  })
+
+  it('updates dark mode text tokens to high-contrast values', () => {
+    const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+    expect(body).toMatch(/--text-completed\s*:\s*#B8AB98;/)
+    expect(body).toMatch(/--text-cancelled\s*:\s*#D48B78;/)
+    expect(body).toMatch(/--text-skipped\s*:\s*#D4AD7D;/)
+  })
+
+  describe('WCAG AA contrast ratio >= 4.5:1 in dark mode', () => {
+    const darkRoot = ruleBody(/:root\[data-theme="dark"\]\s*/)
+    const extractVars = (body: string): Record<string, string> => {
+      const vars: Record<string, string> = {}
+      for (const m of body.matchAll(/(--[a-zA-Z0-9_-]+)\s*:\s*([^;]+);/g)) {
+        vars[m[1]!] = m[2]!.trim()
+      }
+      return vars
+    }
+    const darkVars = extractVars(darkRoot)
+
+    it('has contrast ratio >= 4.5:1 for --text-completed against --task-completed-bg and --bg', () => {
+      const text = resolveCssColor(darkVars['--text-completed'] ?? '', darkVars)
+      const cardBg = resolveCssColor(darkVars['--task-completed-bg'] ?? '', darkVars)
+      const pageBg = resolveCssColor(darkVars['--bg'] ?? '', darkVars)
+
+      expect(contrastRatio(text, cardBg)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(text, pageBg)).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('has contrast ratio >= 4.5:1 for --text-cancelled against --task-cancelled-bg and --bg', () => {
+      const text = resolveCssColor(darkVars['--text-cancelled'] ?? '', darkVars)
+      const cardBg = resolveCssColor(darkVars['--task-cancelled-bg'] ?? '', darkVars)
+      const pageBg = resolveCssColor(darkVars['--bg'] ?? '', darkVars)
+
+      expect(contrastRatio(text, cardBg)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(text, pageBg)).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('has contrast ratio >= 4.5:1 for --text-skipped against --task-skipped-bg and --bg', () => {
+      const text = resolveCssColor(darkVars['--text-skipped'] ?? '', darkVars)
+      const cardBg = resolveCssColor(darkVars['--task-skipped-bg'] ?? '', darkVars)
+      const pageBg = resolveCssColor(darkVars['--bg'] ?? '', darkVars)
+
+      expect(contrastRatio(text, cardBg)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(text, pageBg)).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('keeps completed, cancelled, and skipped text colors distinct in dark mode', () => {
+      const completed = darkVars['--text-completed']?.trim() ?? ''
+      const cancelled = darkVars['--text-cancelled']?.trim() ?? ''
+      const skipped = darkVars['--text-skipped']?.trim() ?? ''
+
+      expect(completed).not.toBe('')
+      expect(cancelled).not.toBe('')
+      expect(skipped).not.toBe('')
+      expect(completed).not.toBe(cancelled)
+      expect(completed).not.toBe(skipped)
+      expect(cancelled).not.toBe(skipped)
+    })
+  })
+})
+
+

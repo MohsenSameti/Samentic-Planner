@@ -531,7 +531,7 @@ function handleToggleStatus(): void {
 
 .task-card.completed {
   border-left: 3px solid var(--text-completed);
-  background: linear-gradient(to right, #EBE7DE 0%, var(--bg) 60%);
+  background: linear-gradient(to right, var(--task-completed-bg) 0%, var(--bg) 60%);
 }
 
 .task-card.completed .task-title,
@@ -546,7 +546,7 @@ function handleToggleStatus(): void {
 
 .task-card.cancelled {
   border-left: 3px solid var(--text-cancelled);
-  background: linear-gradient(to right, #EAE3DB 0%, var(--bg) 60%);
+  background: linear-gradient(to right, var(--task-cancelled-bg) 0%, var(--bg) 60%);
 }
 
 .task-card.cancelled .task-title,
@@ -567,7 +567,7 @@ function handleToggleStatus(): void {
  * on title, description, and project name (spec §9). */
 .task-card.skipped {
   border-left: 3px solid var(--text-skipped);
-  background: linear-gradient(to right, #EDE6D6 0%, var(--bg) 60%);
+  background: linear-gradient(to right, var(--task-skipped-bg) 0%, var(--bg) 60%);
 }
 .task-card.skipped .task-title,
 .task-card.skipped .task-description,

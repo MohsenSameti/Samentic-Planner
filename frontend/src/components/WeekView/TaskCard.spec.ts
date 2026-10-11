@@ -940,4 +940,24 @@ describe('TaskCard', () => {
       expect(setData).not.toHaveBeenCalled()
     })
   })
+
+  describe('theme-aware status card background tokens (Task 4.2)', () => {
+    const taskCardSource = readFileSync(
+      resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
+      'utf8',
+    )
+
+    it('has no hardcoded light gradient start literals (#EBE7DE, #EAE3DB, #EDE6D6)', () => {
+      expect(taskCardSource).not.toMatch(/#EBE7DE/i)
+      expect(taskCardSource).not.toMatch(/#EAE3DB/i)
+      expect(taskCardSource).not.toMatch(/#EDE6D6/i)
+    })
+
+    it('references theme-aware gradient start tokens', () => {
+      expect(taskCardSource).toContain('var(--task-completed-bg)')
+      expect(taskCardSource).toContain('var(--task-cancelled-bg)')
+      expect(taskCardSource).toContain('var(--task-skipped-bg)')
+    })
+  })
 })
+
