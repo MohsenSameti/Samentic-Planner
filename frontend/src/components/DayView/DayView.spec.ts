@@ -339,6 +339,30 @@ describe('DayView', () => {
       await textarea.trigger('blur')
       expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-15', 'new note')
     })
+
+    it('isolates day note drafts across date changes and saves only to the date that owned the editor', async () => {
+      const { wrapper, actions } = mountWithActions(DayView, {
+        props: { ...baseProps, date: '2024-01-17', dayNoteValue: 'wednesday note' },
+      })
+      await wrapper.find('.day-notes-toggle').trigger('click')
+      const wedTextarea = wrapper.find('.day-notes textarea')
+      await wedTextarea.setValue('edited wednesday draft')
+
+      // Navigate to Thursday
+      await wrapper.setProps({ date: '2024-01-18', dayNoteValue: 'thursday note' })
+
+      // DayNotes must be re-mounted for Thursday; it starts collapsed with Thursday's value
+      expect(wrapper.find('.day-notes-content').classes()).not.toContain('expanded')
+      const thuTextarea = wrapper.find('.day-notes textarea')
+      expect((thuTextarea.element as HTMLTextAreaElement).value).toBe('thursday note')
+
+      // Blur the Wednesday editor
+      await wedTextarea.trigger('blur')
+
+      // The save initiated for Wednesday can only update Wednesday
+      expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-17', 'edited wednesday draft')
+      expect(actions.updateDayNote).not.toHaveBeenCalledWith('2024-01-18', 'edited wednesday draft')
+    })
   })
 
   describe('day navigation', () => {

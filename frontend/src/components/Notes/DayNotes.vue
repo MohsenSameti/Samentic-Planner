@@ -46,9 +46,16 @@ const previewText = computed<string>(() => {
   return trimmed.replace(/\s+/g, ' ')
 })
 
+/**
+ * Date that owned this editor when mounted. Blur / save actions always
+ * write to this date, never a newly displayed date, guaranteeing note
+ * date isolation.
+ */
+const editorDate = props.date
+
 function handleBlur(e: FocusEvent): void {
   const target = e.target as HTMLTextAreaElement
-  actions?.updateDayNote(props.date, target.value)
+  actions?.updateDayNote(editorDate, target.value)
 }
 </script>
 

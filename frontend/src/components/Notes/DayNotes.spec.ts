@@ -73,6 +73,19 @@ describe('DayNotes', () => {
     expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-01', 'hello')
   })
 
+  it('writes to the date that owned the editor on blur even if date prop changes', async () => {
+    const { wrapper, actions } = mountWithActions(DayNotes, {
+      props: { date: '2024-01-17', initialValue: 'wednesday' },
+    })
+    await wrapper.find('.day-notes-toggle').trigger('click')
+    const textarea = wrapper.find('textarea')
+    await textarea.setValue('edited wednesday')
+    await wrapper.setProps({ date: '2024-01-18' })
+    await textarea.trigger('blur')
+    expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-17', 'edited wednesday')
+    expect(actions.updateDayNote).not.toHaveBeenCalledWith('2024-01-18', expect.anything())
+  })
+
   it('sets aria-expanded correctly', async () => {
     const wrapper = mount(DayNotes, { props: baseProps })
     expect(wrapper.find('.day-notes-toggle').attributes('aria-expanded')).toBe('false')
