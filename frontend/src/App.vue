@@ -1106,6 +1106,7 @@ function handlePasswordChanged(): void {
 .main-container {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: visible;
 }
 
@@ -1119,11 +1120,11 @@ function handlePasswordChanged(): void {
 
 .week-container {
   flex: 1;
+  min-height: 0;
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  height: calc(100vh - 73px);
 }
 
 .loading {
@@ -1218,7 +1219,7 @@ function handlePasswordChanged(): void {
     padding: var(--space-4);
     overflow-y: auto;
     flex: 1;
-    height: calc(100dvh - 73px);
+    min-height: 0;
   }
 
   .project-filter-indicator {

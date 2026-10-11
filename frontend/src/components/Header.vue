@@ -394,11 +394,19 @@ onUnmounted(() => {
   .header {
     padding: var(--space-3) var(--space-4);
     overflow: visible;
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    column-gap: var(--space-3);
   }
 
   .header-left {
     gap: var(--space-3);
     flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .header-right {
+    margin-left: auto;
   }
 
   .logo h1 {
