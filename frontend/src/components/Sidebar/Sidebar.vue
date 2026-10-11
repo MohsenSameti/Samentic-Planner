@@ -35,6 +35,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-project', id: string): void
   (e: 'add-project'): void
+  (e: 'edit-project', project: Project): void
   (e: 'add-property'): void
   (e: 'change-theme', t: Theme): void
   (e: 'change-week-start', day: WeekStartDay): void
@@ -71,6 +72,7 @@ const totalActiveTasks = computed<number>(() =>
         :total-active-tasks="totalActiveTasks"
         @select="(id) => emit('select-project', id)"
         @add="emit('add-project')"
+        @edit="(project) => emit('edit-project', project)"
       />
     </section>
 

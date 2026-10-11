@@ -13,6 +13,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'select', id: string): void
   (e: 'add'): void
+  (e: 'edit', project: Project): void
 }>()
 </script>
 
@@ -45,6 +46,29 @@ const emit = defineEmits<{
       <div class="project-dot" :style="{ background: project.color }"></div>
       <span class="project-name">{{ project.name }}</span>
       <span class="project-count">{{ taskCounts[project.id] ?? 0 }}</span>
+      <button
+        type="button"
+        class="project-edit-btn"
+        :aria-label="`Edit ${project.name}`"
+        title="Edit project"
+        @click.stop="emit('edit', project)"
+        @keydown.enter.stop
+        @keydown.space.stop
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+      </button>
     </div>
   </div>
   <button class="add-btn" type="button" @click="emit('add')">
@@ -141,5 +165,60 @@ const emit = defineEmits<{
 .add-btn svg {
   width: 16px;
   height: 16px;
+}
+
+.project-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.project-item:hover .project-edit-btn,
+.project-edit-btn:focus-visible {
+  opacity: 1;
+}
+
+.project-edit-btn:hover {
+  opacity: 1;
+  color: var(--text-primary);
+  background: var(--surface);
+}
+
+.project-edit-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.project-edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 1024px) {
+  .project-edit-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    opacity: 0.9;
+  }
+
+  .project-edit-btn svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 </style>

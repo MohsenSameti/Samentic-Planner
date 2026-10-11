@@ -909,6 +909,7 @@ function handlePasswordChanged(): void {
           :calendar="calendar"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
+          @edit-project="openProjectModal"
           @add-property="openPropertyModal()"
           @change-theme="setTheme"
           @change-week-start="changeWeekStart"
