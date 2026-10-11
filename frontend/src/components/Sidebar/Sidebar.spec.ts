@@ -7,13 +7,18 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import Sidebar from './Sidebar.vue'
-import type { Calendar, Project, Task, Theme, WeekStartDay } from '../../types/index.js'
+import type { Calendar, Project, Property, Task, Theme, WeekStartDay } from '../../types/index.js'
 
 const now = Date.now()
 
 const testProjects: Project[] = [
   { id: 'p1', name: 'Alpha', color: '#E74C3C', createdAt: now, updatedAt: now },
   { id: 'p2', name: 'Beta', color: '#3498DB', createdAt: now, updatedAt: now },
+]
+
+const testProperties: Property[] = [
+  { id: 'prop-1', name: 'Reading', unit: 'pages', createdAt: now, updatedAt: now },
+  { id: 'prop-2', name: 'Meditation', unit: 'mins', createdAt: now, updatedAt: now },
 ]
 
 const testTasks: Task[] = [
@@ -32,7 +37,7 @@ const testTasks: Task[] = [
 
 const defaultProps = {
   projects: testProjects,
-  properties: [],
+  properties: testProperties,
   tasks: testTasks,
   selectedProject: 'all',
   weeklyPropertySums: [],
@@ -66,9 +71,28 @@ describe('Sidebar', () => {
 
   it('forwards add-project when Add Project is clicked', async () => {
     const wrapper = mount(Sidebar, { props: defaultProps })
-    const addBtn = wrapper.find('.add-btn')
-    await addBtn.trigger('click')
+    const addProjectBtn = wrapper.find('.project-list + .add-btn')
+    await addProjectBtn.trigger('click')
 
     expect(wrapper.emitted('add-project')).toBeTruthy()
+  })
+
+  it('renders properties and forwards edit event as edit-property', async () => {
+    const wrapper = mount(Sidebar, { props: defaultProps })
+    const editButtons = wrapper.findAll('.property-edit-btn')
+    expect(editButtons.length).toBeGreaterThan(0)
+
+    await editButtons[0].trigger('click')
+
+    expect(wrapper.emitted('edit-property')).toBeTruthy()
+    expect(wrapper.emitted('edit-property')?.[0]).toEqual([testProperties[0]])
+  })
+
+  it('forwards add-property when Add Property is clicked', async () => {
+    const wrapper = mount(Sidebar, { props: defaultProps })
+    const addPropertyBtn = wrapper.find('.property-list + .add-btn')
+    await addPropertyBtn.trigger('click')
+
+    expect(wrapper.emitted('add-property')).toBeTruthy()
   })
 })

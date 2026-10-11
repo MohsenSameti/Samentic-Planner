@@ -911,6 +911,7 @@ function handlePasswordChanged(): void {
           @add-project="openProjectModal()"
           @edit-project="openProjectModal"
           @add-property="openPropertyModal()"
+          @edit-property="openPropertyModal"
           @change-theme="setTheme"
           @change-week-start="changeWeekStart"
           @change-calendar="changeCalendar"
