@@ -10,7 +10,7 @@ import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import TaskModal from './TaskModal.vue'
 import JalaliDatePicker from '../components/common/JalaliDatePicker.vue'
-import type { Calendar, Project } from '../types/index.js'
+import type { Calendar, Project, Task } from '../types/index.js'
 
 /**
  * Read the modal SFC's source for the dark-mode regression tests
@@ -111,6 +111,134 @@ describe('TaskModal', () => {
     expect(wrapper.findComponent(JalaliDatePicker).exists()).toBe(false)
     expect(wrapper.find('input[type="date"]').exists()).toBe(true)
   })
+
+  it('resets title and description when closed and reopened in create mode on the same date', async () => {
+    const wrapper = mount(TaskModal, {
+      props: {
+        ...baseProps,
+        show: true,
+        task: null,
+        date: '2024-03-20',
+      },
+    })
+
+    await wrapper.find('#task-title').setValue('Draft Title')
+    await wrapper.find('#task-description').setValue('Draft Description')
+
+    // Close the modal
+    await wrapper.setProps({ show: false })
+
+    // Reopen on the same date in create mode
+    await wrapper.setProps({ show: true, task: null, date: '2024-03-20' })
+
+    const titleInput = wrapper.find('#task-title').element as HTMLInputElement
+    const descInput = wrapper.find('#task-description').element as HTMLTextAreaElement
+
+    expect(titleInput.value).toBe('')
+    expect(descInput.value).toBe('')
+  })
+
+  it('resets title and description after saving and reopening in create mode on the same date', async () => {
+    const wrapper = mount(TaskModal, {
+      props: {
+        ...baseProps,
+        show: true,
+        task: null,
+        date: '2024-03-20',
+      },
+    })
+
+    await wrapper.find('#task-title').setValue('Created Task')
+    await wrapper.find('#task-description').setValue('Task details')
+
+    await wrapper.find('form').trigger('submit.prevent')
+    expect(wrapper.emitted('save')).toBeTruthy()
+
+    // App.vue sets taskModalOpen = false on save
+    await wrapper.setProps({ show: false })
+
+    // Reopen on the same date
+    await wrapper.setProps({ show: true, task: null, date: '2024-03-20' })
+
+    const titleInput = wrapper.find('#task-title').element as HTMLInputElement
+    const descInput = wrapper.find('#task-description').element as HTMLTextAreaElement
+
+    expect(titleInput.value).toBe('')
+    expect(descInput.value).toBe('')
+  })
+
+  it("preserves the selected task's title, description, project, and date when opened in edit mode", async () => {
+    const sampleTask: Task = {
+      id: 'task-42',
+      projectId: 'p1',
+      title: 'Edit Me',
+      description: 'Existing Description',
+      date: '2024-04-15',
+      status: 'active',
+      notes: 'Some notes',
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const wrapper = mount(TaskModal, {
+      props: {
+        ...baseProps,
+        show: false,
+        task: null,
+        date: '2024-03-20',
+      },
+    })
+
+    // Open in edit mode
+    await wrapper.setProps({
+      show: true,
+      task: sampleTask,
+      date: sampleTask.date,
+    })
+
+    const titleInput = wrapper.find('#task-title').element as HTMLInputElement
+    const descInput = wrapper.find('#task-description').element as HTMLTextAreaElement
+    const projectSelect = wrapper.find('#task-project').element as HTMLSelectElement
+    const dateInput = wrapper.find('input[type="date"]').element as HTMLInputElement
+
+    expect(titleInput.value).toBe('Edit Me')
+    expect(descInput.value).toBe('Existing Description')
+    expect(projectSelect.value).toBe('p1')
+    expect(dateInput.value).toBe('2024-04-15')
+  })
+
+  it('initializes empty draft when switching from edit mode to create mode on the same date', async () => {
+    const sampleTask: Task = {
+      id: 'task-42',
+      projectId: 'p1',
+      title: 'Edit Me',
+      description: 'Existing Description',
+      date: '2024-03-20',
+      status: 'active',
+      notes: 'Some notes',
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const wrapper = mount(TaskModal, {
+      props: {
+        ...baseProps,
+        show: true,
+        task: sampleTask,
+        date: '2024-03-20',
+      },
+    })
+
+    expect((wrapper.find('#task-title').element as HTMLInputElement).value).toBe('Edit Me')
+
+    // Close and reopen in create mode
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true, task: null, date: '2024-03-20' })
+
+    expect((wrapper.find('#task-title').element as HTMLInputElement).value).toBe('')
+    expect((wrapper.find('#task-description').element as HTMLTextAreaElement).value).toBe('')
+  })
+
 
   // --------------------------------------------------------------- //
   // Source-level regression coverage for dark-mode form-control   //

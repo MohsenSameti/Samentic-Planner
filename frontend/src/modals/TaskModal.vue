@@ -32,8 +32,9 @@ const emit = defineEmits<{
 
 /**
  * Local form state. Initialised from props but reset whenever the
- * upstream `task` or `date` changes — see `watch` below — so the
- * modal always reflects what the user opened it with.
+ * modal opens or the upstream `task` or `date` changes — see `watch`
+ * below — so the modal always reflects what the user opened it with
+ * (with empty drafts for new tasks).
  */
 const form = ref<{
   title: string
@@ -48,8 +49,9 @@ const form = ref<{
 })
 
 watch(
-  () => [props.task, props.date, props.projects] as const,
-  ([nextTask, nextDate, nextProjects]) => {
+  () => [props.show, props.task, props.date, props.projects] as const,
+  ([nextShow, nextTask, nextDate, nextProjects]) => {
+    if (!nextShow) return
     form.value = {
       title: nextTask?.title ?? '',
       description: nextTask?.description ?? '',
