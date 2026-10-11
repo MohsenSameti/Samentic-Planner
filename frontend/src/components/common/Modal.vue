@@ -17,10 +17,15 @@ const modalRef = ref<HTMLElement | null>(null)
  * registered for the lifetime of the component, but we only react when
  * the modal is actually open. Without the gate, pressing Escape in any
  * other modal's overlay would close this one too.
+ *
+ * When open, Escape propagation is stopped so parent/window-level listeners
+ * (such as App.vue's Day View shortcut) do not also react to this Escape.
  */
 function handleKeydown(e: KeyboardEvent): void {
   if (!props.show) return
   if (e.key === 'Escape') {
+    e.stopPropagation()
+    e.stopImmediatePropagation()
     emit('close')
   }
 }
@@ -46,12 +51,12 @@ function handleDocumentMouseDown(e: MouseEvent): void {
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('keydown', handleKeydown, true)
   document.addEventListener('mousedown', handleDocumentMouseDown)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('keydown', handleKeydown, true)
   document.removeEventListener('mousedown', handleDocumentMouseDown)
 })
 </script>

@@ -14,7 +14,7 @@
  * no CSS. The tests below scan the shipped stylesheets instead and fail
  * if the overlay is ever hidden again.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -152,5 +152,98 @@ describe('Modal outside-interaction', () => {
     await nextTick()
 
     expect(wrapper.find('.modal-overlay').exists()).toBe(true)
+  })
+})
+
+describe('Modal Escape keydown', () => {
+  it('calls stopPropagation and stopImmediatePropagation and emits close when open', async () => {
+    const wrapper = mount(Modal, {
+      props: { show: true, title: 'Test Modal' },
+      attachTo: document.body,
+    })
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    const stopPropagationSpy = vi.spyOn(event, 'stopPropagation')
+    const stopImmediatePropagationSpy = vi.spyOn(event, 'stopImmediatePropagation')
+
+    document.dispatchEvent(event)
+    await nextTick()
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+    expect(wrapper.emitted('close')?.length).toBe(1)
+    expect(stopPropagationSpy).toHaveBeenCalled()
+    expect(stopImmediatePropagationSpy).toHaveBeenCalled()
+  })
+
+  it('does not stop propagation or emit close when closed', async () => {
+    const wrapper = mount(Modal, {
+      props: { show: false, title: 'Test Modal' },
+      attachTo: document.body,
+    })
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    const stopPropagationSpy = vi.spyOn(event, 'stopPropagation')
+    const stopImmediatePropagationSpy = vi.spyOn(event, 'stopImmediatePropagation')
+
+    document.dispatchEvent(event)
+    await nextTick()
+
+    expect(wrapper.emitted('close')).toBeFalsy()
+    expect(stopPropagationSpy).not.toHaveBeenCalled()
+    expect(stopImmediatePropagationSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not stop propagation or emit close for non-Escape keys when open', async () => {
+    const wrapper = mount(Modal, {
+      props: { show: true, title: 'Test Modal' },
+      attachTo: document.body,
+    })
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    })
+    const stopPropagationSpy = vi.spyOn(event, 'stopPropagation')
+    const stopImmediatePropagationSpy = vi.spyOn(event, 'stopImmediatePropagation')
+
+    document.dispatchEvent(event)
+    await nextTick()
+
+    expect(wrapper.emitted('close')).toBeFalsy()
+    expect(stopPropagationSpy).not.toHaveBeenCalled()
+    expect(stopImmediatePropagationSpy).not.toHaveBeenCalled()
+  })
+
+  it('intercepts Escape in capture phase so downstream document listeners do not fire', async () => {
+    const bubbleListener = vi.fn()
+    document.addEventListener('keydown', bubbleListener)
+
+    try {
+      mount(Modal, {
+        props: { show: true, title: 'Test Modal' },
+        attachTo: document.body,
+      })
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      })
+      document.dispatchEvent(event)
+      await nextTick()
+
+      expect(bubbleListener).not.toHaveBeenCalled()
+    } finally {
+      document.removeEventListener('keydown', bubbleListener)
+    }
   })
 })

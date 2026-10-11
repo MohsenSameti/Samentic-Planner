@@ -25,6 +25,7 @@ import { h, defineComponent, ref, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import WeekView from '../WeekView/WeekView.vue'
 import DayView from './DayView.vue'
+import Modal from '../common/Modal.vue'
 import type {
   Calendar,
   Project,
@@ -58,19 +59,21 @@ const baseTask: Task = {
  * listener App.vue uses so we can exercise the back-to-week key.
  */
 const Harness = defineComponent({
-  components: { WeekView, DayView },
+  components: { WeekView, DayView, Modal },
   setup() {
     const calendar = ref<Calendar>('gregorian')
     const weekStart = ref<WeekStartDay>(6) // Saturday-start
     const viewMode = ref<'week' | 'day'>('week')
     const currentDay = ref<string>('2024-01-03')
     const goToTodayTrigger = ref<number>(0)
+    const taskModalOpen = ref<boolean>(false)
     return {
       calendar,
       weekStart,
       viewMode,
       currentDay,
       goToTodayTrigger,
+      taskModalOpen,
     }
   },
   render(): ReturnType<typeof h> {
@@ -130,7 +133,7 @@ const Harness = defineComponent({
               this.currentDay = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
             },
             onNavigateDay: (date: string) => { this.currentDay = date },
-            onAddTask: () => {},
+            onAddTask: () => { this.taskModalOpen = true },
             onEditTask: () => {},
             onMoveTask: () => {},
             onToggleTaskStatus: () => {},
@@ -142,6 +145,13 @@ const Harness = defineComponent({
             onUpdatePropertyValue: () => {},
             onDropTask: () => {},
           }),
+      h(Modal, {
+        show: this.taskModalOpen,
+        title: 'Add Task',
+        onClose: () => {
+          this.taskModalOpen = false
+        },
+      }),
     ])
   },
 })
@@ -294,5 +304,99 @@ describe('Day view wiring (WeekView ↔ DayView)', () => {
     await nextTick()
     expect(dayView.props('date')).toBe('2024-01-10')
     vi.useRealTimers()
+  })
+
+  it('pressing Escape with a modal open in day view closes the modal without leaving day view', async () => {
+    const wrapper = mount(Harness, { attachTo: document.body })
+    const weekView = wrapper.findComponent({ name: 'WeekView' })
+    await weekView.vm.$emit('open-day', '2024-01-03')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'DayView' }).exists()).toBe(true)
+
+    const root = wrapper.vm as unknown as {
+      viewMode: 'week' | 'day'
+      taskModalOpen: boolean
+    }
+
+    let dayViewEscHandledCount = 0
+    // Window-level keydown handler matching App.vue:
+    // Guards against open modals and expects stopped propagation.
+    const onKeydown = (e: KeyboardEvent): void => {
+      if (root.taskModalOpen) return
+      if (root.viewMode === 'day' && e.key === 'Escape') {
+        dayViewEscHandledCount++
+        root.viewMode = 'week'
+      }
+    }
+    document.addEventListener('keydown', onKeydown)
+
+    try {
+      root.taskModalOpen = true
+      await nextTick()
+      expect(wrapper.findComponent(Modal).props('show')).toBe(true)
+
+      // First Escape: open modal intercepts Escape, closes the modal, and stops propagation
+      const escEvent1 = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      document.dispatchEvent(escEvent1)
+      await nextTick()
+
+      expect(root.taskModalOpen).toBe(false)
+      expect(dayViewEscHandledCount).toBe(0)
+      expect(wrapper.findComponent({ name: 'DayView' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'WeekView' }).exists()).toBe(false)
+
+      // Second Escape: modal is now closed, so Escape closes Day View
+      const escEvent2 = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      document.dispatchEvent(escEvent2)
+      await nextTick()
+
+      expect(dayViewEscHandledCount).toBe(1)
+      expect(wrapper.findComponent({ name: 'WeekView' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'DayView' }).exists()).toBe(false)
+    } finally {
+      document.removeEventListener('keydown', onKeydown)
+    }
+  })
+
+  it('stops propagation of Escape so an unguarded window-level Day View listener does not exit Day View while a modal is open', async () => {
+    const wrapper = mount(Harness, { attachTo: document.body })
+    const weekView = wrapper.findComponent({ name: 'WeekView' })
+    await weekView.vm.$emit('open-day', '2024-01-03')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'DayView' }).exists()).toBe(true)
+
+    const root = wrapper.vm as unknown as {
+      viewMode: 'week' | 'day'
+      taskModalOpen: boolean
+    }
+
+    let unguardedListenerFired = false
+    const unguardedEscListener = (e: KeyboardEvent): void => {
+      if (root.viewMode === 'day' && e.key === 'Escape') {
+        unguardedListenerFired = true
+        root.viewMode = 'week'
+      }
+    }
+    document.addEventListener('keydown', unguardedEscListener)
+
+    try {
+      root.taskModalOpen = true
+      await nextTick()
+      expect(wrapper.findComponent(Modal).props('show')).toBe(true)
+
+      // Press Escape while modal is open
+      const escEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      document.dispatchEvent(escEvent)
+      await nextTick()
+
+      // Modal closed
+      expect(root.taskModalOpen).toBe(false)
+      // The unguarded listener should NOT have fired because Modal called stopPropagation()
+      expect(unguardedListenerFired).toBe(false)
+      expect(wrapper.findComponent({ name: 'DayView' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'WeekView' }).exists()).toBe(false)
+    } finally {
+      document.removeEventListener('keydown', unguardedEscListener)
+    }
   })
 })

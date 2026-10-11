@@ -175,6 +175,21 @@ const deleteModalOpen = ref<boolean>(false)
 const deleteMessage = ref<string>('')
 
 const changePasswordModalOpen = ref<boolean>(false)
+
+/**
+ * True if any modal dialog in the application is currently open.
+ * Used to isolate Escape handling in day view so closing a modal
+ * does not accidentally exit day view.
+ */
+const isAnyModalOpen = computed<boolean>(
+  () =>
+    taskModalOpen.value ||
+    projectModalOpen.value ||
+    propertyModalOpen.value ||
+    moveModalOpen.value ||
+    deleteModalOpen.value ||
+    changePasswordModalOpen.value,
+)
 /**
  * The async delete action to run when the user confirms. Stored as a
  * closure rather than a discriminated union because both delete paths
@@ -415,12 +430,14 @@ function handleGoToday(): void {
 
 /**
  * Window-level `keydown` listener for Esc, mounted only while in
- * day view. The `DatePickerPopover` (when open) handles its own Esc
- * with `stopPropagation()` so this listener doesn't fire while the
- * popover is closing — pressing Esc twice is the documented flow:
- * first Esc closes the popover, second Esc closes day view.
+ * day view. The `DatePickerPopover` (when open) and `Modal` (when open)
+ * handle their own Esc with `stopPropagation()` so this listener doesn't
+ * fire while a modal or popover is closing — pressing Esc twice is the
+ * documented flow: first Esc closes the modal/popover, second Esc closes
+ * day view. We also check `isAnyModalOpen` to ensure day view is preserved.
  */
 function handleDocumentKeydown(e: KeyboardEvent): void {
+  if (isAnyModalOpen.value) return
   if (viewMode.value === 'day' && e.key === 'Escape') {
     closeDayView()
   }
