@@ -261,6 +261,19 @@ const mobileMetaSummary = computed<string>(() => {
  * user looks at the always-mounted notes section or the meta row.
  */
 const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
+
+/**
+ * Accessible name for the mobile meta footer disclosure button (spec 13 §5.2).
+ * Toggles between "Show day details" and "Hide day details", including property
+ * summary and note indicator when collapsed.
+ */
+const mobileMetaAriaLabel = computed<string>(() => {
+  if (mobileMetaExpanded.value) {
+    return 'Hide day details'
+  }
+  const suffix = `${props.properties.length > 0 ? ` (${mobileMetaSummary.value})` : ''}${hasNote.value ? ', has note' : ''}`
+  return `Show day details${suffix}`
+})
 </script>
 
 <template>
@@ -405,26 +418,30 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
     </div>
 
     <!-- Day Notes -->
-    <div v-show="!isMobile || mobileMetaExpanded">
+    <div class="day-notes-section" v-show="!isMobile || mobileMetaExpanded">
       <DayNotes
         :date="date"
         :initial-value="dayNoteValue"
       />
     </div>
 
-    <!-- Mobile meta footer (spec §9): on <=768px, properties and
-         notes collapse into a single tap-to-expand row instead of
-         permanently eating the column's vertical budget. Desktop
-         leaves this hidden so the existing always-mounted layout is
+    <!-- Mobile meta footer (spec §9, spec 13 §5.2): on <=768px, properties
+         and notes collapse into a tap-to-expand/collapse row instead of
+         permanently eating the column's vertical budget. On empty days,
+         shows "Day details" disclosure so the user can open/collapse notes.
+         Desktop leaves this hidden so the existing always-mounted layout is
          byte-identical. -->
     <button
-      v-if="isMobile && !mobileMetaExpanded && (properties.length > 0 || hasNote)"
+      v-if="isMobile"
       type="button"
       class="meta-footer"
-      :aria-label="`Show day details${properties.length > 0 ? ` (${mobileMetaSummary})` : ''}${hasNote ? ', has note' : ''}`"
-      @click="mobileMetaExpanded = true"
+      :aria-label="mobileMetaAriaLabel"
+      :aria-expanded="mobileMetaExpanded ? 'true' : 'false'"
+      @click="mobileMetaExpanded = !mobileMetaExpanded"
     >
-      <span v-if="properties.length > 0" class="meta-summary">{{ mobileMetaSummary }}</span>
+      <span v-if="properties.length === 0 && !hasNote" class="meta-summary">Day details</span>
+      <span v-else-if="properties.length > 0" class="meta-summary">{{ mobileMetaSummary }}</span>
+      <span v-else class="meta-summary">Notes</span>
       <span v-if="hasNote" class="meta-note-dot" aria-hidden="true"></span>
     </button>
   </div>
@@ -742,11 +759,13 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
   flex-shrink: 0;
 }
 
-/* Mobile meta footer (spec §9). On <=768px, properties and notes
- * collapse into this single tap-to-expand row. The button is
- * hidden on desktop so the existing layout is byte-identical. */
+/* Mobile meta footer (spec §9, spec 13 §5.2). On <=768px, properties and notes
+ * collapse into this single tap-to-expand/collapse row with at least 44px
+ * touch target on mobile. The button is hidden on desktop so the existing layout
+ * is byte-identical. */
 .meta-footer {
   display: none;
+  min-height: 44px;
   /* Token-based padding; width / border-radius raw px per project
    * convention (the spacing lint doesn't scan these). */
   padding: var(--space-2) var(--space-3);
@@ -762,6 +781,17 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
   width: 100%;
   cursor: pointer;
   flex-shrink: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.meta-footer:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.meta-footer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .meta-summary {
@@ -783,6 +813,7 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
 @media (max-width: 768px) {
   .meta-footer {
     display: flex;
+    min-height: 44px;
   }
 }
 

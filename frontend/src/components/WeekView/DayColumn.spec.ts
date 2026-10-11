@@ -650,6 +650,69 @@ describe('DayColumn', () => {
       const wrapper = mountAt({ dayNoteValue: 'a note' })
       expect(wrapper.find('.meta-footer').exists()).toBe(false)
     })
+
+    describe('empty-day details disclosure (spec 13 §5.2)', () => {
+      it('renders .meta-footer on mobile even when day has no properties and no note', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        expect(footer.exists()).toBe(true)
+        expect(footer.text()).toContain('Day details')
+      })
+
+      it('exposes accessible name and aria-expanded="false" initially', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        expect(footer.attributes('aria-expanded')).toBe('false')
+        expect(footer.attributes('aria-label')).toBe('Show day details')
+      })
+
+      it('clicking .meta-footer expands day details', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        await footer.trigger('click')
+        await wrapper.vm.$nextTick()
+
+        expect(footer.attributes('aria-expanded')).toBe('true')
+        expect(footer.attributes('aria-label')).toBe('Hide day details')
+        const dayNotes = wrapper.findComponent({ name: 'DayNotes' })
+        expect(dayNotes.exists()).toBe(true)
+        const notesSection = wrapper.find('.day-notes-section').element as HTMLElement
+        expect(notesSection.style.display).not.toBe('none')
+      })
+
+      it('clicking .meta-footer again collapses day details', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        await footer.trigger('click')
+        await wrapper.vm.$nextTick()
+        expect(footer.attributes('aria-expanded')).toBe('true')
+
+        await footer.trigger('click')
+        await wrapper.vm.$nextTick()
+        expect(footer.attributes('aria-expanded')).toBe('false')
+        expect(footer.attributes('aria-label')).toBe('Show day details')
+        const notesSection = wrapper.find('.day-notes-section').element as HTMLElement
+        expect(notesSection.style.display).toBe('none')
+      })
+
+      it('ensures .meta-footer has a min-height of 44px on mobile in CSS', () => {
+        const css = readFileSync(
+          resolve(process.cwd(), 'src/components/WeekView/DayColumn.vue'),
+          'utf8',
+        )
+        const mobileBlock = css.match(
+          /@media\s*\(max-width:\s*768px\)\s*\{([\s\S]*?)\}\s*\n/g,
+        )
+        expect(mobileBlock).not.toBeNull()
+        const mobileCss = (mobileBlock ?? []).join('\n')
+        const rule = mobileCss.match(/\.meta-footer\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+        expect(rule).toMatch(/min-height\s*:\s*44px/)
+      })
+    })
   })
 
   /**
