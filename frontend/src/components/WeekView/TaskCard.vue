@@ -29,6 +29,20 @@ const actions = useDayActions()
 
 const menuOpen = ref<boolean>(false)
 const notesExpanded = ref<boolean>(false)
+
+type NotesSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
+const notesSaveStatus = ref<NotesSaveStatus>('idle')
+let notesSaveSeq = 0
+let notesResetTimer: ReturnType<typeof setTimeout> | null = null
+
+const notesSaveStatusText = computed<string>(() => {
+  if (notesSaveStatus.value === 'saving') return 'Saving…'
+  if (notesSaveStatus.value === 'saved') return 'Saved'
+  if (notesSaveStatus.value === 'error') return 'Save failed'
+  return ''
+})
+
 /**
  * Local mirror of `task.notes`. We use a local ref instead of `:value`
  * so the textarea keeps its in-progress edits even when the parent
@@ -124,8 +138,25 @@ function handleDragStart(e: DragEvent): void {
 /* Notes                                                                 */
 /* ------------------------------------------------------------------ */
 
-function handleNotesBlur(): void {
-  actions?.updateTaskNotes(props.task, notes.value)
+async function handleNotesBlur(): Promise<void> {
+  const currentSeq = ++notesSaveSeq
+  notesSaveStatus.value = 'saving'
+  try {
+    await actions?.updateTaskNotes(props.task, notes.value)
+    if (notesSaveSeq === currentSeq) {
+      notesSaveStatus.value = 'saved'
+      if (notesResetTimer) clearTimeout(notesResetTimer)
+      notesResetTimer = setTimeout(() => {
+        if (notesSaveSeq === currentSeq) {
+          notesSaveStatus.value = 'idle'
+        }
+      }, 2000)
+    }
+  } catch {
+    if (notesSaveSeq === currentSeq) {
+      notesSaveStatus.value = 'error'
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -258,6 +289,7 @@ watch(menuOpen, open => {
 })
 
 onUnmounted(() => {
+  if (notesResetTimer) clearTimeout(notesResetTimer)
   document.removeEventListener('click', handleDocumentClick)
   document.removeEventListener('keydown', handleDocumentKeydown, true)
   window.removeEventListener('scroll', closeMenu, true)
@@ -510,6 +542,15 @@ function handleToggleStatus(): void {
         rows="2"
         @blur="handleNotesBlur"
       ></textarea>
+      <div
+        v-if="notesSaveStatus !== 'idle'"
+        class="note-save-status"
+        :class="notesSaveStatus"
+        :role="notesSaveStatus === 'error' ? 'alert' : undefined"
+        aria-live="polite"
+      >
+        {{ notesSaveStatusText }}
+      </div>
     </div>
   </div>
 </template>
@@ -797,6 +838,24 @@ function handleToggleStatus(): void {
 .task-notes textarea:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.note-save-status {
+  font-size: 0.75rem;
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.note-save-status.saving {
+  color: var(--text-secondary);
+}
+
+.note-save-status.saved {
+  color: var(--success);
+}
+
+.note-save-status.error {
+  color: var(--danger);
 }
 
 /* Mobile touch hit areas (spec 13 §5.1). */

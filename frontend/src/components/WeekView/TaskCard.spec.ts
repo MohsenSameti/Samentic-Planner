@@ -7,7 +7,7 @@
  * keyboard activation of the checkbox, etc.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import TaskCard from './TaskCard.vue'
@@ -974,6 +974,203 @@ describe('TaskCard', () => {
       expect(taskCardSource).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.task-checkbox::after\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
     })
   })
+
+  describe('notes save status feedback (Task 6.2)', () => {
+    it('shows saving status while task note save is in flight', async () => {
+      let resolvePromise!: () => void
+      const pendingPromise = new Promise<void>(resolve => {
+        resolvePromise = resolve
+      })
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes.mockReturnValue(pendingPromise)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('new task note')
+      await textarea.trigger('blur')
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('saving')
+      expect(statusEl.text()).toBe('Saving…')
+      expect(statusEl.attributes('aria-live')).toBe('polite')
+
+      resolvePromise()
+      await flushPromises()
+      wrapper.unmount()
+    })
+
+    it('shows saved status after successful task note save and returns to idle after timeout', async () => {
+      vi.useFakeTimers()
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes.mockResolvedValue(undefined)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('saved task note')
+      await textarea.trigger('blur')
+      await flushPromises()
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('saved')
+      expect(statusEl.text()).toBe('Saved')
+
+      // Advance time past the transient status timeout (2000ms)
+      vi.advanceTimersByTime(2000)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.note-save-status').exists()).toBe(false)
+      vi.useRealTimers()
+      wrapper.unmount()
+    })
+
+    it('shows error status with role="alert" when task note save fails', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes.mockRejectedValue(new Error('Network error'))
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('failed task note')
+      await textarea.trigger('blur')
+      await flushPromises()
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('error')
+      expect(statusEl.text()).toBe('Save failed')
+      expect(statusEl.attributes('role')).toBe('alert')
+      wrapper.unmount()
+    })
+
+    it('race condition: older save resolving does not overwrite newer save status', async () => {
+      let resolveFirst!: () => void
+      let resolveSecond!: () => void
+      const firstPromise = new Promise<void>(resolve => {
+        resolveFirst = resolve
+      })
+      const secondPromise = new Promise<void>(resolve => {
+        resolveSecond = resolve
+      })
+
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes
+        .mockReturnValueOnce(firstPromise)
+        .mockReturnValueOnce(secondPromise)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+
+      // First blur
+      await textarea.setValue('task note 1')
+      await textarea.trigger('blur')
+
+      // Second blur
+      await textarea.setValue('task note 2')
+      await textarea.trigger('blur')
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saving')
+
+      // Second completes first
+      resolveSecond()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+
+      // Older first save completes later
+      resolveFirst()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+      wrapper.unmount()
+    })
+
+    it('race condition: older save rejecting does not overwrite newer save status', async () => {
+      let rejectFirst!: (err: Error) => void
+      let resolveSecond!: () => void
+      const firstPromise = new Promise<void>((_, reject) => {
+        rejectFirst = reject
+      })
+      const secondPromise = new Promise<void>(resolve => {
+        resolveSecond = resolve
+      })
+
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes
+        .mockReturnValueOnce(firstPromise)
+        .mockReturnValueOnce(secondPromise)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+
+      // First blur
+      await textarea.setValue('task note 1')
+      await textarea.trigger('blur')
+
+      // Second blur
+      await textarea.setValue('task note 2')
+      await textarea.trigger('blur')
+
+      // First save fails after second started
+      rejectFirst(new Error('Old failure'))
+      await flushPromises()
+
+      // Should still be saving
+      expect(wrapper.find('.note-save-status').classes()).toContain('saving')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saving…')
+
+      // Second save succeeds
+      resolveSecond()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+      wrapper.unmount()
+    })
+  })
 })
+
 
 
