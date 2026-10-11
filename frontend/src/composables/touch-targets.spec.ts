@@ -88,13 +88,16 @@ describe('source-wide: touch targets meet 44px minimum on mobile (spec §6)', ()
     })
 
     /**
-     * Spec §25: the `.open-day-btn` chevron is gone, so the header's
-     * only interactive control is `.add-task-btn` — the 44px bump must
-     * survive on it alone. Also pin that no `.open-day-btn` rule
-     * sneaks back into the mobile block.
+     * Spec 13 §3.3 / §11: .open-day-btn meets the 44x44px touch-target minimum on mobile.
      */
-    it('leaves no .open-day-btn rule on mobile (§25 removal)', () => {
-      expect(mobileBlocks.join('\n')).not.toMatch(/\.open-day-btn/)
+    it('bumps .open-day-btn to >=44x44 on mobile (spec 13 §3.3)', () => {
+      const rule = mobileBlocks
+        .join('\n')
+        .match(/\.open-day-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
     })
 
     it('bumps .property-input to >=40px tall on mobile', () => {

@@ -192,9 +192,9 @@ function onAddTask(): void {
  * The handler on `.day-header` is a mouse/touch convenience (clicking
  * the day text is the existing muscle memory) and deliberately carries
  * no `role`/`tabindex` — see spec §2: a focusable interactive descendant
- * (the `+`) inside a `role="button"` container is invalid ARIA. Spec
- * §25 removed the per-column chevron, so keyboard entry to the day view
- * is the header's date picker.
+ * inside a `role="button"` container is invalid ARIA. Spec 13 Task 3.3
+ * provides a dedicated `.open-day-btn` so keyboard users can enter
+ * Day View via Tab + Enter/Space without making the container a button.
  */
 function onOpenDay(): void {
   actions?.openDay(props.date)
@@ -286,10 +286,30 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
         >{{ monthMarker }}</div>
       </div>
       <div class="day-header-actions">
-        <!-- Spec §25: the §7 chevron control is removed — the header
-             exposes only the add-task control. Opening the day view is
-             the header-click handler (mouse/touch) or the header's
-             date picker (keyboard). -->
+        <!-- Spec 13 Task 3.3: dedicated, accessible Open day button so
+             keyboard users can enter Day View without making the header
+             container a button. Enter and Space activate it. -->
+        <button
+          type="button"
+          class="open-day-btn"
+          :aria-label="`Open ${dayName}`"
+          @click.stop="onOpenDay"
+          @keydown.enter.stop.prevent="onOpenDay"
+          @keydown.space.stop.prevent="onOpenDay"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
         <button
           class="add-task-btn"
           type="button"
@@ -525,6 +545,35 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
   font-weight: 500;
 }
 
+.open-day-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.open-day-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.open-day-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.open-day-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .add-task-btn {
   width: 28px;
   height: 28px;
@@ -535,6 +584,7 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
   transition: all 0.1s ease;
 }
 
@@ -543,19 +593,26 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
   color: white;
 }
 
+.add-task-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .add-task-btn svg {
   width: 16px;
   height: 16px;
 }
 
-/* Spec §6: bump the touch targets on every interactive control below
- * 768px to the 44px (or 40px for inputs) minimum. Spec §25 removed the
- * per-column chevron, so `.add-task-btn` is the header's only
- * control. Width / height are not scanned by the spacing lint, so
- * literal px values are fine.
+/* Spec §6, Spec 13 §3.3 / §11: bump the touch targets on interactive controls
+ * below 768px to the 44px (or 40px for inputs) minimum.
  */
 @media (max-width: 768px) {
   .add-task-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .open-day-btn {
     width: 44px;
     height: 44px;
   }
