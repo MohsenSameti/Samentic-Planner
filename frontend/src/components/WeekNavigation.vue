@@ -27,7 +27,7 @@ const emit = defineEmits<{
     <span class="week-display">{{ weekDisplay }}</span>
     <span
       v-if="currentDayLabel"
-      class="today-pill"
+      class="today-pill today-orientation-pill"
       :title="`Today: ${currentDayLabel}`"
     >{{ currentDayLabel }}</span>
     <button class="nav-btn" type="button" aria-label="Next week" @click="emit('next-week')">

@@ -269,10 +269,9 @@ const viewMode = ref<'week' | 'day'>('week')
  * Template ref into the mounted `WeekView`. Used by the toolbar
  * (`WeekNavigation`) to read the today-orientation pill computed
  * from inside WeekView without adding a new state store. The
- * instance type is loosely typed because WeekView is conditionally
- * mounted (`v-if="viewMode === 'week'"`).
+ * instance type matches the component instance exposed by WeekView.
  */
-const weekViewRef = ref<{ currentDayLabel?: { value: string | null } } | null>(null)
+const weekViewRef = ref<InstanceType<typeof WeekView> | null>(null)
 
 /**
  * Today's column label inside the visible week (e.g. "Wed 03"), or
@@ -281,7 +280,7 @@ const weekViewRef = ref<{ currentDayLabel?: { value: string | null } } | null>(n
  * today changes without duplicating the calendar logic.
  */
 const currentDayLabel = computed<string | null>(
-  () => weekViewRef.value?.currentDayLabel?.value ?? null,
+  () => weekViewRef.value?.currentDayLabel ?? null,
 )
 
 /**
