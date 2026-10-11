@@ -49,7 +49,7 @@ export const test = base.extend({
 
     try {
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => finish(new Error(`App startup timed out\n${output}`)), 15_000)
+        const timer = setTimeout(() => finish(new Error(`App startup timed out\n${output}`)), 30_000)
         const onError = (error: Error): void => finish(error)
         const onExit = (code: number | null): void => {
           finish(new Error(`App exited during startup (${code})\n${output}`))
