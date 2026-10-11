@@ -134,6 +134,29 @@ describe('TaskCard', () => {
     })
   })
 
+  describe('accessible name (spec §3.2)', () => {
+    it('exposes "Mark \'<title>\' complete" on the checkbox for an active task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, title: 'Call Sam', status: 'active' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').attributes('aria-label')).toBe("Mark 'Call Sam' complete")
+    })
+
+    it('exposes "Mark \'<title>\' incomplete" on the checkbox for a completed task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, title: 'Call Sam', status: 'completed' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').attributes('aria-label')).toBe("Mark 'Call Sam' incomplete")
+    })
+
+    it('exposes "Mark \'<title>\' complete" on the checkbox for a skipped task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, title: 'Call Sam', status: 'skipped' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').attributes('aria-label')).toBe("Mark 'Call Sam' complete")
+    })
+  })
+
   /**
    * Colour-per-state assertions for spec §4. The old code dimmed the
    * container with `opacity: 0.6` / `0.4`, which dropped text

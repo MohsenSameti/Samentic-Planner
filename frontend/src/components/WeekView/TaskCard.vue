@@ -75,6 +75,17 @@ const ariaChecked = computed<'true' | 'mixed' | 'false'>(() => {
   return 'false'
 })
 
+/**
+ * Accessible name for the custom checkbox (spec §3.2).
+ * Exposes a task-specific, status-appropriate action label.
+ */
+const checkboxAriaLabel = computed<string>(() => {
+  if (props.task.status === 'completed') {
+    return `Mark '${props.task.title}' incomplete`
+  }
+  return `Mark '${props.task.title}' complete`
+})
+
 /** Label for the Skip / Unskip menu item. Toggles by status. */
 const skipLabel = computed<string>(() =>
   props.task.status === 'skipped' ? 'Unskip' : 'Skip',
@@ -319,6 +330,7 @@ function handleToggleStatus(): void {
         :class="{ checked: checkboxState === 'checked', indeterminate: checkboxState === 'indeterminate' }"
         role="checkbox"
         :aria-checked="ariaChecked"
+        :aria-label="checkboxAriaLabel"
         tabindex="0"
         @click="handleToggleStatus"
         @keydown.enter.prevent="handleToggleStatus"
