@@ -959,5 +959,21 @@ describe('TaskCard', () => {
       expect(taskCardSource).toContain('var(--task-skipped-bg)')
     })
   })
+
+  describe('mobile touch hit areas (Task 5.1)', () => {
+    const taskCardSource = readFileSync(
+      resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
+      'utf8',
+    )
+
+    it('bumps .task-menu-btn to 44x44px on mobile', () => {
+      expect(taskCardSource).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.task-menu-btn\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+    })
+
+    it('expands .task-checkbox touch hit area to at least 44x44px via ::after on mobile', () => {
+      expect(taskCardSource).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.task-checkbox::after\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+    })
+  })
 })
+
 

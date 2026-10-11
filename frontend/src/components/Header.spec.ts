@@ -240,6 +240,21 @@ describe('Header', () => {
       expect(ratio).toBeGreaterThanOrEqual(4.5)
     })
   })
+
+  describe('mobile touch hit areas (Task 5.1)', () => {
+    it('bumps .sidebar-toggle, .settings-btn, and .logout-btn to 44px on mobile', () => {
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.sidebar-toggle\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.settings-btn\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.logout-btn\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+    })
+
+    it('ensures .today-btn has at least 44x44px min dimensions and inline-flex on mobile', () => {
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.today-btn\s*\{[^}]*min-height:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.today-btn\s*\{[^}]*min-width:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.today-btn\s*\{[^}]*display:\s*inline-flex;/)
+    })
+  })
 })
+
 
 
