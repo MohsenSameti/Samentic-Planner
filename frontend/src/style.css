@@ -45,6 +45,7 @@
    * reads as "placeholder" rather than typed content. */
   --placeholder: #A89880;
   --accent: #C5A065;
+  --accent-contrast: #1A1612;
   /* Translucent accent so `::selection` and soft accent backgrounds
    * read correctly in both light and dark modes. */
   --accent-light: rgba(197, 160, 101, 0.14);
@@ -124,6 +125,7 @@
   --text: var(--text-primary);
   --placeholder: #8A7D70;
   --accent: #C5A065;
+  --accent-contrast: #1A1612;
   --accent-light: rgba(197, 160, 101, 0.18);
   --accent-hover: #B08D55;
   --success: #6B8E5A;
@@ -230,7 +232,7 @@ input, select, textarea {
 
 .btn-primary {
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #1A1612);
 }
 
 .btn-primary:hover {

@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
+import { contrastRatio, resolveCssColor } from '../test/contrast'
 import Header from './Header.vue'
 
 /**
@@ -215,5 +216,30 @@ describe('Header', () => {
       expect(match[0]).toMatch(/var\(--text-primary\)/)
     })
   })
+
+  describe('Today button contrast (Task 4.1)', () => {
+    it('styles .today-btn with var(--accent-contrast, #1A1612)', () => {
+      const match = source.match(/\.today-btn\s*\{[^}]*\}/)
+      expect(match, 'expected to find a CSS rule for .today-btn').toBeTruthy()
+      expect(match?.[0]).toMatch(/color\s*:\s*var\(--accent-contrast,\s*#1A1612\)/)
+    })
+
+    it('has contrast ratio >= 4.5:1 against --accent background', () => {
+      const match = source.match(/\.today-btn\s*\{[^}]*\}/)
+      expect(match).toBeTruthy()
+      const rule = match?.[0] ?? ''
+      const fgColorExpr = rule.match(/color\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const bgColorExpr = rule.match(/background\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const vars = {
+        '--accent': '#C5A065',
+        '--accent-contrast': '#1A1612',
+      }
+      const fg = resolveCssColor(fgColorExpr, vars)
+      const bg = resolveCssColor(bgColorExpr, vars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+  })
 })
+
 

@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { globSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { contrastRatio, resolveCssColor } from './test/contrast'
 
 /**
  * Read the stylesheet once. `pnpm test` runs with `cwd` at the repo
@@ -294,3 +295,98 @@ describe('source-wide: spacing declarations use --space-* tokens', () => {
     expect(violations).toEqual([])
   })
 })
+
+describe('primary action contrast and --accent-contrast token (Task 4.1)', () => {
+  it('declares --accent-contrast in :root', () => {
+    const body = ruleBody(/^:root\s*/)
+    expect(body).toMatch(/--accent-contrast\s*:\s*#1A1612;/)
+  })
+
+  it('re-declares --accent-contrast in :root[data-theme="dark"]', () => {
+    const body = ruleBody(/:root\[data-theme="dark"\]\s*/)
+    expect(body).toMatch(/--accent-contrast\s*:\s*#1A1612;/)
+  })
+
+  it('updates .btn-primary text color to use var(--accent-contrast, #1A1612)', () => {
+    const body = ruleBody(/\.btn-primary\s*/)
+    expect(body).toMatch(/color\s*:\s*var\(--accent-contrast,\s*#1A1612\);/)
+  })
+
+  describe('WCAG AA contrast ratio >= 4.5:1 for .btn-primary', () => {
+    const lightRoot = ruleBody(/^:root\s*/)
+    const darkRoot = ruleBody(/:root\[data-theme="dark"\]\s*/)
+
+    const extractVars = (body: string): Record<string, string> => {
+      const vars: Record<string, string> = {}
+      for (const m of body.matchAll(/(--[a-zA-Z0-9_-]+)\s*:\s*([^;]+);/g)) {
+        vars[m[1]!] = m[2]!.trim()
+      }
+      return vars
+    }
+
+    const lightVars = extractVars(lightRoot)
+    const darkVars = extractVars(darkRoot)
+
+    const btnPrimaryBody = ruleBody(/\.btn-primary\s*/)
+    const btnPrimaryHoverBody = ruleBody(/\.btn-primary:hover\s*/)
+
+    const fgColorExpr = btnPrimaryBody.match(/color\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+    const bgNormalExpr = btnPrimaryBody.match(/background\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+    const bgHoverExpr = btnPrimaryHoverBody.match(/background\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+
+    it('has contrast ratio >= 4.5:1 in light mode (normal state)', () => {
+      const fg = resolveCssColor(fgColorExpr, lightVars)
+      const bg = resolveCssColor(bgNormalExpr, lightVars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('has contrast ratio >= 4.5:1 in light mode (hover state)', () => {
+      const fg = resolveCssColor(fgColorExpr, lightVars)
+      const bg = resolveCssColor(bgHoverExpr, lightVars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('has contrast ratio >= 4.5:1 in dark mode (normal state)', () => {
+      const fg = resolveCssColor(fgColorExpr, darkVars)
+      const bg = resolveCssColor(bgNormalExpr, darkVars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('has contrast ratio >= 4.5:1 in dark mode (hover state)', () => {
+      const fg = resolveCssColor(fgColorExpr, darkVars)
+      const bg = resolveCssColor(bgHoverExpr, darkVars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+  })
+
+  describe('ErrorBoundary retry button contrast', () => {
+    const errorBoundarySource = readFileSync(
+      resolve(process.cwd(), 'src/components/ErrorBoundary.vue'),
+      'utf8',
+    )
+
+    it('styles .retry-btn with var(--accent-contrast, #1A1612)', () => {
+      const retryRule = errorBoundarySource.match(/\.retry-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      expect(retryRule).toMatch(/color\s*:\s*var\(--accent-contrast,\s*#1A1612\);/)
+    })
+
+    it('has contrast ratio >= 4.5:1 for .retry-btn against its accent background', () => {
+      const retryRule = errorBoundarySource.match(/\.retry-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const fgColorExpr = retryRule.match(/color\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const bgColorExpr = retryRule.match(/background\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const lightVars = {
+        '--accent': '#C5A065',
+        '--accent-contrast': '#1A1612',
+      }
+      const fg = resolveCssColor(fgColorExpr, lightVars)
+      const bg = resolveCssColor(bgColorExpr, lightVars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+  })
+})
+

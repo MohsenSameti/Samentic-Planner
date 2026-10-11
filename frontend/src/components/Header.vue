@@ -236,7 +236,7 @@ onUnmounted(() => {
 .today-btn {
   padding: var(--space-2) var(--space-4);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #1A1612);
   border: none;
   border-radius: 4px;
   font-size: 0.875rem;
