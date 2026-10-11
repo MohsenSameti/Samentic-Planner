@@ -167,6 +167,9 @@ const dataLoading = ref<boolean>(false)
  */
 const dataLoaded = ref<boolean>(false)
 
+/** Board-level load error when the initial data fetch fails. */
+const loadError = ref<string | null>(null)
+
 /* ------------------------------------------------------------------ */
 /* Modal state (per plan: modals & currently-edited entities live here) */
 /* ------------------------------------------------------------------ */
@@ -760,6 +763,7 @@ function scheduleIdle(task: () => void): void {
  */
 async function loadData(): Promise<void> {
   dataLoading.value = true
+  loadError.value = null
   try {
     const state = await api.getState()
     projects.value = state.projects
@@ -783,7 +787,10 @@ async function loadData(): Promise<void> {
       })
       projects.value.push(project)
     }
+    dataLoaded.value = true
   } catch (err) {
+    loadError.value = 'Could not load planner'
+    dataLoaded.value = false
     // `api.ts` already sets `apiError`; we just log for devtools.
     // eslint-disable-next-line no-console
     console.error('Failed to load data:', err)
@@ -792,10 +799,21 @@ async function loadData(): Promise<void> {
     // Wait until after the first paint to start pulling the
     // `WeekSummary` chunk — keeps the initial render from competing
     // with the chunk download.
-    scheduleIdle(() => {
-      showWeekSummary.value = true
-    })
+    if (!loadError.value) {
+      scheduleIdle(() => {
+        showWeekSummary.value = true
+      })
+    }
   }
+}
+
+/**
+ * Retry loading the board data after a failed load.
+ * Resets the `dataLoaded` guard and initiates a new fetch.
+ */
+async function retryLoad(): Promise<void> {
+  dataLoaded.value = false
+  await loadData()
 }
 
 /**
@@ -898,7 +916,15 @@ function handlePasswordChanged(): void {
       <p>Opening planner…</p>
     </div>
 
-    <!-- 5. Authenticated, data loaded -->
+    <!-- 5. Board load error -->
+    <div v-else-if="loadError" class="board-error" role="alert">
+      <p>{{ loadError }}</p>
+      <button type="button" class="btn btn-primary retry-btn" @click="retryLoad">
+        Retry
+      </button>
+    </div>
+
+    <!-- 6. Authenticated, data loaded -->
     <div v-else class="app">
       <Header
         :sidebar-collapsed="sidebarCollapsed"
@@ -1136,6 +1162,24 @@ function handlePasswordChanged(): void {
   color: var(--text-secondary);
 }
 
+.board-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+}
+
+.board-error p {
+  margin: var(--space-0);
+  color: var(--text-primary);
+}
+
 .project-filter-indicator {
   display: flex;
   align-items: center;
@@ -1215,6 +1259,10 @@ function handlePasswordChanged(): void {
 }
 
 @media (max-width: 768px) {
+  .board-error {
+    padding: var(--space-4);
+  }
+
   .week-container {
     padding: var(--space-4);
     overflow-y: auto;
