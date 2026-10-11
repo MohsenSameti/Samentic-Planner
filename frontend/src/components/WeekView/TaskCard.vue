@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import type { Task, Project } from '../../types'
 import { useDayActions } from '../../composables/useDayActions'
 
@@ -155,9 +155,20 @@ function computeMenuPosition(): void {
   menuPosition.value = { top, left }
 }
 
+function getMenuItems(): HTMLButtonElement[] {
+  if (!menuRef.value) return []
+  return Array.from(menuRef.value.querySelectorAll<HTMLButtonElement>('.task-menu-item'))
+}
+
 function openMenu(): void {
   computeMenuPosition()
   menuOpen.value = true
+  nextTick(() => {
+    const items = getMenuItems()
+    if (items.length > 0) {
+      items[0].focus()
+    }
+  })
 }
 
 function closeMenu(): void {
@@ -183,13 +194,39 @@ function handleDocumentClick(e: MouseEvent): void {
 }
 
 /**
- * Closes the menu when pressing Escape. Stops propagation so window-level
- * view shortcuts don't also fire.
+ * Handles keyboard navigation within the menu (ArrowUp/Down, Home/End, Escape).
+ * Escape closes the menu, stops propagation so window-level view shortcuts
+ * don't fire, and restores focus to the menu trigger button.
  */
 function handleDocumentKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.stopPropagation()
     closeMenu()
+    menuAnchor.value?.focus()
+    return
+  }
+
+  const items = getMenuItems()
+  if (items.length === 0) return
+
+  const activeElement = document.activeElement as HTMLButtonElement | null
+  const currentIndex = activeElement ? items.indexOf(activeElement) : -1
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % items.length
+    items[nextIndex].focus()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    const prevIndex =
+      currentIndex === -1 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length
+    items[prevIndex].focus()
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    items[0].focus()
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    items[items.length - 1].focus()
   }
 }
 
@@ -356,21 +393,36 @@ function handleToggleStatus(): void {
             @click.stop
           >
             <template v-if="task.status !== 'cancelled'">
-              <div class="task-menu-item" role="menuitem" @click="handleEdit">
+              <button
+                type="button"
+                class="task-menu-item"
+                role="menuitem"
+                @click="handleEdit"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
                 Edit
-              </div>
-              <div class="task-menu-item" role="menuitem" @click="handleToggleNotes">
+              </button>
+              <button
+                type="button"
+                class="task-menu-item"
+                role="menuitem"
+                @click="handleToggleNotes"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
                 {{ notesExpanded ? 'Hide Notes' : 'Add Notes' }}
-              </div>
-              <div class="task-menu-item" role="menuitem" @click="handleMove">
+              </button>
+              <button
+                type="button"
+                class="task-menu-item"
+                role="menuitem"
+                @click="handleMove"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="5 9 2 12 5 15" />
                   <polyline points="9 5 12 2 15 5" />
@@ -380,8 +432,9 @@ function handleToggleStatus(): void {
                   <line x1="12" y1="2" x2="12" y2="22" />
                 </svg>
                 Move to...
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
                 class="task-menu-item"
                 role="menuitem"
                 @click="handleSkip"
@@ -391,9 +444,10 @@ function handleToggleStatus(): void {
                   <line x1="19" y1="5" x2="19" y2="19" />
                 </svg>
                 {{ skipLabel }}
-              </div>
-              <div
+              </button>
+              <button
                 v-if="canCancel"
+                type="button"
                 class="task-menu-item danger"
                 role="menuitem"
                 @click="handleCancel"
@@ -404,23 +458,33 @@ function handleToggleStatus(): void {
                   <line x1="9" y1="9" x2="15" y2="15" />
                 </svg>
                 Cancel
-              </div>
+              </button>
             </template>
             <template v-else>
-              <div class="task-menu-item" role="menuitem" @click="handleRestore">
+              <button
+                type="button"
+                class="task-menu-item"
+                role="menuitem"
+                @click="handleRestore"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                 </svg>
                 Restore
-              </div>
-              <div class="task-menu-item danger" role="menuitem" @click="handleDelete">
+              </button>
+              <button
+                type="button"
+                class="task-menu-item danger"
+                role="menuitem"
+                @click="handleDelete"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
                 Delete
-              </div>
+              </button>
             </template>
           </div>
         </Teleport>
@@ -656,19 +720,28 @@ function handleToggleStatus(): void {
 }
 
 .task-menu-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  color: inherit;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85rem;
   transition: background 0.1s ease;
   user-select: none;
 }
 
-.task-menu-item:hover {
+.task-menu-item:hover,
+.task-menu-item:focus,
+.task-menu-item:focus-visible {
   background: var(--bg);
+  outline: none;
 }
 
 .task-menu-item svg {

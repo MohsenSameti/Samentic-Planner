@@ -718,6 +718,118 @@ describe('TaskCard', () => {
       expect(actions.deleteTask).toHaveBeenCalledWith(cancelledTask)
       wrapper.unmount()
     })
+
+    describe('keyboard accessibility (spec §3.1)', () => {
+      it('renders menu items as native button elements with role="menuitem"', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+        expect(items.length).toBeGreaterThan(0)
+        for (const item of items) {
+          expect(item.tagName.toLowerCase()).toBe('button')
+          expect(item.getAttribute('type')).toBe('button')
+          expect(item.getAttribute('role')).toBe('menuitem')
+        }
+        wrapper.unmount()
+      })
+
+      it('moves focus to the first menu item on opening the menu', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        const firstItem = document.body.querySelector<HTMLButtonElement>('.task-menu-item')
+        expect(firstItem).not.toBeNull()
+        expect(document.activeElement).toBe(firstItem)
+        wrapper.unmount()
+      })
+
+      it('navigates between menu items using ArrowDown and ArrowUp with circular wrapping', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        const items = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.task-menu-item'))
+        expect(items.length).toBeGreaterThanOrEqual(2)
+        expect(document.activeElement).toBe(items[0])
+
+        // ArrowDown moves to next item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        expect(document.activeElement).toBe(items[1])
+
+        // ArrowUp moves back to first item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+        expect(document.activeElement).toBe(items[0])
+
+        // ArrowUp from first item wraps to last item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+        expect(document.activeElement).toBe(items[items.length - 1])
+
+        // ArrowDown from last item wraps to first item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        expect(document.activeElement).toBe(items[0])
+
+        wrapper.unmount()
+      })
+
+      it('navigates to the first and last menu items using Home and End', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        const items = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.task-menu-item'))
+        expect(items.length).toBeGreaterThanOrEqual(3)
+
+        // Move to middle item first
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        expect(document.activeElement).toBe(items[1])
+
+        // End moves to last item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+        expect(document.activeElement).toBe(items[items.length - 1])
+
+        // Home moves to first item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+        expect(document.activeElement).toBe(items[0])
+
+        wrapper.unmount()
+      })
+
+      it('closes menu and restores focus to the trigger button on Escape', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        const triggerBtn = wrapper.find<HTMLButtonElement>('.task-menu-btn').element
+        triggerBtn.focus()
+        expect(document.activeElement).toBe(triggerBtn)
+
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        expect(document.body.querySelector('.task-menu.open')).not.toBeNull()
+
+        const stopPropagationSpy = vi.fn()
+        const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        escapeEvent.stopPropagation = stopPropagationSpy
+        document.dispatchEvent(escapeEvent)
+        await wrapper.vm.$nextTick()
+
+        expect(document.body.querySelector('.task-menu.open')).toBeNull()
+        expect(stopPropagationSpy).toHaveBeenCalled()
+        expect(document.activeElement).toBe(triggerBtn)
+
+        wrapper.unmount()
+      })
+    })
   })
 
   describe('notes', () => {
