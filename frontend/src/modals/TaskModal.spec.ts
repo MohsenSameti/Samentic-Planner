@@ -239,6 +239,105 @@ describe('TaskModal', () => {
     expect((wrapper.find('#task-description').element as HTMLTextAreaElement).value).toBe('')
   })
 
+  describe('project selection and defaultProjectId (Task 2.4)', () => {
+    it('includes a "No project" option with an empty string value', () => {
+      const wrapper = mount(TaskModal, { props: baseProps })
+      const select = wrapper.find('#task-project')
+      const options = select.findAll('option')
+      const noProjectOption = options.find(opt => opt.attributes('value') === '')
+      expect(noProjectOption).toBeDefined()
+      expect(noProjectOption?.text()).toBe('No project')
+    })
+
+    it('defaults projectId to defaultProjectId when opened in create mode', () => {
+      const wrapper = mount(TaskModal, {
+        props: {
+          ...baseProps,
+          projects: [
+            ...baseProjects,
+            { id: 'p2', name: 'Other', color: '#fff', createdAt: now, updatedAt: now },
+          ],
+          defaultProjectId: 'p2',
+        },
+      })
+      const select = wrapper.find('#task-project').element as HTMLSelectElement
+      expect(select.value).toBe('p2')
+    })
+
+    it('defaults projectId to "" ("No project") when defaultProjectId is "" in create mode', () => {
+      const wrapper = mount(TaskModal, {
+        props: {
+          ...baseProps,
+          defaultProjectId: '',
+        },
+      })
+      const select = wrapper.find('#task-project').element as HTMLSelectElement
+      expect(select.value).toBe('')
+    })
+
+    it('submits projectId as "" when "No project" is selected and saved', async () => {
+      const wrapper = mount(TaskModal, {
+        props: {
+          ...baseProps,
+          defaultProjectId: 'p1',
+        },
+      })
+      await wrapper.find('#task-title').setValue('Task without project')
+      await wrapper.find('#task-project').setValue('')
+      await wrapper.find('form').trigger('submit.prevent')
+
+      expect(wrapper.emitted('save')).toBeTruthy()
+      const payload = wrapper.emitted('save')?.[0]?.[0] as { projectId: string } | undefined
+      expect(payload?.projectId).toBe('')
+    })
+
+    it('preserves existing task projectId in edit mode even if defaultProjectId is provided', async () => {
+      const sampleTask: Task = {
+        id: 't-edit',
+        projectId: 'p1',
+        title: 'Edit Me',
+        description: '',
+        date: '2024-03-20',
+        status: 'active',
+        notes: '',
+        createdAt: now,
+        updatedAt: now,
+      }
+      const wrapper = mount(TaskModal, {
+        props: {
+          ...baseProps,
+          task: sampleTask,
+          defaultProjectId: 'p2',
+        },
+      })
+      const select = wrapper.find('#task-project').element as HTMLSelectElement
+      expect(select.value).toBe('p1')
+    })
+
+    it('preserves empty projectId ("No project") in edit mode even if defaultProjectId is provided', async () => {
+      const sampleTaskNoProj: Task = {
+        id: 't-no-proj',
+        projectId: '',
+        title: 'Task with no project',
+        description: '',
+        date: '2024-03-20',
+        status: 'active',
+        notes: '',
+        createdAt: now,
+        updatedAt: now,
+      }
+      const wrapper = mount(TaskModal, {
+        props: {
+          ...baseProps,
+          task: sampleTaskNoProj,
+          defaultProjectId: 'p1',
+        },
+      })
+      const select = wrapper.find('#task-project').element as HTMLSelectElement
+      expect(select.value).toBe('')
+    })
+  })
+
 
   // --------------------------------------------------------------- //
   // Source-level regression coverage for dark-mode form-control   //

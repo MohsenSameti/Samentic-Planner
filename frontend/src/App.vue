@@ -141,6 +141,19 @@ const auth = useAuth()
 /* ------------------------------------------------------------------ */
 
 const selectedProject = ref<string>('all')
+
+const activeProject = computed<Project | undefined>(() =>
+  projects.value.find(p => p.id === selectedProject.value),
+)
+
+const activeProjectName = computed<string>(() =>
+  activeProject.value ? activeProject.value.name : selectedProject.value,
+)
+
+function clearProjectFilter(): void {
+  selectedProject.value = 'all'
+}
+
 const sidebarCollapsed = ref<boolean>(true)
 
 /** True while the initial data fetch is in flight (after auth resolves). */
@@ -924,6 +937,30 @@ function handlePasswordChanged(): void {
         ></div>
 
         <main class="week-container">
+          <div
+            v-if="selectedProject !== 'all'"
+            class="project-filter-indicator active-filter-indicator"
+          >
+            <div class="filter-indicator-content">
+              <span
+                v-if="activeProject?.color"
+                class="filter-indicator-dot"
+                :style="{ backgroundColor: activeProject.color }"
+                aria-hidden="true"
+              ></span>
+              <span class="filter-indicator-label">Filtered by:</span>
+              <strong class="filter-indicator-name">{{ activeProjectName }}</strong>
+            </div>
+            <button
+              type="button"
+              class="clear-filter-btn"
+              aria-label="Clear filter"
+              @click="clearProjectFilter"
+            >
+              Clear filter
+            </button>
+          </div>
+
           <!--
             `WeekNavigation` is only meaningful in week view; it's
             hidden in day view because day view has its own header
@@ -1011,6 +1048,7 @@ function handlePasswordChanged(): void {
         :projects="projects"
         :date="taskModalDate"
         :calendar="calendar"
+        :default-project-id="selectedProject !== 'all' ? selectedProject : ''"
         @close="taskModalOpen = false"
         @save="saveTask"
       />
@@ -1098,6 +1136,77 @@ function handlePasswordChanged(): void {
   color: var(--text-secondary);
 }
 
+.project-filter-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-indicator-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.filter-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.filter-indicator-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.filter-indicator-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.clear-filter-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.clear-filter-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1024px) {
   .sidebar-backdrop {
     display: block;
@@ -1111,6 +1220,18 @@ function handlePasswordChanged(): void {
     overflow-y: auto;
     flex: 1;
     height: calc(100dvh - 73px);
+  }
+
+  .project-filter-indicator {
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .clear-filter-btn {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
   }
 }
 </style>
