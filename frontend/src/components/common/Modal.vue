@@ -1,5 +1,12 @@
+<script lang="ts">
+import { ref } from 'vue'
+
+let modalIdCounter = 0
+const modalStack = ref<number[]>([])
+</script>
+
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 
 const props = defineProps<{
   show: boolean
@@ -11,22 +18,137 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
+const instanceId = ++modalIdCounter
+const openerElement = ref<HTMLElement | null>(null)
+
+const isActive = computed<boolean>(() => {
+  return modalStack.value.length > 0 && modalStack.value[modalStack.value.length - 1] === instanceId
+})
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
+function isFocusable(el: HTMLElement | null): boolean {
+  if (!el || el === document.body) return false
+  if (!document.contains(el)) return false
+  if ('disabled' in el && (el as HTMLButtonElement).disabled) return false
+  if (el.getAttribute('aria-hidden') === 'true') return false
+  if (el.style.display === 'none' || el.style.visibility === 'hidden') return false
+  if (el.getAttribute('tabindex') === '-1') return false
+  return typeof el.focus === 'function'
+}
+
+function getFocusableElements(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return []
+  const matches = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+  return matches.filter((el) => {
+    if (el.hasAttribute('disabled')) return false
+    if (el.getAttribute('tabindex') === '-1') return false
+    if (el.getAttribute('aria-hidden') === 'true') return false
+    if (el.style.display === 'none' || el.style.visibility === 'hidden') return false
+    return true
+  })
+}
+
+function openModal(): void {
+  if (modalStack.value.includes(instanceId)) return
+
+  const currentActive = document.activeElement as HTMLElement | null
+  if (currentActive && (!modalRef.value || !modalRef.value.contains(currentActive))) {
+    openerElement.value = currentActive
+  }
+
+  modalStack.value.push(instanceId)
+
+  void nextTick(() => {
+    if (!props.show || !modalRef.value) return
+    const focusable = getFocusableElements(modalRef.value)
+    const target = modalRef.value.querySelector<HTMLElement>('[autofocus]') ?? focusable[0]
+    if (target) {
+      target.focus()
+    } else {
+      modalRef.value.focus()
+    }
+  })
+}
+
+function closeModal(): void {
+  const index = modalStack.value.indexOf(instanceId)
+  if (index !== -1) {
+    modalStack.value.splice(index, 1)
+  }
+
+  const opener = openerElement.value
+  openerElement.value = null
+
+  if (opener && isFocusable(opener)) {
+    opener.focus()
+  }
+}
+
+watch(
+  () => props.show,
+  (show) => {
+    if (show) {
+      openModal()
+    } else {
+      closeModal()
+    }
+  },
+  { immediate: true },
+)
+
+function handleTab(e: KeyboardEvent): void {
+  if (!modalRef.value) return
+
+  const focusable = getFocusableElements(modalRef.value)
+  if (focusable.length === 0) {
+    e.preventDefault()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+
+  if (e.shiftKey) {
+    if (active === first || active === modalRef.value || !modalRef.value.contains(active)) {
+      e.preventDefault()
+      last?.focus()
+    }
+  } else {
+    if (active === last || active === modalRef.value || !modalRef.value.contains(active)) {
+      e.preventDefault()
+      first?.focus()
+    }
+  }
+}
 
 /**
- * Close-on-Escape handler. The `show` gate matters: the listener stays
- * registered for the lifetime of the component, but we only react when
- * the modal is actually open. Without the gate, pressing Escape in any
- * other modal's overlay would close this one too.
+ * Close-on-Escape and Tab trap handler. The `show` gate and `isActive` check
+ * ensure only the topmost active dialog manages focus and intercepts keyboard events.
  *
- * When open, Escape propagation is stopped so parent/window-level listeners
+ * When open and active, Escape propagation is stopped so parent/window-level listeners
  * (such as App.vue's Day View shortcut) do not also react to this Escape.
  */
 function handleKeydown(e: KeyboardEvent): void {
-  if (!props.show) return
+  if (!props.show || !isActive.value) return
+
   if (e.key === 'Escape') {
     e.stopPropagation()
     e.stopImmediatePropagation()
     emit('close')
+    return
+  }
+
+  if (e.key === 'Tab') {
+    handleTab(e)
   }
 }
 
@@ -34,17 +156,13 @@ function handleKeydown(e: KeyboardEvent): void {
  * Close-on-outside-interaction handler. Listens for `mousedown` rather
  * than `click` deliberately: a real user's press on the element that
  * *opens* the modal fires `mousedown` first (while the modal is still
- * closed) and only then the `click` that sets `show=true`. If we
- * listened for `click` here, the opening click would bubble up to
- * `document` after `show` had already flipped to `true`, and the
- * handler would immediately close the modal it just opened (the button
- * receives focus during the click, so the prop update is applied before
- * the event finishes bubbling). `mousedown` also fires on touch (as a
- * synthetic event before the tap's `click`), so this stays correct on
- * mobile. Same `show` gate reasoning as the Escape handler above.
+ * closed) and only then the `click` that sets `show=true`.
+ *
+ * The `isActive` check ensures that when modals are nested or overlapped,
+ * only the topmost active dialog handles outside clicks.
  */
 function handleDocumentMouseDown(e: MouseEvent): void {
-  if (!props.show) return
+  if (!props.show || !isActive.value) return
   if (modalRef.value && !modalRef.value.contains(e.target as Node)) {
     emit('close')
   }
@@ -58,12 +176,20 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown, true)
   document.removeEventListener('mousedown', handleDocumentMouseDown)
+  closeModal()
 })
 </script>
 
 <template>
   <div v-if="show" class="modal-overlay" @click.self="emit('close')">
-    <div ref="modalRef" class="modal" role="dialog" :aria-label="title">
+    <div
+      ref="modalRef"
+      class="modal"
+      role="dialog"
+      :aria-label="title"
+      :aria-modal="isActive ? 'true' : undefined"
+      tabindex="-1"
+    >
       <div class="modal-header">
         <h2>{{ title }}</h2>
         <button
@@ -116,6 +242,7 @@ onUnmounted(() => {
   overflow-y: auto;
   box-shadow: var(--shadow-md);
   animation: modalSlideIn 0.2s ease;
+  outline: none;
 }
 
 .modal-header {
