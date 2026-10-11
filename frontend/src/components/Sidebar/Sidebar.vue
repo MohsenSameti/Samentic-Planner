@@ -77,7 +77,7 @@ const totalActiveTasks = computed<number>(() =>
       />
     </section>
 
-    <section v-if="properties.length > 0" class="sidebar-section">
+    <section class="sidebar-section">
       <h3>Custom Properties</h3>
       <PropertiesSection
         :properties="properties"

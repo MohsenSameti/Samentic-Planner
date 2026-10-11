@@ -60,4 +60,33 @@ describe('PropertiesSection', () => {
 
     expect(wrapper.emitted('add')).toBeTruthy()
   })
+
+  it('renders empty-state text and Add Property button when properties is empty', () => {
+    const wrapper = mount(PropertiesSection, {
+      props: { properties: [] },
+    })
+    const emptyMsg = wrapper.find('.property-empty')
+    expect(emptyMsg.exists()).toBe(true)
+    expect(emptyMsg.text()).toBe('No trackers yet.')
+    expect(wrapper.findAll('.property-item')).toHaveLength(0)
+    expect(wrapper.find('.add-btn').exists()).toBe(true)
+    expect(wrapper.find('.add-btn').text()).toContain('Add Property')
+  })
+
+  it('does not render empty-state text when properties are present', () => {
+    const wrapper = mount(PropertiesSection, {
+      props: { properties: testProperties },
+    })
+    expect(wrapper.find('.property-empty').exists()).toBe(false)
+  })
+
+  it('emits "add" when Add Property is clicked in empty state', async () => {
+    const wrapper = mount(PropertiesSection, {
+      props: { properties: [] },
+    })
+    const addBtn = wrapper.find('.add-btn')
+    await addBtn.trigger('click')
+
+    expect(wrapper.emitted('add')).toBeTruthy()
+  })
 })

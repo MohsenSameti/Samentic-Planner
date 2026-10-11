@@ -95,4 +95,37 @@ describe('Sidebar', () => {
 
     expect(wrapper.emitted('add-property')).toBeTruthy()
   })
+
+  it('keeps Custom Properties section and Add Property button visible when properties is empty', () => {
+    const wrapper = mount(Sidebar, {
+      props: {
+        ...defaultProps,
+        properties: [],
+      },
+    })
+
+    expect(wrapper.text()).toContain('Custom Properties')
+    const emptyMsg = wrapper.find('.property-empty')
+    expect(emptyMsg.exists()).toBe(true)
+    expect(emptyMsg.text()).toBe('No trackers yet.')
+
+    const addPropertyBtn = wrapper.findAll('button').find(btn => btn.text().includes('Add Property'))
+    expect(addPropertyBtn).toBeDefined()
+    expect(addPropertyBtn!.exists()).toBe(true)
+  })
+
+  it('forwards add-property when Add Property button is clicked in empty state', async () => {
+    const wrapper = mount(Sidebar, {
+      props: {
+        ...defaultProps,
+        properties: [],
+      },
+    })
+
+    const addPropertyBtn = wrapper.findAll('button').find(btn => btn.text().includes('Add Property'))
+    expect(addPropertyBtn).toBeDefined()
+    await addPropertyBtn!.trigger('click')
+
+    expect(wrapper.emitted('add-property')).toBeTruthy()
+  })
 })

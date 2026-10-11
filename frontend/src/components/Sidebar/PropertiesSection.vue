@@ -12,7 +12,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="property-list">
+  <div v-if="properties.length > 0" class="property-list">
     <div v-for="prop in properties" :key="prop.id" class="property-item">
       <span class="property-name">{{ prop.name }}</span>
       <span class="property-unit">{{ prop.unit }}</span>
@@ -41,6 +41,7 @@ const emit = defineEmits<{
       </button>
     </div>
   </div>
+  <p v-else class="property-empty">No trackers yet.</p>
   <button class="add-btn" type="button" @click="emit('add')">
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -146,6 +147,18 @@ const emit = defineEmits<{
     width: 16px;
     height: 16px;
   }
+
+  .property-empty {
+    font-size: 0.9rem;
+  }
+}
+
+.property-empty {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  line-height: 1.4;
 }
 
 .add-btn {

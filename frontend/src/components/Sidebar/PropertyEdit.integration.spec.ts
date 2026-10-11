@@ -110,4 +110,22 @@ describe('Property Edit Integration (Sidebar → PropertyModal)', () => {
     // Delete button exists in edit mode
     expect(modal.find('.btn-danger').exists()).toBe(true)
   })
+
+  it('shows empty state when there are no properties and opens creation modal on click', async () => {
+    const wrapper = mount(Harness)
+    wrapper.vm.properties = []
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.property-empty').exists()).toBe(true)
+    expect(wrapper.find('.property-empty').text()).toBe('No trackers yet.')
+
+    const addBtn = wrapper.findAll('button').find(btn => btn.text().includes('Add Property'))
+    expect(addBtn).toBeDefined()
+    await addBtn!.trigger('click')
+
+    const modal = wrapper.findComponent(PropertyModal)
+    expect(modal.props('show')).toBe(true)
+    expect(modal.props('property')).toBeNull()
+    expect(modal.text()).toContain('Add Property')
+  })
 })
