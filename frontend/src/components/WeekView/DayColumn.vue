@@ -449,6 +449,10 @@ const mobileMetaAriaLabel = computed<string>(() => {
 
 <style scoped>
 .day-column {
+  /* Keep the column surface above the week-edge fades so those overlays
+   * cannot replace a strip of its background with the page background. */
+  position: relative;
+  z-index: 1;
   /* Spec §12, superseded by §23: stop claiming a fixed width. Above
    * --bp-md the seven columns share the available space; the 176px
    * floor keeps task titles readable everywhere. Below --bp-md the

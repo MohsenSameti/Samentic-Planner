@@ -11,6 +11,8 @@
  * event-forwarding path, and the day-cell derivation.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import WeekView from './WeekView.vue'
@@ -73,6 +75,16 @@ describe('WeekView', () => {
     const wrapper = mount(WeekView, { props: baseProps })
     const cols = wrapper.findAllComponents({ name: 'DayColumn' })
     expect(cols).toHaveLength(7)
+  })
+
+  it('keeps the edge fade behind the day-column surfaces', () => {
+    const weekViewSource = readFileSync(resolve(process.cwd(), 'src/components/WeekView/WeekView.vue'), 'utf8')
+    const dayColumnSource = readFileSync(resolve(process.cwd(), 'src/components/WeekView/DayColumn.vue'), 'utf8')
+    const fadeRule = weekViewSource.match(/\.grid-fade\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    const columnRule = dayColumnSource.match(/\.day-column\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    expect(fadeRule).toMatch(/z-index\s*:\s*0\s*;/)
+    expect(columnRule).toMatch(/position\s*:\s*relative\s*;/)
+    expect(columnRule).toMatch(/z-index\s*:\s*1\s*;/)
   })
 
   it('labels the day names in en-US short format', () => {

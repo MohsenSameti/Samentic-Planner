@@ -560,7 +560,7 @@ watch(
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
-  z-index: 1;
+  z-index: 0;
 }
 
 .grid-fade.visible {
