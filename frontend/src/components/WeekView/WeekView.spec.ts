@@ -613,55 +613,6 @@ describe('WeekView', () => {
   })
 
   /**
-   * Spec §8: today-orientation pill. The pill is computed inside
-   * WeekView (so the calendar logic stays put) and exposed to the
-   * parent via `defineExpose`. The parent reads the computed through
-   * a template ref. We exercise the seam here so a future refactor
-   * that drops the expose (or breaks reactivity) is caught.
-   *
-   * Vue 3 auto-unwraps refs/computeds on the public instance, so
-   * `wrapper.vm.currentDayLabel` is the resolved string (or `null`),
-   * not a `Ref` object.
-   */
-  describe('currentDayLabel (spec §8)', () => {
-    it('returns null when today is not in the visible week', () => {
-      const wrapper = mount(WeekView, {
-        props: { ...baseProps, currentWeekStart: '2025-01-06' },
-      })
-      const exposed = wrapper.vm as unknown as {
-        currentDayLabel: string | null
-      }
-      expect(exposed.currentDayLabel).toBeNull()
-    })
-
-    it('returns the in-week label of the today column', () => {
-      // Today is pinned to Mon 2024-01-01 (the first day of the
-      // week). Label is weekday short + zero-padded day-of-month.
-      const wrapper = mount(WeekView, { props: baseProps })
-      const exposed = wrapper.vm as unknown as {
-        currentDayLabel: string | null
-      }
-      expect(exposed.currentDayLabel).toBe('Mon 01')
-    })
-
-    it('tracks the today column when the wall clock moves', async () => {
-      const wrapper = mount(WeekView, { props: baseProps })
-      const exposed = wrapper.vm as unknown as {
-        currentDayLabel: string | null
-      }
-      expect(exposed.currentDayLabel).toBe('Mon 01')
-
-      // Move today to Wed 2024-01-03 (mid-week).
-      vi.setSystemTime(new Date('2024-01-03T12:00:00Z'))
-      vi.advanceTimersByTime(60_000)
-      await nextTick()
-      await nextTick()
-
-      expect(exposed.currentDayLabel).toBe('Wed 03')
-    })
-  })
-
-  /**
    * Spec §15 step 2: cards in a day column are sorted active
    * first, then completed, then cancelled; ties broken by
    * `createdAt` then `id` so unrelated edits don't reshuffle.

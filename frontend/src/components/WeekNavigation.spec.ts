@@ -2,10 +2,8 @@
  * Tests for the `WeekNavigation` component.
  *
  * `WeekNavigation` is a presentational toolbar with prev/next buttons
- * and a week-range label. Spec §8 adds an orientation pill that
- * surfaces today's date when it falls inside the visible week, so the
- * user always knows where the today anchor is even after scrolling it
- * out of view on mobile.
+ * and a week-range label. The current week is emphasized without
+ * adding an orientation pill or changing the navigation controls.
  */
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -13,6 +11,7 @@ import WeekNavigation from './WeekNavigation.vue'
 
 const baseProps = {
   weekDisplay: 'Jan 01-07, 2024',
+  isCurrentWeek: false,
 }
 
 describe('WeekNavigation', () => {
@@ -33,35 +32,32 @@ describe('WeekNavigation', () => {
     expect(wrapper.emitted('next-week')).toBeTruthy()
   })
 
-  describe('orientation pill (spec §8)', () => {
-    it('renders no orientation pill when currentDayLabel is omitted', () => {
-      const wrapper = mount(WeekNavigation, { props: baseProps })
+  describe('current-week emphasis', () => {
+    it('emphasizes the week range when the displayed week is current', () => {
+      const wrapper = mount(WeekNavigation, {
+        props: { ...baseProps, isCurrentWeek: true },
+      })
+      expect(wrapper.find('.week-display').classes()).toContain('current-week')
       expect(wrapper.find('.today-pill').exists()).toBe(false)
     })
 
-    it('renders the orientation pill when currentDayLabel is provided', () => {
+    it('leaves the week range normal when the displayed week is not current', () => {
       const wrapper = mount(WeekNavigation, {
-        props: { ...baseProps, currentDayLabel: 'Wed 03' },
+        props: { ...baseProps, isCurrentWeek: false },
       })
-      const pill = wrapper.find('.today-pill')
-      expect(pill.exists()).toBe(true)
-      expect(pill.text()).toBe('Wed 03')
+      expect(wrapper.find('.week-display').classes()).not.toContain('current-week')
+      expect(wrapper.find('.today-pill').exists()).toBe(false)
     })
 
-    it('marks the pill as a non-interactive indicator (no button role, aria-hidden on decoration)', () => {
-      // The pill is informational, not a button — clicking it does
-      // not need to do anything (the toolbar Today button already
-      // brings the user back to today's week). Keeping it as a span
-      // avoids advertising a non-existent action.
-      const wrapper = mount(WeekNavigation, {
-        props: { ...baseProps, currentDayLabel: 'Wed 03' },
+    it('keeps both navigation controls present in either emphasis state', () => {
+      const currentWeek = mount(WeekNavigation, {
+        props: { ...baseProps, isCurrentWeek: true },
       })
-      const pill = wrapper.find('.today-pill')
-      expect(pill.element.tagName).toBe('SPAN')
-      // The text "Wed 03" is the rendered content; the prefix word
-      // "Today" can be set via a visually-hidden span for screen
-      // readers without affecting the visual.
-      expect(pill.text()).toBe('Wed 03')
+      const otherWeek = mount(WeekNavigation, {
+        props: { ...baseProps, isCurrentWeek: false },
+      })
+      expect(currentWeek.findAll('.nav-btn')).toHaveLength(2)
+      expect(otherWeek.findAll('.nav-btn')).toHaveLength(2)
     })
   })
 })

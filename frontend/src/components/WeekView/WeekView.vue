@@ -312,31 +312,6 @@ onMounted(() => {
 })
 
 /**
- * Returns the today's column label inside the visible week, or null
- * when today isn't in the week. Spec §8: surface the current day in
- * the toolbar so the user can re-find today's column even after
- * scrolling it out of the viewport on mobile.
- *
- * The label combines the weekday short name (matching `weekDays[].name`)
- * with the day-of-month — the same shape the column header shows —
- * so the pill and the column header read as one anchor.
- */
-const currentDayLabel = computed<string | null>(() => {
-  if (!isTodayInVisibleWeek()) return null
-  // The week uses `weekDays` for everything else; find today's cell
-  // by matching `isToday`. `props.calendar` matches because
-  // `weekDays` is keyed off it.
-  const today = weekDays.value.find(d => d.isToday)
-  if (!today) return null
-  // "Wed 03" — weekday short + zero-padded day-of-month so the label
-  // is the same width whether today is "3" or "31".
-  const paddedDay = String(
-    today.dayNumJalali ?? today.dayNum,
-  ).padStart(2, '0')
-  return `${today.name} ${paddedDay}`
-})
-
-/**
  * Re-scroll whenever the parent navigates to a week containing today
  * (e.g. when the user clicks the header's "Today" button). When the
 
@@ -409,14 +384,6 @@ onBeforeUnmount(() => {
   const el = weekGridRef.value
   if (el) el.removeEventListener('scroll', recomputeFades)
 })
-
-/**
- * Expose `currentDayLabel` to the parent (App.vue) so the toolbar
- * `WeekNavigation` can render the today-orientation pill. Spec §8.
- * No other internals are exposed — the parent's existing emit
- * contract remains the only way to drive mutations.
- */
-defineExpose({ currentDayLabel })
 
 /**
  * Re-scroll whenever the parent navigates to a week containing today

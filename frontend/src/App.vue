@@ -9,6 +9,7 @@ import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
 import { useTheme } from './composables/useTheme'
 import { useWeekNavigation } from './composables/useWeekNavigation'
+import { useTodayISO } from './composables/useTodayISO'
 import {
   DEFAULT_WEEK_START,
   formatWeekDisplay,
@@ -85,6 +86,7 @@ const {
   goToToday,
   goToTodayTrigger,
 } = useWeekNavigation(weekStart, calendar)
+const { todayISO } = useTodayISO()
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
 // `load*` function, but `App.vue` uses `api.getState()` for the initial
@@ -245,6 +247,13 @@ const weekDisplay = computed<string>(() =>
   formatWeekDisplay(currentWeekStart.value, calendar.value),
 )
 
+/** Emphasize the displayed range when it contains today's local date. */
+const isCurrentWeek = computed<boolean>(
+  () =>
+    currentWeekStart.value ===
+    toLocalISODate(getWeekStart(fromLocalISODate(todayISO.value), weekStart.value)),
+)
+
 /** ISO dates for the visible week — used by `WeekSummary`. */
 const weekDateStrings = computed<string[]>(() => weekDays.value.map(d => d.date))
 
@@ -267,24 +276,6 @@ const currentWeekNote = computed<string>(
  * last editing.
  */
 const viewMode = ref<'week' | 'day'>('week')
-
-/**
- * Template ref into the mounted `WeekView`. Used by the toolbar
- * (`WeekNavigation`) to read the today-orientation pill computed
- * from inside WeekView without adding a new state store. The
- * instance type matches the component instance exposed by WeekView.
- */
-const weekViewRef = ref<InstanceType<typeof WeekView> | null>(null)
-
-/**
- * Today's column label inside the visible week (e.g. "Wed 03"), or
- * `null` when today isn't in the week (spec §8). Surfaces here from
- * WeekView's computed so the toolbar pill is reactive to week /
- * today changes without duplicating the calendar logic.
- */
-const currentDayLabel = computed<string | null>(
-  () => weekViewRef.value?.currentDayLabel ?? null,
-)
 
 /**
  * The focused day when `viewMode === 'day'`. ISO date (`YYYY-MM-DD`).
@@ -994,14 +985,13 @@ function handlePasswordChanged(): void {
           <WeekNavigation
             v-if="viewMode === 'week'"
             :week-display="weekDisplay"
-            :current-day-label="currentDayLabel"
+            :is-current-week="isCurrentWeek"
             @prev-week="navigateWeek(-1)"
             @next-week="navigateWeek(1)"
           />
 
           <WeekView
             v-if="viewMode === 'week'"
-            ref="weekViewRef"
             :current-week-start="currentWeekStart"
             :tasks="tasks"
             :projects="projects"
