@@ -236,7 +236,7 @@ onUnmounted(() => {
 .today-btn {
   padding: var(--space-2) var(--space-4);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #1A1612);
   border: none;
   border-radius: 4px;
   font-size: 0.875rem;
@@ -394,11 +394,19 @@ onUnmounted(() => {
   .header {
     padding: var(--space-3) var(--space-4);
     overflow: visible;
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    column-gap: var(--space-3);
   }
 
   .header-left {
     gap: var(--space-3);
     flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .header-right {
+    margin-left: auto;
   }
 
   .logo h1 {
@@ -411,10 +419,30 @@ onUnmounted(() => {
     flex-shrink: 0;
   }
 
+  .sidebar-toggle {
+    width: 44px;
+    height: 44px;
+  }
+
   .today-btn {
     padding: var(--space-2) var(--space-3);
     font-size: 0.8rem;
     white-space: nowrap;
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .settings-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .logout-btn {
+    width: 44px;
+    height: 44px;
   }
 
   /* Keep the dropdown anchored to the right edge so it never

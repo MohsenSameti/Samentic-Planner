@@ -394,6 +394,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
         <div class="day-view-notes">
           <h3>Day Notes</h3>
           <DayNotes
+            :key="date"
             :date="date"
             :initial-value="dayNoteValue"
             @update="(noteDate, note) => emit('update-day-note', noteDate, note)"

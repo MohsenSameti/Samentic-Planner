@@ -25,6 +25,10 @@
    * distinct from completed (neutral grey) and cancelled (brick red) at a glance.
    * Contrast vs `--bg` `#FAF9F7`: ≈5.3:1; vs `--surface` `#FFFFFF`: ≈5.6:1. Both AA. */
   --text-skipped: #8B6E4A;
+  /* Theme-aware card gradient start tokens (Task 4.2). */
+  --task-completed-bg: #EBE7DE;
+  --task-cancelled-bg: #EAE3DB;
+  --task-skipped-bg: #EDE6D6;
   /* Generic icon-fade opacity (spec §4). The empty-state calendar
    * glyph and any other decorative-but-secondary icon use this token
    * so the page hierarchy (`text > icon > empty-state placeholder`)
@@ -45,6 +49,7 @@
    * reads as "placeholder" rather than typed content. */
   --placeholder: #A89880;
   --accent: #C5A065;
+  --accent-contrast: #1A1612;
   /* Translucent accent so `::selection` and soft accent backgrounds
    * read correctly in both light and dark modes. */
   --accent-light: rgba(197, 160, 101, 0.14);
@@ -112,18 +117,22 @@
   --border: #5A5248;
   --text-primary: #EDE8DB;
   --text-secondary: #A89880;
-  /* Dark-mode counterpart of the completed/cancelled tokens. Same
-   * rationale as the light values, re-evaluated against
-   * `--bg #1A1816` and `--surface #221F1C`:
-   *  - completed: ≥5.7:1 on both
-   *  - cancelled: ≥4.6:1 on both (brick tint, just over the AA
-   *    threshold — deliberately muted, not a full alarm colour) */
-  --text-completed: #9A8D78;
-  --text-cancelled: #8B6E5A;
-  --text-skipped: #A68A6E;
+  /* Dark-mode counterpart of the completed/cancelled tokens (Task 4.2). Re-evaluated
+   * against `--task-*-bg` and `--bg` (`#2A2520`) to achieve >= 4.5:1 contrast (WCAG AA)
+   * while remaining visually distinct from each other:
+   *  - completed: #B8AB98 (neutral grey / tan, contrast >= 4.5:1)
+   *  - cancelled: #D48B78 (terracotta / brick red tint, contrast >= 4.5:1)
+   *  - skipped: #D4AD7D (warm amber / gold tint, contrast >= 4.5:1) */
+  --text-completed: #B8AB98;
+  --text-cancelled: #D48B78;
+  --text-skipped: #D4AD7D;
+  --task-completed-bg: #26231F;
+  --task-cancelled-bg: #2E2320;
+  --task-skipped-bg: #2B251B;
   --text: var(--text-primary);
   --placeholder: #8A7D70;
   --accent: #C5A065;
+  --accent-contrast: #1A1612;
   --accent-light: rgba(197, 160, 101, 0.18);
   --accent-hover: #B08D55;
   --success: #6B8E5A;
@@ -230,7 +239,7 @@ input, select, textarea {
 
 .btn-primary {
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #1A1612);
 }
 
 .btn-primary:hover {
@@ -263,8 +272,14 @@ input, select, textarea {
 @media (max-width: 768px) {
   .btn {
     padding: var(--space-2) var(--space-4);
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Performance hints                                                      */

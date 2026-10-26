@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
+import { contrastRatio, resolveCssColor } from '../test/contrast'
 import Header from './Header.vue'
 
 /**
@@ -30,6 +31,11 @@ const source = readFileSync(
   // URL, so resolve the SFC relative to the working directory (the
   // repo root in `pnpm test`).
   resolve(process.cwd(), 'src/components/Header.vue'),
+  'utf8',
+)
+
+const appSource = readFileSync(
+  resolve(process.cwd(), 'src/App.vue'),
   'utf8',
 )
 
@@ -215,5 +221,108 @@ describe('Header', () => {
       expect(match[0]).toMatch(/var\(--text-primary\)/)
     })
   })
+
+  describe('Today button contrast (Task 4.1)', () => {
+    it('styles .today-btn with var(--accent-contrast, #1A1612)', () => {
+      const match = source.match(/\.today-btn\s*\{[^}]*\}/)
+      expect(match, 'expected to find a CSS rule for .today-btn').toBeTruthy()
+      expect(match?.[0]).toMatch(/color\s*:\s*var\(--accent-contrast,\s*#1A1612\)/)
+    })
+
+    it('has contrast ratio >= 4.5:1 against --accent background', () => {
+      const match = source.match(/\.today-btn\s*\{[^}]*\}/)
+      expect(match).toBeTruthy()
+      const rule = match?.[0] ?? ''
+      const fgColorExpr = rule.match(/color\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const bgColorExpr = rule.match(/background\s*:\s*([^;]+);/)?.[1]?.trim() ?? ''
+      const vars = {
+        '--accent': '#C5A065',
+        '--accent-contrast': '#1A1612',
+      }
+      const fg = resolveCssColor(fgColorExpr, vars)
+      const bg = resolveCssColor(bgColorExpr, vars)
+      const ratio = contrastRatio(fg, bg)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    })
+  })
+
+  describe('mobile touch hit areas (Task 5.1)', () => {
+    it('bumps .sidebar-toggle, .settings-btn, and .logout-btn to 44px on mobile', () => {
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.sidebar-toggle\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.settings-btn\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.logout-btn\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+    })
+
+    it('ensures .today-btn has at least 44x44px min dimensions and inline-flex on mobile', () => {
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.today-btn\s*\{[^}]*min-height:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.today-btn\s*\{[^}]*min-width:\s*44px;/)
+      expect(source).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.today-btn\s*\{[^}]*display:\s*inline-flex;/)
+    })
+  })
+
+  describe('narrow viewport layout and flex sizing (Task 5.3)', () => {
+    it('does NOT contain 73px subtraction literals anywhere in App.vue styles', () => {
+      expect(appSource).not.toMatch(/73px/)
+    })
+
+    it('ensures .main-container has flex: 1 and min-height: 0 in App.vue', () => {
+      const match = appSource.match(/\.main-container\s*\{([^}]*)\}/)
+      expect(match, 'expected .main-container rule in App.vue').toBeTruthy()
+      const rule = match?.[1] ?? ''
+      expect(rule).toMatch(/flex\s*:\s*1/)
+      expect(rule).toMatch(/min-height\s*:\s*0/)
+    })
+
+    it('ensures .week-container has flex: 1, min-height: 0, and overflow-y: auto in App.vue desktop styles', () => {
+      const desktopStyles = appSource.split(/@media/)[0] ?? ''
+      const match = desktopStyles.match(/\.week-container\s*\{([^}]*)\}/)
+      expect(match, 'expected base .week-container rule in App.vue').toBeTruthy()
+      const rule = match?.[1] ?? ''
+      expect(rule).toMatch(/flex\s*:\s*1/)
+      expect(rule).toMatch(/min-height\s*:\s*0/)
+      expect(rule).toMatch(/overflow-y\s*:\s*auto/)
+      expect(rule).not.toMatch(/(?<!-)height\s*:/)
+    })
+
+    it('ensures .week-container has flex: 1, min-height: 0, and overflow-y: auto in App.vue mobile @media (max-width: 768px)', () => {
+      const mobileMatch = appSource.match(/@media\s*\(\s*max-width\s*:\s*768px\s*\)\s*\{([\s\S]*?)\n\}/)
+      expect(mobileMatch, 'expected mobile media query in App.vue').toBeTruthy()
+      const mobileStyles = mobileMatch?.[1] ?? ''
+      const match = mobileStyles.match(/\.week-container\s*\{([^}]*)\}/)
+      expect(match, 'expected .week-container in mobile media query in App.vue').toBeTruthy()
+      const rule = match?.[1] ?? ''
+      expect(rule).toMatch(/flex\s*:\s*1/)
+      expect(rule).toMatch(/min-height\s*:\s*0/)
+      expect(rule).toMatch(/overflow-y\s*:\s*auto/)
+      expect(rule).not.toMatch(/(?<!-)height\s*:/)
+    })
+
+    it('ensures .header in Header.vue has flex-wrap: wrap on mobile/narrow viewports', () => {
+      const mobileMatch = source.match(/@media\s*\(\s*max-width\s*:\s*768px\s*\)\s*\{([\s\S]*?)\n\}/)
+      expect(mobileMatch, 'expected mobile media query in Header.vue').toBeTruthy()
+      const mobileStyles = mobileMatch?.[1] ?? ''
+      const match = mobileStyles.match(/\.header\s*\{([^}]*)\}/)
+      expect(match, 'expected .header in mobile media query in Header.vue').toBeTruthy()
+      const rule = match?.[1] ?? ''
+      expect(rule).toMatch(/flex-wrap\s*:\s*wrap/)
+    })
+
+    it('preserves unwrapped header layout on desktop / tablet (> 768px)', () => {
+      const desktopStyles = source.split(/@media/)[0] ?? ''
+      const match = desktopStyles.match(/\.header\s*\{([^}]*)\}/)
+      expect(match, 'expected base .header rule in Header.vue').toBeTruthy()
+      const rule = match?.[1] ?? ''
+      expect(rule).not.toMatch(/flex-wrap\s*:\s*wrap/)
+    })
+
+    it('consolidates or wraps header controls to prevent horizontal clipping at 320px', () => {
+      const mobileMatch = source.match(/@media\s*\(\s*max-width\s*:\s*768px\s*\)\s*\{([\s\S]*?)\n\}/)
+      const mobileStyles = mobileMatch?.[1] ?? ''
+      expect(mobileStyles).toMatch(/\.header\s*\{[^}]*flex-wrap\s*:\s*wrap/)
+      expect(mobileStyles).toMatch(/\.header\s*\{[^}]*(?:gap|row-gap)/)
+    })
+  })
 })
+
+
 

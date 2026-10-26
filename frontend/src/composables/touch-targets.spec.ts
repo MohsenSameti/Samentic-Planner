@@ -88,13 +88,16 @@ describe('source-wide: touch targets meet 44px minimum on mobile (spec §6)', ()
     })
 
     /**
-     * Spec §25: the `.open-day-btn` chevron is gone, so the header's
-     * only interactive control is `.add-task-btn` — the 44px bump must
-     * survive on it alone. Also pin that no `.open-day-btn` rule
-     * sneaks back into the mobile block.
+     * Spec 13 §3.3 / §11: .open-day-btn meets the 44x44px touch-target minimum on mobile.
      */
-    it('leaves no .open-day-btn rule on mobile (§25 removal)', () => {
-      expect(mobileBlocks.join('\n')).not.toMatch(/\.open-day-btn/)
+    it('bumps .open-day-btn to >=44x44 on mobile (spec 13 §3.3)', () => {
+      const rule = mobileBlocks
+        .join('\n')
+        .match(/\.open-day-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
     })
 
     it('bumps .property-input to >=40px tall on mobile', () => {
@@ -272,3 +275,86 @@ describe('source-wide: column max-height is viewport-tied on desktop (spec §13)
     expect(rule).toMatch(/max-height\s*:\s*500px/)
   })
 })
+
+/**
+ * Task 5.1 — Minimum 44×44px touch hit areas on mobile (spec 13 §5.1, §11)
+ */
+describe('Task 5.1 — Minimum 44×44px touch hit areas on mobile', () => {
+  describe('TaskCard.vue', () => {
+    const css = styleContent('src/components/WeekView/TaskCard.vue')
+    const mobileBlocks = extractMediaBlocks(css, 768)
+    const mobileCss = mobileBlocks.join('\n')
+
+    it('bumps .task-menu-btn to >=44x44px on mobile', () => {
+      const rule = mobileCss.match(/\.task-menu-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/(?:min-)?width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/(?:min-)?height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
+    })
+
+    it('expands .task-checkbox touch hit area to >=44x44px via ::after on mobile', () => {
+      const rule = mobileCss.match(/\.task-checkbox::after\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/(?:min-)?width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/(?:min-)?height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
+      expect(rule).toMatch(/position\s*:\s*absolute/)
+    })
+  })
+
+  describe('Header.vue', () => {
+    const css = styleContent('src/components/Header.vue')
+    const mobileBlocks = extractMediaBlocks(css, 768)
+    const mobileCss = mobileBlocks.join('\n')
+
+    it('bumps .sidebar-toggle to >=44x44px on mobile', () => {
+      const rule = mobileCss.match(/\.sidebar-toggle\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/(?:min-)?width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/(?:min-)?height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
+    })
+
+    it('bumps .today-btn to >=44x44px min dimensions and inline-flex on mobile', () => {
+      const rule = mobileCss.match(/\.today-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/min-width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/min-height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
+      expect(rule).toMatch(/display\s*:\s*inline-flex/)
+    })
+
+    it('bumps .settings-btn to >=44x44px on mobile', () => {
+      const rule = mobileCss.match(/\.settings-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/(?:min-)?width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/(?:min-)?height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
+    })
+
+    it('bumps .logout-btn to >=44x44px on mobile', () => {
+      const rule = mobileCss.match(/\.logout-btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const w = rule.match(/(?:min-)?width\s*:\s*(\d+)px/)?.[1]
+      const h = rule.match(/(?:min-)?height\s*:\s*(\d+)px/)?.[1]
+      expect(Number(w)).toBeGreaterThanOrEqual(44)
+      expect(Number(h)).toBeGreaterThanOrEqual(44)
+    })
+  })
+
+  describe('style.css', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8')
+    const mobileBlocks = extractMediaBlocks(css, 768)
+    const mobileCss = mobileBlocks.join('\n')
+
+    it('bumps .btn to min-height >=44px and min-width >=44px with inline-flex on mobile', () => {
+      const rule = mobileCss.match(/\.btn\s*\{[^}]*\}/)?.[0] ?? ''
+      const minH = rule.match(/min-height\s*:\s*(\d+)px/)?.[1]
+      const minW = rule.match(/min-width\s*:\s*(\d+)px/)?.[1]
+      expect(Number(minH)).toBeGreaterThanOrEqual(44)
+      expect(Number(minW)).toBeGreaterThanOrEqual(44)
+      expect(rule).toMatch(/display\s*:\s*inline-flex/)
+    })
+  })
+})
+

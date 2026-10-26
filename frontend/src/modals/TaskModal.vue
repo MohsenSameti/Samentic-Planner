@@ -13,6 +13,8 @@ const props = defineProps<{
   date: string
   /** Which calendar to render in the date field. */
   calendar: Calendar
+  /** Default project ID for new tasks. Ignored when `task` is set. */
+  defaultProjectId?: string
 }>()
 
 const emit = defineEmits<{
@@ -32,8 +34,9 @@ const emit = defineEmits<{
 
 /**
  * Local form state. Initialised from props but reset whenever the
- * upstream `task` or `date` changes — see `watch` below — so the
- * modal always reflects what the user opened it with.
+ * modal opens or the upstream `task` or `date` changes — see `watch`
+ * below — so the modal always reflects what the user opened it with
+ * (with empty drafts for new tasks).
  */
 const form = ref<{
   title: string
@@ -43,17 +46,18 @@ const form = ref<{
 }>({
   title: props.task?.title ?? '',
   description: props.task?.description ?? '',
-  projectId: props.task?.projectId ?? props.projects[0]?.id ?? '',
+  projectId: props.task ? (props.task.projectId ?? '') : (props.defaultProjectId ?? props.projects[0]?.id ?? ''),
   date: props.task?.date ?? props.date,
 })
 
 watch(
-  () => [props.task, props.date, props.projects] as const,
-  ([nextTask, nextDate, nextProjects]) => {
+  () => [props.show, props.task, props.date, props.projects, props.defaultProjectId] as const,
+  ([nextShow, nextTask, nextDate, nextProjects, nextDefaultProjectId]) => {
+    if (!nextShow) return
     form.value = {
       title: nextTask?.title ?? '',
       description: nextTask?.description ?? '',
-      projectId: nextTask?.projectId ?? nextProjects[0]?.id ?? '',
+      projectId: nextTask ? (nextTask.projectId ?? '') : (nextDefaultProjectId ?? nextProjects[0]?.id ?? ''),
       date: nextTask?.date ?? nextDate,
     }
   },
@@ -111,6 +115,7 @@ function onPickDate(value: string): void {
       <div class="form-group">
         <label for="task-project">Project</label>
         <select id="task-project" v-model="form.projectId">
+          <option value="">No project</option>
           <option v-for="p in projects" :key="p.id" :value="p.id">
             {{ p.name }}
           </option>

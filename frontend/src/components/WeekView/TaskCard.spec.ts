@@ -7,7 +7,7 @@
  * keyboard activation of the checkbox, etc.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import TaskCard from './TaskCard.vue'
@@ -131,6 +131,29 @@ describe('TaskCard', () => {
         props: { task: { ...baseTask, status: 'skipped' }, project: baseProject },
       })
       expect(wrapper.find('.task-checkbox').classes()).not.toContain('checked')
+    })
+  })
+
+  describe('accessible name (spec §3.2)', () => {
+    it('exposes "Mark \'<title>\' complete" on the checkbox for an active task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, title: 'Call Sam', status: 'active' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').attributes('aria-label')).toBe("Mark 'Call Sam' complete")
+    })
+
+    it('exposes "Mark \'<title>\' incomplete" on the checkbox for a completed task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, title: 'Call Sam', status: 'completed' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').attributes('aria-label')).toBe("Mark 'Call Sam' incomplete")
+    })
+
+    it('exposes "Mark \'<title>\' complete" on the checkbox for a skipped task', () => {
+      const wrapper = mount(TaskCard, {
+        props: { task: { ...baseTask, title: 'Call Sam', status: 'skipped' }, project: baseProject },
+      })
+      expect(wrapper.find('.task-checkbox').attributes('aria-label')).toBe("Mark 'Call Sam' complete")
     })
   })
 
@@ -718,6 +741,118 @@ describe('TaskCard', () => {
       expect(actions.deleteTask).toHaveBeenCalledWith(cancelledTask)
       wrapper.unmount()
     })
+
+    describe('keyboard accessibility (spec §3.1)', () => {
+      it('renders menu items as native button elements with role="menuitem"', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+        expect(items.length).toBeGreaterThan(0)
+        for (const item of items) {
+          expect(item.tagName.toLowerCase()).toBe('button')
+          expect(item.getAttribute('type')).toBe('button')
+          expect(item.getAttribute('role')).toBe('menuitem')
+        }
+        wrapper.unmount()
+      })
+
+      it('moves focus to the first menu item on opening the menu', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        const firstItem = document.body.querySelector<HTMLButtonElement>('.task-menu-item')
+        expect(firstItem).not.toBeNull()
+        expect(document.activeElement).toBe(firstItem)
+        wrapper.unmount()
+      })
+
+      it('navigates between menu items using ArrowDown and ArrowUp with circular wrapping', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        const items = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.task-menu-item'))
+        expect(items.length).toBeGreaterThanOrEqual(2)
+        expect(document.activeElement).toBe(items[0])
+
+        // ArrowDown moves to next item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        expect(document.activeElement).toBe(items[1])
+
+        // ArrowUp moves back to first item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+        expect(document.activeElement).toBe(items[0])
+
+        // ArrowUp from first item wraps to last item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+        expect(document.activeElement).toBe(items[items.length - 1])
+
+        // ArrowDown from last item wraps to first item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        expect(document.activeElement).toBe(items[0])
+
+        wrapper.unmount()
+      })
+
+      it('navigates to the first and last menu items using Home and End', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        const items = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.task-menu-item'))
+        expect(items.length).toBeGreaterThanOrEqual(3)
+
+        // Move to middle item first
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        expect(document.activeElement).toBe(items[1])
+
+        // End moves to last item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+        expect(document.activeElement).toBe(items[items.length - 1])
+
+        // Home moves to first item
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+        expect(document.activeElement).toBe(items[0])
+
+        wrapper.unmount()
+      })
+
+      it('closes menu and restores focus to the trigger button on Escape', async () => {
+        const wrapper = mount(TaskCard, {
+          props: { task: baseTask, project: baseProject },
+          attachTo: document.body,
+        })
+        const triggerBtn = wrapper.find<HTMLButtonElement>('.task-menu-btn').element
+        triggerBtn.focus()
+        expect(document.activeElement).toBe(triggerBtn)
+
+        await wrapper.find('.task-menu-btn').trigger('click')
+        await wrapper.vm.$nextTick()
+        expect(document.body.querySelector('.task-menu.open')).not.toBeNull()
+
+        const stopPropagationSpy = vi.fn()
+        const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        escapeEvent.stopPropagation = stopPropagationSpy
+        document.dispatchEvent(escapeEvent)
+        await wrapper.vm.$nextTick()
+
+        expect(document.body.querySelector('.task-menu.open')).toBeNull()
+        expect(stopPropagationSpy).toHaveBeenCalled()
+        expect(document.activeElement).toBe(triggerBtn)
+
+        wrapper.unmount()
+      })
+    })
   })
 
   describe('notes', () => {
@@ -805,4 +940,237 @@ describe('TaskCard', () => {
       expect(setData).not.toHaveBeenCalled()
     })
   })
+
+  describe('theme-aware status card background tokens (Task 4.2)', () => {
+    const taskCardSource = readFileSync(
+      resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
+      'utf8',
+    )
+
+    it('has no hardcoded light gradient start literals (#EBE7DE, #EAE3DB, #EDE6D6)', () => {
+      expect(taskCardSource).not.toMatch(/#EBE7DE/i)
+      expect(taskCardSource).not.toMatch(/#EAE3DB/i)
+      expect(taskCardSource).not.toMatch(/#EDE6D6/i)
+    })
+
+    it('references theme-aware gradient start tokens', () => {
+      expect(taskCardSource).toContain('var(--task-completed-bg)')
+      expect(taskCardSource).toContain('var(--task-cancelled-bg)')
+      expect(taskCardSource).toContain('var(--task-skipped-bg)')
+    })
+  })
+
+  describe('mobile touch hit areas (Task 5.1)', () => {
+    const taskCardSource = readFileSync(
+      resolve(process.cwd(), 'src/components/WeekView/TaskCard.vue'),
+      'utf8',
+    )
+
+    it('bumps .task-menu-btn to 44x44px on mobile', () => {
+      expect(taskCardSource).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.task-menu-btn\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+    })
+
+    it('expands .task-checkbox touch hit area to at least 44x44px via ::after on mobile', () => {
+      expect(taskCardSource).toMatch(/@media\s*\(\s*max-width\s*:\s*768px\s*\)[\s\S]*\.task-checkbox::after\s*\{[^}]*width:\s*44px;\s*height:\s*44px;/)
+    })
+  })
+
+  describe('notes save status feedback (Task 6.2)', () => {
+    it('shows saving status while task note save is in flight', async () => {
+      let resolvePromise!: () => void
+      const pendingPromise = new Promise<void>(resolve => {
+        resolvePromise = resolve
+      })
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes.mockReturnValue(pendingPromise)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('new task note')
+      await textarea.trigger('blur')
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('saving')
+      expect(statusEl.text()).toBe('Saving…')
+      expect(statusEl.attributes('aria-live')).toBe('polite')
+
+      resolvePromise()
+      await flushPromises()
+      wrapper.unmount()
+    })
+
+    it('shows saved status after successful task note save and returns to idle after timeout', async () => {
+      vi.useFakeTimers()
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes.mockResolvedValue(undefined)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('saved task note')
+      await textarea.trigger('blur')
+      await flushPromises()
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('saved')
+      expect(statusEl.text()).toBe('Saved')
+
+      // Advance time past the transient status timeout (2000ms)
+      vi.advanceTimersByTime(2000)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.note-save-status').exists()).toBe(false)
+      vi.useRealTimers()
+      wrapper.unmount()
+    })
+
+    it('shows error status with role="alert" when task note save fails', async () => {
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes.mockRejectedValue(new Error('Network error'))
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('failed task note')
+      await textarea.trigger('blur')
+      await flushPromises()
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('error')
+      expect(statusEl.text()).toBe('Save failed')
+      expect(statusEl.attributes('role')).toBe('alert')
+      wrapper.unmount()
+    })
+
+    it('race condition: older save resolving does not overwrite newer save status', async () => {
+      let resolveFirst!: () => void
+      let resolveSecond!: () => void
+      const firstPromise = new Promise<void>(resolve => {
+        resolveFirst = resolve
+      })
+      const secondPromise = new Promise<void>(resolve => {
+        resolveSecond = resolve
+      })
+
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes
+        .mockReturnValueOnce(firstPromise)
+        .mockReturnValueOnce(secondPromise)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+
+      // First blur
+      await textarea.setValue('task note 1')
+      await textarea.trigger('blur')
+
+      // Second blur
+      await textarea.setValue('task note 2')
+      await textarea.trigger('blur')
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saving')
+
+      // Second completes first
+      resolveSecond()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+
+      // Older first save completes later
+      resolveFirst()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+      wrapper.unmount()
+    })
+
+    it('race condition: older save rejecting does not overwrite newer save status', async () => {
+      let rejectFirst!: (err: Error) => void
+      let resolveSecond!: () => void
+      const firstPromise = new Promise<void>((_, reject) => {
+        rejectFirst = reject
+      })
+      const secondPromise = new Promise<void>(resolve => {
+        resolveSecond = resolve
+      })
+
+      const { wrapper, actions } = mountWithActions(TaskCard, {
+        props: { task: baseTask, project: baseProject },
+        attachTo: document.body,
+      })
+      actions.updateTaskNotes
+        .mockReturnValueOnce(firstPromise)
+        .mockReturnValueOnce(secondPromise)
+
+      // Open notes
+      await wrapper.find('.task-menu-btn').trigger('click')
+      const items = Array.from(document.body.querySelectorAll<HTMLElement>('.task-menu-item'))
+      items.find(i => (i.textContent || '').includes('Notes'))!.click()
+      await wrapper.vm.$nextTick()
+
+      const textarea = wrapper.find('textarea')
+
+      // First blur
+      await textarea.setValue('task note 1')
+      await textarea.trigger('blur')
+
+      // Second blur
+      await textarea.setValue('task note 2')
+      await textarea.trigger('blur')
+
+      // First save fails after second started
+      rejectFirst(new Error('Old failure'))
+      await flushPromises()
+
+      // Should still be saving
+      expect(wrapper.find('.note-save-status').classes()).toContain('saving')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saving…')
+
+      // Second save succeeds
+      resolveSecond()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+      wrapper.unmount()
+    })
+  })
 })
+
+
+

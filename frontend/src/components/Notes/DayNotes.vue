@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { useDayActions } from '../../composables/useDayActions'
 
 const props = defineProps<{
@@ -9,6 +9,23 @@ const props = defineProps<{
 }>()
 
 const actions = useDayActions()
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
+const saveStatus = ref<SaveStatus>('idle')
+let saveSeq = 0
+let resetTimer: ReturnType<typeof setTimeout> | null = null
+
+const saveStatusText = computed<string>(() => {
+  if (saveStatus.value === 'saving') return 'Saving…'
+  if (saveStatus.value === 'saved') return 'Saved'
+  if (saveStatus.value === 'error') return 'Save failed'
+  return ''
+})
+
+onUnmounted(() => {
+  if (resetTimer) clearTimeout(resetTimer)
+})
 
 /**
  * The "expanded/collapsed" toggle is intentionally local — see the
@@ -46,9 +63,34 @@ const previewText = computed<string>(() => {
   return trimmed.replace(/\s+/g, ' ')
 })
 
-function handleBlur(e: FocusEvent): void {
-  const target = e.target as HTMLTextAreaElement
-  actions?.updateDayNote(props.date, target.value)
+/**
+ * Date that owned this editor when mounted. Blur / save actions always
+ * write to this date, never a newly displayed date, guaranteeing note
+ * date isolation.
+ */
+const editorDate = props.date
+
+async function handleBlur(e: FocusEvent): Promise<void> {
+  const target = e.target as HTMLTextAreaElement | null
+  const noteValue = target?.value ?? value.value
+  const currentSeq = ++saveSeq
+  saveStatus.value = 'saving'
+  try {
+    await actions?.updateDayNote(editorDate, noteValue)
+    if (saveSeq === currentSeq) {
+      saveStatus.value = 'saved'
+      if (resetTimer) clearTimeout(resetTimer)
+      resetTimer = setTimeout(() => {
+        if (saveSeq === currentSeq) {
+          saveStatus.value = 'idle'
+        }
+      }, 2000)
+    }
+  } catch {
+    if (saveSeq === currentSeq) {
+      saveStatus.value = 'error'
+    }
+  }
 }
 </script>
 
@@ -98,6 +140,15 @@ function handleBlur(e: FocusEvent): void {
         placeholder="Add notes for this day..."
         @blur="handleBlur"
       ></textarea>
+      <div
+        v-if="saveStatus !== 'idle'"
+        class="note-save-status"
+        :class="saveStatus"
+        :role="saveStatus === 'error' ? 'alert' : undefined"
+        aria-live="polite"
+      >
+        {{ saveStatusText }}
+      </div>
     </div>
   </div>
 </template>
@@ -184,6 +235,24 @@ function handleBlur(e: FocusEvent): void {
 .day-notes textarea:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.note-save-status {
+  font-size: 0.75rem;
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.note-save-status.saving {
+  color: var(--text-secondary);
+}
+
+.note-save-status.saved {
+  color: var(--success);
+}
+
+.note-save-status.error {
+  color: var(--danger);
 }
 
 /* Spec §6: bump the day-notes toggle to a 44px-tall touch target on

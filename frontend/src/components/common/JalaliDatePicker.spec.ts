@@ -198,21 +198,93 @@ describe('JalaliDatePicker', () => {
 })
 
 describe('JalaliDatePicker keyboard navigation', () => {
-  it('arrow keys move focus by 1 day and emit the new Gregorian ISO', async () => {
+  it('arrow keys move focus by 1 day without emitting update', async () => {
     const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
     const grid = wrapper.find('.grid')
     await grid.trigger('keydown', { key: 'ArrowRight' })
-    // ArrowRight from 2024-03-20 → 2024-03-21.
+    // ArrowRight from 2024-03-20 → 2024-03-21 without emitting update
+    expect(wrapper.emitted('update')).toBeFalsy()
+    const focused = wrapper.find('.day-cell.focused')
+    expect(focused.attributes('data-jalali-date')).toBe('2024-03-21')
+  })
+
+  it('PageDown moves by one month without emitting update', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const grid = wrapper.find('.grid')
+    await grid.trigger('keydown', { key: 'PageDown' })
+    // 2024-03-20 + 1 month = 2024-04-20 without emitting update
+    expect(wrapper.emitted('update')).toBeFalsy()
+    const focused = wrapper.find('.day-cell.focused')
+    expect(focused.attributes('data-jalali-date')).toBe('2024-04-20')
+  })
+
+  it('Home and End jump to month edges without emitting update', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const grid = wrapper.find('.grid')
+    await grid.trigger('keydown', { key: 'End' })
+    expect(wrapper.emitted('update')).toBeFalsy()
+    const focusedEnd = wrapper.find('.day-cell.focused')
+    expect(focusedEnd.attributes('data-jalali-date')).toBe(fromJalaliYMD(1403, 1, 31))
+
+    await grid.trigger('keydown', { key: 'Home' })
+    expect(wrapper.emitted('update')).toBeFalsy()
+    const focusedStart = wrapper.find('.day-cell.focused')
+    expect(focusedStart.attributes('data-jalali-date')).toBe(fromJalaliYMD(1403, 1, 1))
+  })
+
+  it('month shift buttons browse months without emitting update', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    await wrapper.find('button[aria-label="Next month"]').trigger('click')
+    expect(wrapper.emitted('update')).toBeFalsy()
+    await wrapper.find('button[aria-label="Previous month"]').trigger('click')
+    expect(wrapper.emitted('update')).toBeFalsy()
+  })
+
+  it('Enter key on grid commits the focused date', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const grid = wrapper.find('.grid')
+    await grid.trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.emitted('update')).toBeFalsy()
+    await grid.trigger('keydown', { key: 'Enter' })
     expect(wrapper.emitted('update')).toBeTruthy()
     expect(wrapper.emitted('update')?.[0]).toEqual(['2024-03-21'])
   })
 
-  it('PageUp moves by one month', async () => {
+  it('Space key on grid commits the focused date', async () => {
     const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
     const grid = wrapper.find('.grid')
-    await grid.trigger('keydown', { key: 'PageDown' })
-    // 2024-03-20 + 1 month = 2024-04-20.
-    expect(wrapper.emitted('update')?.at(-1)).toEqual(['2024-04-20'])
+    await grid.trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.emitted('update')).toBeFalsy()
+    await grid.trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('update')).toBeTruthy()
+    expect(wrapper.emitted('update')?.[0]).toEqual(['2024-03-21'])
+  })
+
+  it('uses roving tabindex with exactly one enabled date cell having tabindex="0"', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const cellsWithZero = wrapper.findAll('.day-cell[tabindex="0"]')
+    expect(cellsWithZero).toHaveLength(1)
+    expect(cellsWithZero[0].attributes('data-jalali-date')).toBe('2024-03-20')
+
+    const cellsWithMinusOne = wrapper.findAll('.day-cell[tabindex="-1"]')
+    expect(cellsWithMinusOne).toHaveLength(41)
+
+    // After arrow navigation, roving tabindex moves to new date
+    const grid = wrapper.find('.grid')
+    await grid.trigger('keydown', { key: 'ArrowRight' })
+    const updatedZero = wrapper.findAll('.day-cell[tabindex="0"]')
+    expect(updatedZero).toHaveLength(1)
+    expect(updatedZero[0].attributes('data-jalali-date')).toBe('2024-03-21')
+  })
+
+  it('prevents duplicate key handling by handling keydown only on the grid', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const focusedCell = wrapper.find('.day-cell.focused')
+    await focusedCell.trigger('keydown', { key: 'ArrowRight' })
+    // If handled only once, it shifts by 1 day (to 2024-03-21).
+    // If duplicated, it would shift by 2 days (to 2024-03-22).
+    const newFocused = wrapper.find('.day-cell.focused')
+    expect(newFocused.attributes('data-jalali-date')).toBe('2024-03-21')
   })
 
   it('does not move or emit when ArrowRight would cross the max bound', async () => {
@@ -256,5 +328,47 @@ describe('JalaliDatePicker keyboard navigation', () => {
     const grid = wrapper.find('.grid')
     await grid.trigger('keydown', { key: 'Home' })
     expect(wrapper.emitted('update')).toBeFalsy()
+  })
+
+  it('does not emit update when Enter or Space is pressed on a disabled date', async () => {
+    const wrapper = mount(JalaliDatePicker, {
+      props: { value: '2024-03-20', min: '2024-03-22' },
+    })
+    const grid = wrapper.find('.grid')
+    await grid.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update')).toBeFalsy()
+    await grid.trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('update')).toBeFalsy()
+  })
+
+  it('gives all cells tabindex="-1" when all cells are disabled', () => {
+    const wrapper = mount(JalaliDatePicker, {
+      props: { value: '2024-03-20', min: '2025-01-01' },
+    })
+    const cellsWithZero = wrapper.findAll('.day-cell[tabindex="0"]')
+    expect(cellsWithZero).toHaveLength(0)
+    const cellsWithMinusOne = wrapper.findAll('.day-cell[tabindex="-1"]')
+    expect(cellsWithMinusOne).toHaveLength(42)
+  })
+
+  it('gives tabindex="0" to the first enabled cell when focused date is out of range', () => {
+    const minIso = fromJalaliYMD(1403, 1, 6)
+    const wrapper = mount(JalaliDatePicker, {
+      props: { value: '2024-03-20', min: minIso },
+    })
+    const cellsWithZero = wrapper.findAll('.day-cell[tabindex="0"]')
+    expect(cellsWithZero).toHaveLength(1)
+    expect(cellsWithZero[0].attributes('data-jalali-date')).toBe(minIso)
+  })
+
+  it('commits focused date when Enter or Space is pressed on a day cell', async () => {
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    const cell = wrapper.find('.day-cell.focused')
+    await cell.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update')).toBeTruthy()
+    expect(wrapper.emitted('update')?.[0]).toEqual(['2024-03-20'])
+
+    await cell.trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('update')?.[1]).toEqual(['2024-03-20'])
   })
 })

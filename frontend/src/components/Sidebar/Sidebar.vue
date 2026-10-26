@@ -35,7 +35,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-project', id: string): void
   (e: 'add-project'): void
+  (e: 'edit-project', project: Project): void
   (e: 'add-property'): void
+  (e: 'edit-property', property: Property): void
   (e: 'change-theme', t: Theme): void
   (e: 'change-week-start', day: WeekStartDay): void
   (e: 'change-calendar', c: Calendar): void
@@ -71,12 +73,17 @@ const totalActiveTasks = computed<number>(() =>
         :total-active-tasks="totalActiveTasks"
         @select="(id) => emit('select-project', id)"
         @add="emit('add-project')"
+        @edit="(project) => emit('edit-project', project)"
       />
     </section>
 
-    <section v-if="properties.length > 0" class="sidebar-section">
+    <section class="sidebar-section">
       <h3>Custom Properties</h3>
-      <PropertiesSection :properties="properties" @add="emit('add-property')" />
+      <PropertiesSection
+        :properties="properties"
+        @add="emit('add-property')"
+        @edit="(property) => emit('edit-property', property)"
+      />
     </section>
 
     <section v-if="weeklyPropertySums.length > 0" class="sidebar-section">

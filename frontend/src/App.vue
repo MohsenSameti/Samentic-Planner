@@ -9,6 +9,7 @@ import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
 import { useTheme } from './composables/useTheme'
 import { useWeekNavigation } from './composables/useWeekNavigation'
+import { useTodayISO } from './composables/useTodayISO'
 import {
   DEFAULT_WEEK_START,
   formatWeekDisplay,
@@ -85,6 +86,7 @@ const {
   goToToday,
   goToTodayTrigger,
 } = useWeekNavigation(weekStart, calendar)
+const { todayISO } = useTodayISO()
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
 // `load*` function, but `App.vue` uses `api.getState()` for the initial
@@ -141,6 +143,19 @@ const auth = useAuth()
 /* ------------------------------------------------------------------ */
 
 const selectedProject = ref<string>('all')
+
+const activeProject = computed<Project | undefined>(() =>
+  projects.value.find(p => p.id === selectedProject.value),
+)
+
+const activeProjectName = computed<string>(() =>
+  activeProject.value ? activeProject.value.name : selectedProject.value,
+)
+
+function clearProjectFilter(): void {
+  selectedProject.value = 'all'
+}
+
 const sidebarCollapsed = ref<boolean>(true)
 
 /** True while the initial data fetch is in flight (after auth resolves). */
@@ -153,6 +168,9 @@ const dataLoading = ref<boolean>(false)
  * trigger a second load.
  */
 const dataLoaded = ref<boolean>(false)
+
+/** Board-level load error when the initial data fetch fails. */
+const loadError = ref<string | null>(null)
 
 /* ------------------------------------------------------------------ */
 /* Modal state (per plan: modals & currently-edited entities live here) */
@@ -175,6 +193,21 @@ const deleteModalOpen = ref<boolean>(false)
 const deleteMessage = ref<string>('')
 
 const changePasswordModalOpen = ref<boolean>(false)
+
+/**
+ * True if any modal dialog in the application is currently open.
+ * Used to isolate Escape handling in day view so closing a modal
+ * does not accidentally exit day view.
+ */
+const isAnyModalOpen = computed<boolean>(
+  () =>
+    taskModalOpen.value ||
+    projectModalOpen.value ||
+    propertyModalOpen.value ||
+    moveModalOpen.value ||
+    deleteModalOpen.value ||
+    changePasswordModalOpen.value,
+)
 /**
  * The async delete action to run when the user confirms. Stored as a
  * closure rather than a discriminated union because both delete paths
@@ -214,6 +247,13 @@ const weekDisplay = computed<string>(() =>
   formatWeekDisplay(currentWeekStart.value, calendar.value),
 )
 
+/** Emphasize the displayed range when it contains today's local date. */
+const isCurrentWeek = computed<boolean>(
+  () =>
+    currentWeekStart.value ===
+    toLocalISODate(getWeekStart(fromLocalISODate(todayISO.value), weekStart.value)),
+)
+
 /** ISO dates for the visible week — used by `WeekSummary`. */
 const weekDateStrings = computed<string[]>(() => weekDays.value.map(d => d.date))
 
@@ -236,25 +276,6 @@ const currentWeekNote = computed<string>(
  * last editing.
  */
 const viewMode = ref<'week' | 'day'>('week')
-
-/**
- * Template ref into the mounted `WeekView`. Used by the toolbar
- * (`WeekNavigation`) to read the today-orientation pill computed
- * from inside WeekView without adding a new state store. The
- * instance type is loosely typed because WeekView is conditionally
- * mounted (`v-if="viewMode === 'week'"`).
- */
-const weekViewRef = ref<{ currentDayLabel?: { value: string | null } } | null>(null)
-
-/**
- * Today's column label inside the visible week (e.g. "Wed 03"), or
- * `null` when today isn't in the week (spec §8). Surfaces here from
- * WeekView's computed so the toolbar pill is reactive to week /
- * today changes without duplicating the calendar logic.
- */
-const currentDayLabel = computed<string | null>(
-  () => weekViewRef.value?.currentDayLabel?.value ?? null,
-)
 
 /**
  * The focused day when `viewMode === 'day'`. ISO date (`YYYY-MM-DD`).
@@ -415,12 +436,14 @@ function handleGoToday(): void {
 
 /**
  * Window-level `keydown` listener for Esc, mounted only while in
- * day view. The `DatePickerPopover` (when open) handles its own Esc
- * with `stopPropagation()` so this listener doesn't fire while the
- * popover is closing — pressing Esc twice is the documented flow:
- * first Esc closes the popover, second Esc closes day view.
+ * day view. The `DatePickerPopover` (when open) and `Modal` (when open)
+ * handle their own Esc with `stopPropagation()` so this listener doesn't
+ * fire while a modal or popover is closing — pressing Esc twice is the
+ * documented flow: first Esc closes the modal/popover, second Esc closes
+ * day view. We also check `isAnyModalOpen` to ensure day view is preserved.
  */
 function handleDocumentKeydown(e: KeyboardEvent): void {
+  if (isAnyModalOpen.value) return
   if (viewMode.value === 'day' && e.key === 'Escape') {
     closeDayView()
   }
@@ -731,6 +754,7 @@ function scheduleIdle(task: () => void): void {
  */
 async function loadData(): Promise<void> {
   dataLoading.value = true
+  loadError.value = null
   try {
     const state = await api.getState()
     projects.value = state.projects
@@ -754,7 +778,10 @@ async function loadData(): Promise<void> {
       })
       projects.value.push(project)
     }
+    dataLoaded.value = true
   } catch (err) {
+    loadError.value = 'Could not load planner'
+    dataLoaded.value = false
     // `api.ts` already sets `apiError`; we just log for devtools.
     // eslint-disable-next-line no-console
     console.error('Failed to load data:', err)
@@ -763,10 +790,21 @@ async function loadData(): Promise<void> {
     // Wait until after the first paint to start pulling the
     // `WeekSummary` chunk — keeps the initial render from competing
     // with the chunk download.
-    scheduleIdle(() => {
-      showWeekSummary.value = true
-    })
+    if (!loadError.value) {
+      scheduleIdle(() => {
+        showWeekSummary.value = true
+      })
+    }
   }
+}
+
+/**
+ * Retry loading the board data after a failed load.
+ * Resets the `dataLoaded` guard and initiates a new fetch.
+ */
+async function retryLoad(): Promise<void> {
+  dataLoaded.value = false
+  await loadData()
 }
 
 /**
@@ -869,7 +907,15 @@ function handlePasswordChanged(): void {
       <p>Opening planner…</p>
     </div>
 
-    <!-- 5. Authenticated, data loaded -->
+    <!-- 5. Board load error -->
+    <div v-else-if="loadError" class="board-error" role="alert">
+      <p>{{ loadError }}</p>
+      <button type="button" class="btn btn-primary retry-btn" @click="retryLoad">
+        Retry
+      </button>
+    </div>
+
+    <!-- 6. Authenticated, data loaded -->
     <div v-else class="app">
       <Header
         :sidebar-collapsed="sidebarCollapsed"
@@ -892,7 +938,9 @@ function handlePasswordChanged(): void {
           :calendar="calendar"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
+          @edit-project="openProjectModal"
           @add-property="openPropertyModal()"
+          @edit-property="openPropertyModal"
           @change-theme="setTheme"
           @change-week-start="changeWeekStart"
           @change-calendar="changeCalendar"
@@ -905,6 +953,30 @@ function handlePasswordChanged(): void {
         ></div>
 
         <main class="week-container">
+          <div
+            v-if="selectedProject !== 'all'"
+            class="project-filter-indicator active-filter-indicator"
+          >
+            <div class="filter-indicator-content">
+              <span
+                v-if="activeProject?.color"
+                class="filter-indicator-dot"
+                :style="{ backgroundColor: activeProject.color }"
+                aria-hidden="true"
+              ></span>
+              <span class="filter-indicator-label">Filtered by:</span>
+              <strong class="filter-indicator-name">{{ activeProjectName }}</strong>
+            </div>
+            <button
+              type="button"
+              class="clear-filter-btn"
+              aria-label="Clear filter"
+              @click="clearProjectFilter"
+            >
+              Clear filter
+            </button>
+          </div>
+
           <!--
             `WeekNavigation` is only meaningful in week view; it's
             hidden in day view because day view has its own header
@@ -913,14 +985,13 @@ function handlePasswordChanged(): void {
           <WeekNavigation
             v-if="viewMode === 'week'"
             :week-display="weekDisplay"
-            :current-day-label="currentDayLabel"
+            :is-current-week="isCurrentWeek"
             @prev-week="navigateWeek(-1)"
             @next-week="navigateWeek(1)"
           />
 
           <WeekView
             v-if="viewMode === 'week'"
-            ref="weekViewRef"
             :current-week-start="currentWeekStart"
             :tasks="tasks"
             :projects="projects"
@@ -992,6 +1063,7 @@ function handlePasswordChanged(): void {
         :projects="projects"
         :date="taskModalDate"
         :calendar="calendar"
+        :default-project-id="selectedProject !== 'all' ? selectedProject : ''"
         @close="taskModalOpen = false"
         @save="saveTask"
       />
@@ -1050,6 +1122,7 @@ function handlePasswordChanged(): void {
 .main-container {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: visible;
 }
 
@@ -1063,11 +1136,11 @@ function handlePasswordChanged(): void {
 
 .week-container {
   flex: 1;
+  min-height: 0;
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  height: calc(100vh - 73px);
 }
 
 .loading {
@@ -1079,6 +1152,95 @@ function handlePasswordChanged(): void {
   color: var(--text-secondary);
 }
 
+.board-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+}
+
+.board-error p {
+  margin: var(--space-0);
+  color: var(--text-primary);
+}
+
+.project-filter-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-indicator-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.filter-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.filter-indicator-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.filter-indicator-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.clear-filter-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.clear-filter-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1024px) {
   .sidebar-backdrop {
     display: block;
@@ -1087,11 +1249,27 @@ function handlePasswordChanged(): void {
 }
 
 @media (max-width: 768px) {
+  .board-error {
+    padding: var(--space-4);
+  }
+
   .week-container {
     padding: var(--space-4);
     overflow-y: auto;
     flex: 1;
-    height: calc(100dvh - 73px);
+    min-height: 0;
+  }
+
+  .project-filter-indicator {
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .clear-filter-btn {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
   }
 }
 </style>

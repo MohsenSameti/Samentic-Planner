@@ -166,6 +166,15 @@ function shiftMonth(delta: number): void {
   // month in the year/month/day fields.
   inputYear.value = String(newYear)
   inputMonth.value = String(newMonth)
+
+  const currentJ = toJalaliYMD(toLocalISODate(focusedDate.value))
+  const maxDays = jalaliMonthLength(newYear, newMonth)
+  const newDay = Math.min(currentJ.jd, maxDays)
+  const newIso = fromJalaliYMD(newYear, newMonth, newDay)
+  if (!isOutOfRange(newIso)) {
+    focusedDate.value = fromLocalISODate(newIso)
+    inputDay.value = String(newDay)
+  }
 }
 
 /** Snap the view back to the month of the current `value` prop. */
@@ -210,9 +219,6 @@ function focusShift(days: number): void {
     inputYear.value = String(j.jy)
     inputMonth.value = String(j.jm)
   }
-  // Emit so the value follows the focus (Tab+Enter is one keystroke
-  // shorter than focus-then-pick).
-  emit('update', iso)
   // Move keyboard focus to the matching cell so the next arrow is
   // picked up by the `keydown` handler on that cell.
   nextTick(() => {
@@ -239,7 +245,6 @@ function focusShiftMonth(delta: number): void {
   viewMonth.value = j.jm
   inputYear.value = String(j.jy)
   inputMonth.value = String(j.jm)
-  emit('update', iso)
   nextTick(() => {
     const cell = document.querySelector<HTMLElement>(
       `[data-jalali-date="${iso}"]`,
@@ -254,7 +259,6 @@ function focusMonthEdge(edge: 'start' | 'end'): void {
   const iso = fromJalaliYMD(viewYear.value, viewMonth.value, day)
   if (isOutOfRange(iso)) return
   focusedDate.value = fromLocalISODate(iso)
-  emit('update', iso)
   nextTick(() => {
     const cell = document.querySelector<HTMLElement>(
       `[data-jalali-date="${iso}"]`,
@@ -264,11 +268,21 @@ function focusMonthEdge(edge: 'start' | 'end'): void {
 }
 
 /**
+ * Commit the currently focused date if within range.
+ * Called when pressing Enter or Space on the grid.
+ */
+function commitFocusedDate(): void {
+  const iso = toLocalISODate(focusedDate.value)
+  if (isOutOfRange(iso)) return
+  emit('update', iso)
+}
+
+/**
  * Generic keyboard handler for the grid. Keys:
  *  - ArrowLeft / ArrowRight / ArrowUp / ArrowDown: move ±1 day, ±7 days
  *  - PageUp / PageDown: ±1 month
  *  - Home / End: start / end of view month
- *  - Enter: pick focused cell (already emitted on focus, but harmless)
+ *  - Enter / Space: commit focused cell
  */
 function onKeydown(e: KeyboardEvent): void {
   switch (e.key) {
@@ -305,8 +319,11 @@ function onKeydown(e: KeyboardEvent): void {
       focusMonthEdge('end')
       break
     case 'Enter':
-      // Already emitted on focus; prevent the default form submit.
+    case ' ':
+    case 'Space':
+    case 'Spacebar':
       e.preventDefault()
+      commitFocusedDate()
       break
     default:
       break
@@ -367,6 +384,31 @@ function ariaLabelFor(cell: DayCell): string {
 function isDisabled(cell: DayCell): boolean {
   return isOutOfRange(cell.gregIso)
 }
+
+/**
+ * The Gregorian ISO date of the single enabled cell that is keyboard-tabbable (tabindex="0").
+ * Follows the WAI-ARIA roving tabindex pattern:
+ * Exactly one enabled date cell is in the tab sequence at any time.
+ * If the currently focused date is visible in the grid and enabled, it is the tabbable cell.
+ * Otherwise, the first enabled cell of the view month is used, falling back to the first
+ * enabled cell in the grid.
+ */
+const tabbableIso = computed<string | null>(() => {
+  const focusedIso = toLocalISODate(focusedDate.value)
+  const focusedInGrid = grid.value.find(c => c.gregIso === focusedIso)
+  if (focusedInGrid && !isDisabled(focusedInGrid)) {
+    return focusedIso
+  }
+  const firstInMonth = grid.value.find(c => c.inMonth && !isDisabled(c))
+  if (firstInMonth) {
+    return firstInMonth.gregIso
+  }
+  const firstEnabled = grid.value.find(c => !isDisabled(c))
+  if (firstEnabled) {
+    return firstEnabled.gregIso
+  }
+  return null
+})
 
 /**
  * Compute the current view month label for the header button. E.g.
@@ -510,12 +552,11 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
           'disabled': isDisabled(cell),
         }"
         role="gridcell"
-        tabindex="0"
+        :tabindex="cell.gregIso === tabbableIso ? 0 : -1"
         :aria-label="ariaLabelFor(cell)"
         :aria-selected="cell.isFocused"
         :data-jalali-date="cell.gregIso"
         @click="!isDisabled(cell) && pickCell(cell)"
-        @keydown="onKeydown"
       >
         {{ cell.jd }}
       </div>

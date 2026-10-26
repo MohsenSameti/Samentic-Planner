@@ -39,7 +39,7 @@ export interface DayActions {
    * by ISO date; `DayNotes` always knows its own date, so the call
    * shape mirrors the previous `(date, note) => emit(...)`.
    */
-  updateDayNote: (date: string, note: string) => void
+  updateDayNote: (date: string, note: string) => Promise<void> | void
   /**
    * Save a numeric property value (e.g. hours slept, water intake).
    * `propertyId` is the row's property definition; `value` is the
@@ -72,7 +72,7 @@ export interface DayActions {
   /** Permanently delete a task (after confirmation). */
   deleteTask: (task: Task) => void
   /** Save the in-card notes textarea value. */
-  updateTaskNotes: (task: Task, notes: string) => void
+  updateTaskNotes: (task: Task, notes: string) => Promise<void> | void
 }
 
 /**

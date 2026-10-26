@@ -182,6 +182,78 @@ describe('DatePickerPopover', () => {
       expect(wrapper.emitted('close')).toBeTruthy()
     })
 
+    it('leaves the popover open when browsing dates with arrow keys in the Jalali picker', async () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
+      })
+      await wrapper.find('button.date-anchor').trigger('click')
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      const grid = wrapper.find('.grid')
+      await grid.trigger('keydown', { key: 'ArrowRight' })
+
+      // Popover remains open, no update or close emitted
+      expect(wrapper.find('.popover').exists()).toBe(true)
+      expect(wrapper.emitted('update')).toBeFalsy()
+      expect(wrapper.emitted('close')).toBeFalsy()
+    })
+
+    it('leaves the popover open when browsing months with navigation buttons in the Jalali picker', async () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
+      })
+      await wrapper.find('button.date-anchor').trigger('click')
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      await wrapper.find('button[aria-label="Next month"]').trigger('click')
+      expect(wrapper.find('.popover').exists()).toBe(true)
+      expect(wrapper.emitted('update')).toBeFalsy()
+      expect(wrapper.emitted('close')).toBeFalsy()
+    })
+
+    it('commits and closes the popover when Enter is pressed in the Jalali grid', async () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
+      })
+      await wrapper.find('button.date-anchor').trigger('click')
+      const grid = wrapper.find('.grid')
+      await grid.trigger('keydown', { key: 'ArrowRight' })
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      await grid.trigger('keydown', { key: 'Enter' })
+      expect(wrapper.emitted('update')).toBeTruthy()
+      expect(wrapper.emitted('close')).toBeTruthy()
+      expect(wrapper.find('.popover').exists()).toBe(false)
+    })
+
+    it('commits and closes the popover when Space is pressed in the Jalali grid', async () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
+      })
+      await wrapper.find('button.date-anchor').trigger('click')
+      const grid = wrapper.find('.grid')
+      await grid.trigger('keydown', { key: ' ' })
+      expect(wrapper.emitted('update')).toBeTruthy()
+      expect(wrapper.emitted('close')).toBeTruthy()
+      expect(wrapper.find('.popover').exists()).toBe(false)
+    })
+
+    it('commits and closes the popover when a day cell is clicked in the Jalali picker', async () => {
+      const wrapper = mount(DatePickerPopover, {
+        props: { value: '2024-01-15', calendar: 'jalali' as Calendar },
+      })
+      await wrapper.find('button.date-anchor').trigger('click')
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      const targetCell = wrapper.find('.day-cell:not(.disabled)')
+      const targetIso = targetCell.attributes('data-jalali-date')
+      await targetCell.trigger('click')
+
+      expect(wrapper.emitted('update')?.[0]).toEqual([targetIso])
+      expect(wrapper.emitted('close')).toBeTruthy()
+      expect(wrapper.find('.popover').exists()).toBe(false)
+    })
+
     it('closes the popover after a pick', async () => {
       const wrapper = mount(DatePickerPopover, {
         props: { value: '2024-01-15', calendar: 'gregorian' as Calendar },

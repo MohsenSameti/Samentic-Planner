@@ -9,8 +9,8 @@
  *   - emit on blur with the current value
  *   - Initial value seeding
  */
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import DayNotes from './DayNotes.vue'
 import { mountWithActions } from '../../composables/test-utils'
 
@@ -71,6 +71,19 @@ describe('DayNotes', () => {
     await textarea.setValue('hello')
     await textarea.trigger('blur')
     expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-01', 'hello')
+  })
+
+  it('writes to the date that owned the editor on blur even if date prop changes', async () => {
+    const { wrapper, actions } = mountWithActions(DayNotes, {
+      props: { date: '2024-01-17', initialValue: 'wednesday' },
+    })
+    await wrapper.find('.day-notes-toggle').trigger('click')
+    const textarea = wrapper.find('textarea')
+    await textarea.setValue('edited wednesday')
+    await wrapper.setProps({ date: '2024-01-18' })
+    await textarea.trigger('blur')
+    expect(actions.updateDayNote).toHaveBeenCalledWith('2024-01-17', 'edited wednesday')
+    expect(actions.updateDayNote).not.toHaveBeenCalledWith('2024-01-18', expect.anything())
   })
 
   it('sets aria-expanded correctly', async () => {
@@ -154,4 +167,157 @@ describe('DayNotes', () => {
       expect(wrapper.find('.day-notes-preview').exists()).toBe(false)
     })
   })
+
+  describe('save status feedback (Task 6.2)', () => {
+    it('shows saving status while save is in flight', async () => {
+      let resolvePromise!: () => void
+      const pendingPromise = new Promise<void>(resolve => {
+        resolvePromise = resolve
+      })
+      const { wrapper, actions } = mountWithActions(DayNotes, { props: baseProps })
+      actions.updateDayNote.mockReturnValue(pendingPromise)
+
+      await wrapper.find('.day-notes-toggle').trigger('click')
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('new note')
+      await textarea.trigger('blur')
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('saving')
+      expect(statusEl.text()).toBe('Saving…')
+      expect(statusEl.attributes('aria-live')).toBe('polite')
+
+      resolvePromise()
+      await flushPromises()
+    })
+
+    it('shows saved status after successful save and returns to idle after timeout', async () => {
+      vi.useFakeTimers()
+      const { wrapper, actions } = mountWithActions(DayNotes, { props: baseProps })
+      actions.updateDayNote.mockResolvedValue(undefined)
+
+      await wrapper.find('.day-notes-toggle').trigger('click')
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('saved note')
+      await textarea.trigger('blur')
+      await flushPromises()
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('saved')
+      expect(statusEl.text()).toBe('Saved')
+
+      // Advance time past the transient status timeout (2000ms)
+      vi.advanceTimersByTime(2000)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.note-save-status').exists()).toBe(false)
+      vi.useRealTimers()
+    })
+
+    it('shows error status with role="alert" when save fails', async () => {
+      const { wrapper, actions } = mountWithActions(DayNotes, { props: baseProps })
+      actions.updateDayNote.mockRejectedValue(new Error('Network error'))
+
+      await wrapper.find('.day-notes-toggle').trigger('click')
+      const textarea = wrapper.find('textarea')
+      await textarea.setValue('failed note')
+      await textarea.trigger('blur')
+      await flushPromises()
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.exists()).toBe(true)
+      expect(statusEl.classes()).toContain('error')
+      expect(statusEl.text()).toBe('Save failed')
+      expect(statusEl.attributes('role')).toBe('alert')
+    })
+
+    it('race condition: older save resolving does not overwrite newer save status', async () => {
+      let resolveFirst!: () => void
+      let resolveSecond!: () => void
+      const firstPromise = new Promise<void>(resolve => {
+        resolveFirst = resolve
+      })
+      const secondPromise = new Promise<void>(resolve => {
+        resolveSecond = resolve
+      })
+
+      const { wrapper, actions } = mountWithActions(DayNotes, { props: baseProps })
+      actions.updateDayNote
+        .mockReturnValueOnce(firstPromise)
+        .mockReturnValueOnce(secondPromise)
+
+      await wrapper.find('.day-notes-toggle').trigger('click')
+      const textarea = wrapper.find('textarea')
+
+      // First blur (initiates first save)
+      await textarea.setValue('edit 1')
+      await textarea.trigger('blur')
+
+      // Second blur before first completes (initiates second save)
+      await textarea.setValue('edit 2')
+      await textarea.trigger('blur')
+
+      const statusEl = wrapper.find('.note-save-status')
+      expect(statusEl.classes()).toContain('saving')
+
+      // Second save finishes first
+      resolveSecond()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+
+      // Older first save completes later — should be ignored and not overwrite
+      resolveFirst()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+    })
+
+    it('race condition: older save rejecting does not overwrite newer save status', async () => {
+      let rejectFirst!: (err: Error) => void
+      let resolveSecond!: () => void
+      const firstPromise = new Promise<void>((_, reject) => {
+        rejectFirst = reject
+      })
+      const secondPromise = new Promise<void>(resolve => {
+        resolveSecond = resolve
+      })
+
+      const { wrapper, actions } = mountWithActions(DayNotes, { props: baseProps })
+      actions.updateDayNote
+        .mockReturnValueOnce(firstPromise)
+        .mockReturnValueOnce(secondPromise)
+
+      await wrapper.find('.day-notes-toggle').trigger('click')
+      const textarea = wrapper.find('textarea')
+
+      // First blur
+      await textarea.setValue('edit 1')
+      await textarea.trigger('blur')
+
+      // Second blur before first finishes
+      await textarea.setValue('edit 2')
+      await textarea.trigger('blur')
+
+      // First save fails after second has started
+      rejectFirst(new Error('Old failure'))
+      await flushPromises()
+
+      // Should still be saving edit 2, NOT error from edit 1
+      expect(wrapper.find('.note-save-status').classes()).toContain('saving')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saving…')
+
+      // Second save succeeds
+      resolveSecond()
+      await flushPromises()
+
+      expect(wrapper.find('.note-save-status').classes()).toContain('saved')
+      expect(wrapper.find('.note-save-status').text()).toBe('Saved')
+    })
+  })
 })
+

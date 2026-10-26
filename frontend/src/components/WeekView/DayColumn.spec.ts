@@ -403,26 +403,22 @@ describe('DayColumn', () => {
     })
 
     /**
-     * Spec §25: the §7 open-day chevron is removed from the header
-     * entirely — the two-icon header read as clutter. The header now
-     * exposes exactly one real button (add-task); opening the day view
-     * happens via the header-click handler (mouse/touch) or the
-     * header's date picker (keyboard).
+     * Spec 13 §3.3: the header exposes native buttons (add-task and open-day).
      */
-    it('exposes exactly one real button in the header: add-task (§25)', () => {
+    it('exposes native buttons in the header (spec 13 §3.3)', () => {
       const wrapper = mount(DayColumn, { props: baseProps })
       const header = wrapper.find('.day-header').element as HTMLElement
       const buttons = Array.from(header.querySelectorAll('button'))
       const addBtn = wrapper.find('.add-task-btn').element as HTMLElement
+      const openBtn = wrapper.find('.open-day-btn').element as HTMLElement
 
-      expect(buttons).toHaveLength(1)
-      expect(buttons[0]).toBe(addBtn)
-      expect(wrapper.find('.open-day-btn').exists()).toBe(false)
-      // A native button is what gives the control keyboard activation and a
-      // button role for free — happy-dom does not synthesize `click` from
-      // Enter/Space, so this structural check is the testable half of it.
+      expect(buttons).toHaveLength(2)
+      expect(buttons).toContain(addBtn)
+      expect(buttons).toContain(openBtn)
       expect(addBtn.tagName).toBe('BUTTON')
       expect(addBtn.getAttribute('type')).toBe('button')
+      expect(openBtn.tagName).toBe('BUTTON')
+      expect(openBtn.getAttribute('type')).toBe('button')
     })
 
     it('keeps the add-task control name unchanged', () => {
@@ -494,23 +490,58 @@ describe('DayColumn', () => {
     })
 
     /**
-     * Spec §25 removal contract: the §7 chevron is gone — not in the
-     * rendered DOM, and not as a dormant CSS selector waiting to be
-     * re-added. The header-click and `+` behaviour tests above are the
-     * surviving coverage for opening the day view.
+     * Spec 13 Task 3.3: Keyboard route to Day View.
+     * Dedicated, accessible Open day button in the day header so keyboard users
+     * can enter Day View without making a container with nested controls behave as one button.
+     * Enter and Space activate it.
      */
-    describe('open-day chevron removed (spec §25)', () => {
-      it('renders no .open-day-btn in the column', () => {
-        const wrapper = mount(DayColumn, { props: baseProps })
-        expect(wrapper.find('.open-day-btn').exists()).toBe(false)
+    describe('open-day button (spec 13 §3.3)', () => {
+      it('renders a dedicated, focusable open-day button with accessible label', () => {
+        const wrapper = mount(DayColumn, {
+          props: { ...baseProps, dayName: 'Monday' },
+        })
+        const btn = wrapper.find('.open-day-btn')
+        expect(btn.exists()).toBe(true)
+        expect(btn.element.tagName).toBe('BUTTON')
+        expect(btn.attributes('type')).toBe('button')
+        expect(btn.attributes('aria-label')).toBe('Open Monday')
+        expect(btn.attributes('tabindex')).toBeUndefined()
+        expect(btn.attributes('disabled')).toBeUndefined()
       })
 
-      it('leaves no .open-day-btn selector in the component source (template or style)', () => {
-        const css = readFileSync(
-          resolve(process.cwd(), 'src/components/WeekView/DayColumn.vue'),
-          'utf8',
-        )
-        expect(css).not.toMatch(/open-day-btn/)
+      it('calls openDay with the column date when the open-day button is clicked', async () => {
+        const { wrapper, actions } = mountWithActions(DayColumn, {
+          props: { ...baseProps, date: '2024-01-15' },
+        })
+        await wrapper.find('.open-day-btn').trigger('click')
+        expect(actions.openDay).toHaveBeenCalledTimes(1)
+        expect(actions.openDay).toHaveBeenCalledWith('2024-01-15')
+      })
+
+      it('calls openDay with the column date when Enter is pressed on the open-day button', async () => {
+        const { wrapper, actions } = mountWithActions(DayColumn, {
+          props: { ...baseProps, date: '2024-01-15' },
+        })
+        await wrapper.find('.open-day-btn').trigger('keydown.enter')
+        expect(actions.openDay).toHaveBeenCalledTimes(1)
+        expect(actions.openDay).toHaveBeenCalledWith('2024-01-15')
+      })
+
+      it('calls openDay with the column date when Space is pressed on the open-day button', async () => {
+        const { wrapper, actions } = mountWithActions(DayColumn, {
+          props: { ...baseProps, date: '2024-01-15' },
+        })
+        await wrapper.find('.open-day-btn').trigger('keydown.space')
+        expect(actions.openDay).toHaveBeenCalledTimes(1)
+        expect(actions.openDay).toHaveBeenCalledWith('2024-01-15')
+      })
+
+      it('stops click propagation so clicking open-day button does not trigger duplicate openDay', async () => {
+        const { wrapper, actions } = mountWithActions(DayColumn, {
+          props: { ...baseProps, date: '2024-01-15' },
+        })
+        await wrapper.find('.open-day-btn').trigger('click')
+        expect(actions.openDay).toHaveBeenCalledTimes(1)
       })
 
       it('keeps calling addTask when the + button is clicked', async () => {
@@ -618,6 +649,69 @@ describe('DayColumn', () => {
       // is conditionally rendered, so it must be absent.
       const wrapper = mountAt({ dayNoteValue: 'a note' })
       expect(wrapper.find('.meta-footer').exists()).toBe(false)
+    })
+
+    describe('empty-day details disclosure (spec 13 §5.2)', () => {
+      it('renders .meta-footer on mobile even when day has no properties and no note', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        expect(footer.exists()).toBe(true)
+        expect(footer.text()).toContain('Day details')
+      })
+
+      it('exposes accessible name and aria-expanded="false" initially', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        expect(footer.attributes('aria-expanded')).toBe('false')
+        expect(footer.attributes('aria-label')).toBe('Show day details')
+      })
+
+      it('clicking .meta-footer expands day details', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        await footer.trigger('click')
+        await wrapper.vm.$nextTick()
+
+        expect(footer.attributes('aria-expanded')).toBe('true')
+        expect(footer.attributes('aria-label')).toBe('Hide day details')
+        const dayNotes = wrapper.findComponent({ name: 'DayNotes' })
+        expect(dayNotes.exists()).toBe(true)
+        const notesSection = wrapper.find('.day-notes-section').element as HTMLElement
+        expect(notesSection.style.display).not.toBe('none')
+      })
+
+      it('clicking .meta-footer again collapses day details', async () => {
+        const wrapper = mountAt({ properties: [], dayNoteValue: '' })
+        await goMobile(wrapper)
+        const footer = wrapper.find('.meta-footer')
+        await footer.trigger('click')
+        await wrapper.vm.$nextTick()
+        expect(footer.attributes('aria-expanded')).toBe('true')
+
+        await footer.trigger('click')
+        await wrapper.vm.$nextTick()
+        expect(footer.attributes('aria-expanded')).toBe('false')
+        expect(footer.attributes('aria-label')).toBe('Show day details')
+        const notesSection = wrapper.find('.day-notes-section').element as HTMLElement
+        expect(notesSection.style.display).toBe('none')
+      })
+
+      it('ensures .meta-footer has a min-height of 44px on mobile in CSS', () => {
+        const css = readFileSync(
+          resolve(process.cwd(), 'src/components/WeekView/DayColumn.vue'),
+          'utf8',
+        )
+        const mobileBlock = css.match(
+          /@media\s*\(max-width:\s*768px\)\s*\{([\s\S]*?)\}\s*\n/g,
+        )
+        expect(mobileBlock).not.toBeNull()
+        const mobileCss = (mobileBlock ?? []).join('\n')
+        const rule = mobileCss.match(/\.meta-footer\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+        expect(rule).toMatch(/min-height\s*:\s*44px/)
+      })
     })
   })
 
