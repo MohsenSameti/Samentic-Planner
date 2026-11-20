@@ -11,8 +11,11 @@ import type {
 import { compareTasksByStatus } from '../../utils/taskSort'
 import { fromLocalISODate, monthMarkerFor, toLocalISODate } from '../../utils/date'
 import { toJalaliYMD, JALALI_WEEKDAY_LABELS_LONG } from '../../utils/jalali'
+import { useI18n } from '../../composables/useI18n'
 import { useTodayISO } from '../../composables/useTodayISO'
 import DayColumn from './DayColumn.vue'
+
+const { language } = useI18n()
 
 const props = defineProps<{
   /** ISO date (`YYYY-MM-DD`) of the first day of the displayed week. */
@@ -93,9 +96,9 @@ const weekDays = computed<DayCell[]>(() => {
       // renders. Gregorian stays `weekday: 'short'`. The short labels
       // remain in use by `JalaliDatePicker`, whose grid columns are
       // too narrow for the long form.
-      name: props.calendar === 'jalali'
+      name: props.calendar === 'jalali' && language.value === 'en'
         ? (JALALI_WEEKDAY_LABELS_LONG[d.getDay()] ?? '')
-        : d.toLocaleDateString('en-US', { weekday: 'short' }),
+        : d.toLocaleDateString(language.value === 'fa' ? 'fa-IR-u-ca-gregory-nu-latn' : 'en-US', { weekday: props.calendar === 'jalali' ? 'long' : 'short' }),
       dayNum: d.getDate(),
       isToday: d.toDateString() === todayKey,
       // Past = strictly before today (today itself stays loudest).
@@ -183,7 +186,7 @@ function tasksForDay(date: string): Task[] {
  * in that case.
  */
 const monthMarkers = computed<Map<string, string | null>>(() => {
-  return monthMarkerFor(weekDays.value, props.calendar)
+  return monthMarkerFor(weekDays.value, props.calendar, language.value)
 })
 
 function monthMarkerForDay(date: string): string | null {
@@ -312,10 +315,6 @@ onMounted(() => {
 })
 
 /**
- * Re-scroll whenever the parent navigates to a week containing today
- * (e.g. when the user clicks the header's "Today" button). When the
-
-/**
  * Scroll affordance (spec §8). Position-driven visibility for the
  * left + right edge fades. `false` when the grid fits without
  * overflow, so on a wide desktop the fades stay invisible. The two
@@ -338,17 +337,15 @@ function recomputeFades(): void {
     showRightFade.value = false
     return
   }
-  // `scrollLeft` > 0 means the user has moved away from the left
-  // edge, so the left edge is no longer under the gradient — show
-  // a fade so they know they can scroll back.
-  showLeftFade.value = el.scrollLeft > 4
-  // `scrollLeft + clientWidth < scrollWidth - threshold` means there
-  // is hidden content to the right. The 4px tolerance matches the
-  // snap container's snap tolerance on iOS / Android, where a
-  // pixel-perfect scroll can leave 1-2px un-scrolled even when the
-  // snap point says "fully right".
+  // Chromium exposes RTL scrollLeft as negative while moving away
+  // from inline-start (the right edge); normalize it to a positive
+  // distance so the same edge-fade checks work in both directions.
+  const scrollFromInlineStart = document.documentElement.dir === 'rtl'
+    ? Math.max(0, -el.scrollLeft)
+    : Math.max(0, el.scrollLeft)
+  showLeftFade.value = scrollFromInlineStart > 4
   showRightFade.value =
-    el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+    scrollFromInlineStart + el.clientWidth < el.scrollWidth - 4
 }
 
 let scrollListenerBound = false
@@ -535,23 +532,31 @@ watch(
 }
 
 .grid-fade-left {
-  left: 0;
+  inset-inline-start: 0;
   background: linear-gradient(to right, var(--bg), transparent);
 }
 
 .grid-fade-right {
-  right: 0;
+  inset-inline-end: 0;
   background: linear-gradient(to left, var(--bg), transparent);
+}
+
+:root[dir="rtl"] .grid-fade-left {
+  background: linear-gradient(to left, var(--bg), transparent);
+}
+
+:root[dir="rtl"] .grid-fade-right {
+  background: linear-gradient(to right, var(--bg), transparent);
 }
 
 /* On mobile the grid carries a negative margin; pull the right-edge
  * fade past the margin so the gradient reaches the viewport edge. */
 @media (max-width: 768px) {
   .grid-fade-right {
-    right: calc(-1 * var(--space-4));
+    inset-inline-end: calc(-1 * var(--space-4));
   }
   .grid-fade-left {
-    left: calc(-1 * var(--space-4));
+    inset-inline-start: calc(-1 * var(--space-4));
   }
 }
 </style>

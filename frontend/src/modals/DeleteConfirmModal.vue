@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import Modal from '../components/common/Modal.vue'
+import { useI18n } from '../composables/useI18n'
+
+const { t } = useI18n()
 
 defineProps<{
   show: boolean
@@ -14,11 +17,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <Modal :show="show" title="Confirm Delete" @close="emit('close')">
+  <Modal :show="show" :title="t('Confirm Delete')" @close="emit('close')">
     <p class="message">{{ message }}</p>
     <div class="modal-actions">
-      <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>
-      <button type="button" class="btn btn-danger" @click="emit('confirm')">Delete</button>
+      <button type="button" class="btn btn-secondary" @click="emit('close')">{{ t('Cancel') }}</button>
+      <button type="button" class="btn btn-danger" @click="emit('confirm')">{{ t('Delete') }}</button>
     </div>
   </Modal>
 </template>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useAuth } from '../composables/useAuth'
+import { useI18n } from '../composables/useI18n'
 
 const auth = useAuth()
+const { t, translateText } = useI18n()
 
 const password = ref('')
 const confirmPassword = ref('')
@@ -14,10 +16,10 @@ const error = ref<string | null>(null)
  */
 const validationError = computed<string | null>(() => {
   if (password.value.length > 0 && password.value.length < 8) {
-    return 'Password must be at least 8 characters.'
+    return t('Password must be at least 8 characters.')
   }
   if (confirmPassword.value.length > 0 && password.value !== confirmPassword.value) {
-    return 'Passwords do not match.'
+    return t('Passwords do not match.')
   }
   return null
 })
@@ -54,9 +56,9 @@ async function handleSubmit(): Promise<void> {
     // Show inline error — do NOT touch apiError (no global toast for
     // auth failures; the SetupWizard renders the error inline instead).
     if (err instanceof Error) {
-      error.value = err.message
+      error.value = translateText(err.message)
     } else {
-      error.value = 'An unknown error occurred.'
+      error.value = translateText('An unknown error occurred.')
     }
   } finally {
     submitting.value = false
@@ -76,12 +78,12 @@ function clearError(): void {
 <template>
   <div class="setup-wizard">
     <div class="setup-card">
-      <h1 class="setup-title">Create your password</h1>
-      <p class="setup-subtitle">Choose a strong password to secure your planner.</p>
+      <h1 class="setup-title">{{ t('Create your password') }}</h1>
+      <p class="setup-subtitle">{{ t('Choose a strong password to secure your planner.') }}</p>
 
       <form @submit.prevent="handleSubmit">
         <div class="field">
-          <label for="password" class="field-label">Password</label>
+          <label for="password" class="field-label">{{ t('Password') }}</label>
           <input
             id="password"
             v-model="password"
@@ -95,7 +97,7 @@ function clearError(): void {
         </div>
 
         <div class="field">
-          <label for="confirm-password" class="field-label">Confirm password</label>
+          <label for="confirm-password" class="field-label">{{ t('Confirm password') }}</label>
           <input
             id="confirm-password"
             v-model="confirmPassword"
@@ -121,7 +123,7 @@ function clearError(): void {
           class="btn btn-primary submit-btn"
           :disabled="!canSubmit"
         >
-          {{ submitting ? 'Creating password…' : 'Create password' }}
+          {{ submitting ? t('Creating password…') : t('Create password') }}
         </button>
       </form>
     </div>

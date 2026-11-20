@@ -3,6 +3,9 @@ import { ref, watch } from 'vue'
 import Modal from '../components/common/Modal.vue'
 import JalaliDatePicker from '../components/common/JalaliDatePicker.vue'
 import type { Calendar, Task } from '../types'
+import { useI18n } from '../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -49,10 +52,10 @@ function onPickDate(value: string): void {
 </script>
 
 <template>
-  <Modal :show="show" title="Move Task" @close="emit('close')">
+  <Modal :show="show" :title="t('Move Task')" @close="emit('close')">
     <form @submit.prevent="onSubmit">
       <div class="form-group">
-        <label id="move-date-label">Move to</label>
+        <label id="move-date-label">{{ t('Move to') }}</label>
         <JalaliDatePicker
           v-if="calendar === 'jalali'"
           :value="moveDate"
@@ -69,8 +72,8 @@ function onPickDate(value: string): void {
         />
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Move</button>
+        <button type="button" class="btn btn-secondary" @click="emit('close')">{{ t('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('Move') }}</button>
       </div>
     </form>
   </Modal>

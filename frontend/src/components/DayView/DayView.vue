@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from '../../composables/useI18n'
+const { t } = useI18n()
 import { computed } from 'vue'
 import type {
   Calendar,
@@ -221,7 +223,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
       <button
         class="day-back-btn"
         type="button"
-        aria-label="Back to week"
+        :aria-label="t('Back to week')"
         @click="handleBack"
       >
         <svg
@@ -236,13 +238,13 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
         >
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        <span class="day-back-btn-label">Week</span>
+        <span class="day-back-btn-label">{{ t('Week') }}</span>
       </button>
       <div class="day-view-title-group">
         <button
           class="day-prev-btn"
           type="button"
-          aria-label="Previous day"
+          :aria-label="t('Previous day')"
           @click="handlePrev"
         >
           <svg
@@ -267,7 +269,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
         <button
           class="day-next-btn"
           type="button"
-          aria-label="Next day"
+          :aria-label="t('Next day')"
           @click="handleNext"
         >
           <svg
@@ -289,13 +291,13 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
     <!-- Summary line: counts + per-property badges for the day. -->
     <div class="day-view-summary">
       <span class="day-view-summary-counts">
-        <span class="day-view-summary-count">{{ summary.active }} active</span>
+        <span class="day-view-summary-count">{{ summary.active }} {{ t('active') }}</span>
         <span class="day-view-summary-sep" aria-hidden="true">·</span>
-        <span class="day-view-summary-count">{{ summary.completed }} done</span>
+        <span class="day-view-summary-count">{{ summary.completed }} {{ t('done') }}</span>
         <span class="day-view-summary-sep" aria-hidden="true">·</span>
-        <span class="day-view-summary-count">{{ summary.skipped }} skipped</span>
+        <span class="day-view-summary-count">{{ summary.skipped }} {{ t('skipped') }}</span>
         <span class="day-view-summary-sep" aria-hidden="true">·</span>
-        <span class="day-view-summary-count">{{ summary.cancelled }} cancelled</span>
+        <span class="day-view-summary-count">{{ summary.cancelled }} {{ t('cancelled') }}</span>
       </span>
       <span v-if="summary.propertyValues.length > 0" class="day-view-summary-properties">
         <span
@@ -317,11 +319,11 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
         @drop="handleDrop"
       >
         <div class="day-view-tasks-header">
-          <h3>Tasks</h3>
+          <h3>{{ t('Tasks') }}</h3>
           <button
             class="day-add-task-btn"
             type="button"
-            aria-label="Add task"
+            :aria-label="t('Add task')"
             @click="handleAddTask"
           >
             <svg
@@ -367,14 +369,14 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            <p>No tasks for this day</p>
+            <p>{{ t('No tasks for this day') }}</p>
           </div>
         </div>
       </div>
 
       <div class="day-view-side">
         <div v-if="properties.length > 0" class="day-view-properties">
-          <h3>Day Properties</h3>
+          <h3>{{ t('Day Properties') }}</h3>
           <div
             v-for="prop in properties"
             :key="prop.id"
@@ -392,7 +394,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
         </div>
 
         <div class="day-view-notes">
-          <h3>Day Notes</h3>
+          <h3>{{ t('Day Notes') }}</h3>
           <DayNotes
             :key="date"
             :date="date"
@@ -496,6 +498,12 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
 .day-next-btn svg {
   width: 18px;
   height: 18px;
+}
+
+:root[dir="rtl"] .day-back-btn svg,
+:root[dir="rtl"] .day-prev-btn svg,
+:root[dir="rtl"] .day-next-btn svg {
+  transform: scaleX(-1);
 }
 
 .day-view-date-picker {
@@ -674,7 +682,7 @@ function onUpdateTaskNotes(task: Task, notes: string): void {
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  text-align: right;
+  text-align: end;
   background: var(--bg);
   color: var(--text-primary);
 }

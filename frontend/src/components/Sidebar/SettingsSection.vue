@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import type { Calendar, Theme, WeekStartDay } from '../../types'
-import { WEEKDAY_LABELS } from '../../utils/date'
+import { computed } from 'vue'
+import type { Calendar, Language, Theme, WeekStartDay } from '../../types'
+import { weekdayLabelsForLanguage } from '../../utils/date'
+import { useI18n } from '../../composables/useI18n'
 
 /**
  * Sidebar settings panel. Exposes three controls — the theme
@@ -8,14 +10,21 @@ import { WEEKDAY_LABELS } from '../../utils/date'
  * and is structured as its own component so adding more settings
  * later is a one-section change in the sidebar.
  */
-defineProps<{
+withDefaults(defineProps<{
   /** Current theme choice (persisted in localStorage, applied to <html>). */
   theme: Theme
   /** Current start-of-week setting, 0=Sunday..6=Saturday. */
   weekStart: WeekStartDay
   /** Current calendar preference. */
   calendar: Calendar
-}>()
+  /** Current interface language. */
+  language?: Language
+}>(), {
+  language: 'en',
+})
+
+const { t, language: activeLanguage } = useI18n()
+const weekdayLabels = computed(() => weekdayLabelsForLanguage(activeLanguage.value))
 
 const emit = defineEmits<{
   /**
@@ -34,6 +43,7 @@ const emit = defineEmits<{
    * the `Calendar` literal union.
    */
   (e: 'change-calendar', c: Calendar): void
+  (e: 'change-language', language: Language): void
 }>()
 
 /**
@@ -42,19 +52,19 @@ const emit = defineEmits<{
  * deliberate: Light → Dark → System reads as "off, on, follow OS" in
  * the order most users will scan.
  */
-const THEME_OPTIONS: ReadonlyArray<{ value: Theme; label: string }> = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+const THEME_OPTIONS: ReadonlyArray<{ value: Theme; messageKey: Theme }> = [
+  { value: 'light', messageKey: 'light' },
+  { value: 'dark', messageKey: 'dark' },
+  { value: 'system', messageKey: 'system' },
 ] as const
 
 /**
  * `Calendar` options shown in the `<select>`. Centralised as a
  * constant so the rendering and the validation stay in lockstep.
  */
-const CALENDAR_OPTIONS: ReadonlyArray<{ value: Calendar; label: string }> = [
-  { value: 'gregorian', label: 'Gregorian' },
-  { value: 'jalali', label: 'Jalali' },
+const CALENDAR_OPTIONS: ReadonlyArray<{ value: Calendar; messageKey: 'gregorian' | 'jalali' }> = [
+  { value: 'gregorian', messageKey: 'gregorian' },
+  { value: 'jalali', messageKey: 'jalali' },
 ] as const
 
 /**
@@ -89,6 +99,14 @@ function onChangeWeekStart(e: Event): void {
  * emitting so a malformed option (e.g. from a hand-edited DOM) can't
  * escape into the parent.
  */
+function onChangeLanguage(e: Event): void {
+  const target = e.target as HTMLSelectElement
+  const next = target.value
+  if (next === 'en' || next === 'fa') {
+    emit('change-language', next)
+  }
+}
+
 function onChangeCalendar(e: Event): void {
   const target = e.target as HTMLSelectElement
   const next = target.value
@@ -104,11 +122,23 @@ function onChangeCalendar(e: Event): void {
 <template>
   <div class="settings-list">
     <label class="setting-row">
-      <span class="setting-label">Theme</span>
+      <span class="setting-label">{{ t('language') }}</span>
+      <select
+        class="setting-select"
+        :value="language"
+        :aria-label="t('language')"
+        @change="onChangeLanguage"
+      >
+        <option value="en">English</option>
+        <option value="fa">فارسی</option>
+      </select>
+    </label>
+    <label class="setting-row">
+      <span class="setting-label">{{ t('theme') }}</span>
       <select
         class="setting-select"
         :value="theme"
-        aria-label="Theme"
+        :aria-label="t('theme')"
         @change="onChangeTheme"
       >
         <option
@@ -116,20 +146,20 @@ function onChangeCalendar(e: Event): void {
           :key="opt.value"
           :value="opt.value"
         >
-          {{ opt.label }}
+          {{ t(opt.messageKey) }}
         </option>
       </select>
     </label>
     <label class="setting-row">
-      <span class="setting-label">Start of week</span>
+      <span class="setting-label">{{ t('startOfWeek') }}</span>
       <select
         class="setting-select"
         :value="weekStart"
-        aria-label="Start of week"
+        :aria-label="t('startOfWeek')"
         @change="onChangeWeekStart"
       >
         <option
-          v-for="(label, index) in WEEKDAY_LABELS"
+          v-for="(label, index) in weekdayLabels"
           :key="index"
           :value="index"
         >
@@ -138,11 +168,11 @@ function onChangeCalendar(e: Event): void {
       </select>
     </label>
     <label class="setting-row">
-      <span class="setting-label">Calendar</span>
+      <span class="setting-label">{{ t('calendar') }}</span>
       <select
         class="setting-select"
         :value="calendar"
-        aria-label="Calendar"
+        :aria-label="t('calendar')"
         @change="onChangeCalendar"
       >
         <option
@@ -150,7 +180,7 @@ function onChangeCalendar(e: Event): void {
           :key="opt.value"
           :value="opt.value"
         >
-          {{ opt.label }}
+          {{ t(opt.messageKey) }}
         </option>
       </select>
     </label>

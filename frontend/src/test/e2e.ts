@@ -106,8 +106,11 @@ export async function openSidebar(page: Page): Promise<void> {
 
 export async function closeSidebar(page: Page): Promise<void> {
   // On narrow screens the backdrop covers the header's menu toggle.
+  // Keep the click outside the fixed sidebar in both LTR and RTL modes.
   if ((page.viewportSize()?.width ?? 1440) <= 1024) {
-    await page.locator('.sidebar-backdrop').click({ position: { x: 300, y: 100 } })
+    const isRtl = (await page.locator('html').getAttribute('dir')) === 'rtl'
+    const backdropX = isRtl ? 20 : 300
+    await page.locator('.sidebar-backdrop').click({ position: { x: backdropX, y: 100 } })
     await expect(page.getByRole('complementary')).toHaveClass(/collapsed/)
   }
 }

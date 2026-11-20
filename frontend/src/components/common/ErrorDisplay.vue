@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { apiError } from '../../api'
+import { useI18n } from '../../composables/useI18n'
+const { t, translateText } = useI18n()
 
 /**
  * Toast-style notification that surfaces the most recent `apiError`.
@@ -35,13 +37,13 @@ function dismissError(): void {
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
-        <span class="error-message">{{ apiError }}</span>
+        <span class="error-message">{{ translateText(apiError) }}</span>
       </div>
       <button
         class="error-dismiss"
         type="button"
         @click="dismissError"
-        aria-label="Dismiss error"
+        :aria-label="t('Dismiss error')"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -65,7 +67,7 @@ function dismissError(): void {
 .error-notification {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  inset-inline-end: 20px;
   background: var(--danger);
   color: white;
   padding: var(--space-4) var(--space-5);
@@ -143,7 +145,7 @@ function dismissError(): void {
    close button stays reachable with one thumb. */
 @media (max-width: 480px) {
   .error-notification {
-    left: 20px;
+    inset-inline-start: 20px;
     bottom: 20px;
   }
 }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from '../composables/useI18n'
+const { t } = useI18n()
 import { ref, onErrorCaptured } from 'vue'
 
 /**
@@ -39,9 +41,9 @@ function resetError(): void {
 <template>
   <div v-if="error" class="error-boundary" role="alert">
     <div class="error-content">
-      <h3>Something went wrong</h3>
+      <h3>{{ t('Something went wrong') }}</h3>
       <p>{{ error.message }}</p>
-      <button class="retry-btn" type="button" @click="resetError">Try Again</button>
+      <button class="retry-btn" type="button" @click="resetError">{{ t('Try Again') }}</button>
     </div>
   </div>
   <slot v-else></slot>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuth } from '../composables/useAuth'
+import { useI18n } from '../composables/useI18n'
 
 const auth = useAuth()
+const { t, translateText } = useI18n()
 
 const password = ref('')
 const submitting = ref(false)
@@ -28,9 +30,9 @@ async function handleSubmit(): Promise<void> {
     // Show inline error — do NOT touch apiError (no global toast for
     // auth failures; the LoginPage renders the error inline instead).
     if (err instanceof Error) {
-      error.value = err.message
+      error.value = translateText(err.message)
     } else {
-      error.value = 'Something went wrong. Try again.'
+      error.value = translateText('Something went wrong. Try again.')
     }
   } finally {
     submitting.value = false
@@ -41,11 +43,11 @@ async function handleSubmit(): Promise<void> {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h1 class="login-title">Open planner</h1>
+      <h1 class="login-title">{{ t('Open planner') }}</h1>
 
       <form @submit.prevent="handleSubmit">
         <div class="field">
-          <label for="password" class="field-label">Password</label>
+          <label for="password" class="field-label">{{ t('Password') }}</label>
           <input
             id="password"
             ref="passwordInput"
@@ -67,7 +69,7 @@ async function handleSubmit(): Promise<void> {
           class="btn btn-primary submit-btn"
           :disabled="submitting"
         >
-          {{ submitting ? 'Opening…' : 'Open planner' }}
+          {{ submitting ? t('Opening…') : t('Open planner') }}
         </button>
       </form>
     </div>

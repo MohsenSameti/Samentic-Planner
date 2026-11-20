@@ -101,6 +101,12 @@
   color-scheme: light dark;
 }
 
+:root[lang="fa"] {
+  --font-heading: 'Vazirmatn', sans-serif;
+  --font-body: 'Vazirmatn', sans-serif;
+  --font-mono: 'Vazirmatn', monospace;
+}
+
 /* ------------------------------------------------------------------ */
 /* Dark theme palette                                                   */
 /* ------------------------------------------------------------------ */

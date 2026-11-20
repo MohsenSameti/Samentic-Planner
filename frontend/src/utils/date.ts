@@ -1,4 +1,4 @@
-import type { Calendar, WeekStartDay } from '../types'
+import type { Calendar, Language, WeekStartDay } from '../types'
 import {
   JALALI_MONTH_LABELS,
   JALALI_MONTH_LABELS_LONG,
@@ -44,6 +44,25 @@ export function fromLocalISODate(iso: string): Date {
 }
 
 /** A single day cell in the week grid. */
+export const JALALI_MONTHS_FA = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'] as const
+export const WEEKDAYS_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'] as const
+
+function formatLocaleDate(date: Date, language: Language, options: Intl.DateTimeFormatOptions): string {
+  const locale = language === 'fa' ? 'fa-IR-u-ca-gregory-nu-latn' : 'en-US'
+  return date.toLocaleDateString(locale, options)
+}
+
+function jalaliMonthLabel(month: number, language: Language, long = false): string {
+  if (language === 'fa') return JALALI_MONTHS_FA[month - 1] ?? ''
+  return (long ? JALALI_MONTH_LABELS_LONG : JALALI_MONTH_LABELS)[month - 1] ?? ''
+}
+
+function jalaliWeekdayLabel(day: number, language: Language): string {
+  return language === 'fa'
+    ? WEEKDAYS_FA[day] ?? ''
+    : JALALI_WEEKDAY_LABELS_LONG[day] ?? ''
+}
+
 export interface WeekDay {
   /** ISO date string (`YYYY-MM-DD`) — stable for keys and API calls. */
   date: string
@@ -101,6 +120,7 @@ export function getWeekDays(
   weekStart: WeekStartDay = DEFAULT_WEEK_START,
   calendar: Calendar = 'gregorian',
   today: Date = new Date(),
+  language: Language = 'en',
 ): WeekDay[] {
   const days: WeekDay[] = []
   const start = fromLocalISODate(weekStartStr)
@@ -115,7 +135,7 @@ export function getWeekDays(
     const gregIso = toLocalISODate(d)
     const entry: WeekDay = {
       date: gregIso,
-      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      name: formatLocaleDate(d, language, { weekday: 'short' }),
       dayNum: d.getDate(),
       isToday: d.toDateString() === todayKey,
     }
@@ -146,6 +166,7 @@ export function getWeekDays(
 export function formatWeekDisplay(
   weekStartStr: string,
   calendar: Calendar = 'gregorian',
+  language: Language = 'en',
 ): string {
   const start = fromLocalISODate(weekStartStr)
   const end = new Date(start)
@@ -155,8 +176,8 @@ export function formatWeekDisplay(
     const jStart = toJalaliYMD(weekStartStr)
     const endIso = toLocalISODate(end)
     const jEnd = toJalaliYMD(endIso)
-    const startLabel = JALALI_MONTH_LABELS[jStart.jm - 1] ?? ''
-    const endLabel = JALALI_MONTH_LABELS[jEnd.jm - 1] ?? ''
+    const startLabel = jalaliMonthLabel(jStart.jm, language)
+    const endLabel = jalaliMonthLabel(jEnd.jm, language)
     const startYear = jStart.jy
     const endYear = jEnd.jy
 
@@ -172,8 +193,8 @@ export function formatWeekDisplay(
     return `${startLabel} ${String(jStart.jd).padStart(2, '0')}, ${startYear} - ${endLabel} ${String(jEnd.jd).padStart(2, '0')}, ${endYear}`
   }
 
-  const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
-  const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
+  const startMonth = formatLocaleDate(start, language, { month: 'short' })
+  const endMonth = formatLocaleDate(end, language, { month: 'short' })
   const startYear = start.getFullYear()
   const endYear = end.getFullYear()
   const sDay = String(start.getDate()).padStart(2, '0')
@@ -196,19 +217,20 @@ export function formatDayNavigation(
   value: string,
   calendar: Calendar,
   todayISO: string,
+  language: Language = 'en',
 ): string {
   const date = fromLocalISODate(value)
   const weekday = calendar === 'jalali'
-    ? (JALALI_WEEKDAY_LABELS_COMPACT[date.getDay()] ?? '')
-    : date.toLocaleDateString('en-US', { weekday: 'short' })
+    ? (language === 'fa' ? WEEKDAYS_FA[date.getDay()] ?? '' : JALALI_WEEKDAY_LABELS_COMPACT[date.getDay()] ?? '')
+    : formatLocaleDate(date, language, { weekday: 'short' })
   if (calendar === 'jalali') {
     const selected = toJalaliYMD(value)
     const today = toJalaliYMD(todayISO)
-    const month = JALALI_MONTH_LABELS_LONG[selected.jm - 1] ?? ''
+    const month = jalaliMonthLabel(selected.jm, language, true)
     const year = selected.jy === today.jy ? '' : ` ${selected.jy}`
     return `${weekday}, ${selected.jd} ${month}${year}`
   }
-  const month = date.toLocaleDateString('en-US', { month: 'short' })
+  const month = formatLocaleDate(date, language, { month: 'short' })
   const year = date.getFullYear() === fromLocalISODate(todayISO).getFullYear()
     ? ''
     : `, ${date.getFullYear()}`
@@ -225,12 +247,13 @@ export function formatDayNavigation(
 export function formatDayTitle(
   value: string,
   calendar: Calendar,
+  language: Language = 'en',
 ): string {
   const d = fromLocalISODate(value)
-  const weekdayShort = d.toLocaleDateString('en-US', { weekday: 'short' })
+  const weekdayShort = formatLocaleDate(d, language, { weekday: 'short' })
   if (calendar === 'jalali') {
     const j = toJalaliYMD(value)
-    const weekdayLong = JALALI_WEEKDAY_LABELS_LONG[d.getDay()] ?? ''
+    const weekdayLong = jalaliWeekdayLabel(d.getDay(), language)
     return `${j.jy}-${String(j.jm).padStart(2, '0')}-${String(j.jd).padStart(2, '0')} (${weekdayLong})`
   }
   return `${value} (${weekdayShort})`
@@ -241,6 +264,12 @@ export function formatDayTitle(
  * Indexed by `WeekStartDay` so callers can do
  * `WEEKDAY_LABELS[weekStart]`.
  */
+export function weekdayLabelsForLanguage(language: Language): readonly string[] {
+  return language === 'fa'
+    ? ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
+    : WEEKDAY_LABELS
+}
+
 export const WEEKDAY_LABELS: readonly string[] = [
   'Sunday',
   'Monday',
@@ -272,6 +301,7 @@ export const WEEKDAY_LABELS: readonly string[] = [
 export function monthMarkerFor(
   days: ReadonlyArray<{ date: string }>,
   calendar: Calendar,
+  language: Language = 'en',
 ): Map<string, string | null> {
   const out = new Map<string, string | null>()
   if (days.length === 0) return out
@@ -292,7 +322,7 @@ export function monthMarkerFor(
       // year is appended in that case.
       const j = toJalaliYMD(day.date)
       if (j.jd === 1) {
-        const monthLabel = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
+        const monthLabel = jalaliMonthLabel(j.jm, language)
         label = j.jm === 1
           ? `1 ${monthLabel} ${j.jy}`
           : `1 ${monthLabel}`
@@ -301,7 +331,7 @@ export function monthMarkerFor(
       // Gregorian 1st — marker for the column. `getMonth() === 0`
       // is January, the first month of a new Gregorian year, so
       // the year is appended in that case.
-      const monthLabel = d.toLocaleDateString('en-US', { month: 'short' })
+      const monthLabel = formatLocaleDate(d, language, { month: 'short' })
       label = d.getMonth() === 0
         ? `1 ${monthLabel} ${d.getFullYear()}`
         : `1 ${monthLabel}`

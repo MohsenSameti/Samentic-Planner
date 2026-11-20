@@ -8,6 +8,7 @@
  */
 import { createApp, type App, type Component } from 'vue'
 import { useTheme } from './composables/useTheme'
+import { useI18n } from './composables/useI18n'
 import { initPerformanceMonitoring } from './utils/performance'
 
 /**
@@ -27,6 +28,7 @@ import { initPerformanceMonitoring } from './utils/performance'
  */
 export function bootstrap(rootComponent: Component): ReturnType<App['mount']> {
   useTheme().initTheme()
+  useI18n().initLanguage()
   initPerformanceMonitoring()
   return createApp(rootComponent).mount('#app')
 }

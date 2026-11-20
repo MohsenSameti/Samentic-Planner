@@ -2,6 +2,9 @@
 import { ref, watch } from 'vue'
 import Modal from '../components/common/Modal.vue'
 import type { Project } from '../types'
+import { useI18n } from '../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -59,22 +62,22 @@ function onDelete(): void {
 <template>
   <Modal
     :show="show"
-    :title="project ? 'Edit Project' : 'Add Project'"
+    :title="project ? t('Edit Project') : t('Add Project')"
     @close="emit('close')"
   >
     <form @submit.prevent="onSubmit">
       <div class="form-group">
-        <label for="project-name">Name</label>
+        <label for="project-name">{{ t('Name') }}</label>
         <input
           id="project-name"
           v-model="form.name"
           type="text"
-          placeholder="Project name"
+          :placeholder="t('Project name')"
           required
         />
       </div>
       <div class="form-group">
-        <label>Color</label>
+        <label>{{ t('Color') }}</label>
         <div class="color-picker">
           <div
             v-for="color in COLORS"
@@ -85,7 +88,7 @@ function onDelete(): void {
             role="button"
             tabindex="0"
             :aria-pressed="form.color === color"
-            :aria-label="`Color ${color}`"
+            :aria-label="`${t('Color')} ${color}`"
             @click="form.color = color"
             @keydown.enter.prevent="form.color = color"
             @keydown.space.prevent="form.color = color"
@@ -99,10 +102,10 @@ function onDelete(): void {
           class="btn btn-danger"
           @click="onDelete"
         >
-          Delete
+          {{ t('Delete') }}
         </button>
-        <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" @click="emit('close')">{{ t('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('Save') }}</button>
       </div>
     </form>
   </Modal>

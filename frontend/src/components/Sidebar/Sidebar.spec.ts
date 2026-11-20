@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import Sidebar from './Sidebar.vue'
-import type { Calendar, Project, Property, Task, Theme, WeekStartDay } from '../../types/index.js'
+import type { Calendar, Language, Project, Property, Task, Theme, WeekStartDay } from '../../types/index.js'
 
 const now = Date.now()
 
@@ -44,10 +44,20 @@ const defaultProps = {
   theme: 'system' as Theme,
   weekStart: 1 as WeekStartDay,
   calendar: 'gregorian' as Calendar,
+  language: 'en' as Language,
   collapsed: false,
 }
 
 describe('Sidebar', () => {
+  it('forwards language changes from settings', async () => {
+    const wrapper = mount(Sidebar, { props: defaultProps })
+    const languageSelect = wrapper.find('select[aria-label="Language"]')
+    Object.defineProperty(languageSelect.element, 'value', { value: 'fa', configurable: true })
+    await languageSelect.trigger('change')
+
+    expect(wrapper.emitted('change-language')?.[0]).toEqual(['fa'])
+  })
+
   it('renders projects and forwards edit event as edit-project', async () => {
     const wrapper = mount(Sidebar, { props: defaultProps })
     const editButtons = wrapper.findAll('.project-edit-btn')

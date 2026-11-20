@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from '../composables/useI18n'
+const { t } = useI18n()
 defineProps<{
   /** Pre-formatted week display string (e.g. "Mar 4 - 10, 2024"). */
   weekDisplay: string
@@ -13,8 +15,8 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <nav class="week-nav" aria-label="Week navigation">
-    <button class="nav-btn" type="button" aria-label="Previous week" @click="emit('prev-week')">
+  <nav class="week-nav" :aria-label="t('Week navigation')">
+    <button class="nav-btn" type="button" :aria-label="t('Previous week')" @click="emit('prev-week')">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polyline points="15 18 9 12 15 6" />
       </svg>
@@ -23,7 +25,7 @@ const emit = defineEmits<{
       class="week-display"
       :class="{ 'current-week': isCurrentWeek }"
     >{{ weekDisplay }}</span>
-    <button class="nav-btn" type="button" aria-label="Next week" @click="emit('next-week')">
+    <button class="nav-btn" type="button" :aria-label="t('Next week')" @click="emit('next-week')">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polyline points="9 18 15 12 9 6" />
       </svg>
@@ -71,6 +73,10 @@ const emit = defineEmits<{
 .nav-btn svg {
   width: 18px;
   height: 18px;
+}
+
+:root[dir="rtl"] .nav-btn svg {
+  transform: scaleX(-1);
 }
 
 .week-display {

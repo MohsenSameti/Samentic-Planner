@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SettingsSection from './SettingsSection.vue'
-import type { Calendar, Theme, WeekStartDay } from '../../types/index.js'
+import type { Calendar, Language, Theme, WeekStartDay } from '../../types/index.js'
 
 /**
  * Default props for a `mount(SettingsSection, ...)` call. Centralised
@@ -23,9 +23,34 @@ const defaultProps = {
   theme: 'system' as Theme,
   weekStart: 6 as WeekStartDay,
   calendar: 'gregorian' as Calendar,
+  language: 'en' as Language,
 }
 
 describe('SettingsSection', () => {
+  describe('language', () => {
+    it('renders English and Persian options and binds the selected language', () => {
+      const wrapper = mount(SettingsSection, {
+        props: { ...defaultProps, language: 'fa' as Language },
+      })
+      const languageSelect = wrapper.find('select[aria-label="Language"]')
+      expect(languageSelect.exists()).toBe(true)
+      expect(languageSelect.findAll('option').map(option => option.text())).toEqual(['English', 'فارسی'])
+      expect((languageSelect.element as HTMLSelectElement).value).toBe('fa')
+    })
+
+    it('emits change-language for a supported language only', async () => {
+      const wrapper = mount(SettingsSection, { props: defaultProps })
+      const languageSelect = wrapper.find('select[aria-label="Language"]')
+      Object.defineProperty(languageSelect.element, 'value', { value: 'fa', configurable: true })
+      await languageSelect.trigger('change')
+      expect(wrapper.emitted('change-language')?.[0]).toEqual(['fa'])
+
+      Object.defineProperty(languageSelect.element, 'value', { value: 'ar', configurable: true })
+      await languageSelect.trigger('change')
+      expect(wrapper.emitted('change-language')).toHaveLength(1)
+    })
+  })
+
   describe('theme', () => {
     it('renders a select labelled "Theme"', () => {
       const wrapper = mount(SettingsSection, { props: defaultProps })
@@ -210,7 +235,7 @@ describe('SettingsSection', () => {
       // The Theme row is intentionally above the other two — the
       // theme is the most-touched display setting and lives at the
       // top of the settings panel.
-      expect(labels).toEqual(['Theme', 'Start of week', 'Calendar'])
+      expect(labels).toEqual(['Language', 'Theme', 'Start of week', 'Calendar'])
     })
   })
 })
