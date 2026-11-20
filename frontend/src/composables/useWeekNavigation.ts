@@ -7,7 +7,7 @@ import {
   toLocalISODate,
   type WeekDay,
 } from '../utils/date'
-import type { Calendar, WeekStartDay } from '../types'
+import type { Calendar, Language, WeekStartDay } from '../types'
 
 /**
  * Normalise a `WeekStartDay` value into the 0..6 range, falling back
@@ -53,6 +53,7 @@ function clampCalendar(value: Calendar): Calendar {
 export function useWeekNavigation(
   weekStart: Ref<WeekStartDay> = ref(DEFAULT_WEEK_START),
   calendar: Ref<Calendar> = ref<Calendar>('gregorian'),
+  language: Ref<Language> = ref<Language>('en'),
 ) {
   // Snapshot the (clamped) value once at construction; the watcher
   // below re-clamps on every update.
@@ -77,7 +78,7 @@ export function useWeekNavigation(
    *  week, the week-start setting, or the calendar changes. The
    *  `date` field stays Gregorian ISO regardless of calendar. */
   const weekDays = computed<WeekDay[]>(() =>
-    getWeekDays(currentWeekStart.value, safeWeekStart.value, safeCalendar.value),
+    getWeekDays(currentWeekStart.value, safeWeekStart.value, safeCalendar.value, new Date(), language.value),
   )
 
   /** ISO date string of the current week's first day. */

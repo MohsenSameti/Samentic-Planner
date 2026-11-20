@@ -19,6 +19,11 @@ import { defineComponent, h, nextTick, type Component } from 'vue'
  * mock the whole module and expose an `initSpy` we can assert on.
  */
 const initSpy = vi.fn()
+const initLanguageSpy = vi.fn()
+
+vi.mock('./composables/useI18n.js', () => ({
+  useI18n: () => ({ initLanguage: initLanguageSpy }),
+}))
 
 vi.mock('./composables/useTheme.js', () => ({
   useTheme: () => ({
@@ -64,6 +69,7 @@ vi.mock('vue', async (importOriginal) => {
 describe('bootstrap', () => {
   beforeEach(() => {
     initSpy.mockClear()
+    initLanguageSpy.mockClear()
     mountSpy.mockClear()
     createAppSpy.mockClear()
     document.documentElement.removeAttribute('data-theme')
@@ -83,6 +89,7 @@ describe('bootstrap', () => {
     await nextTick()
 
     expect(initSpy).toHaveBeenCalledTimes(1)
+    expect(initLanguageSpy).toHaveBeenCalledTimes(1)
     expect(createAppSpy).toHaveBeenCalledTimes(1)
     expect(mountSpy).toHaveBeenCalledTimes(1)
 

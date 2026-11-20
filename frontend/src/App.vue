@@ -8,6 +8,7 @@ import { useProjects } from './composables/useProjects'
 import { useProperties } from './composables/useProperties'
 import { useNotes } from './composables/useNotes'
 import { useTheme } from './composables/useTheme'
+import { useI18n } from './composables/useI18n'
 import { useWeekNavigation } from './composables/useWeekNavigation'
 import { useTodayISO } from './composables/useTodayISO'
 import {
@@ -18,8 +19,14 @@ import {
   toLocalISODate,
 } from './utils/date'
 import { toJalaliYMD } from './utils/jalali'
+import {
+  clearManualCalendarOverride,
+  loadManualCalendarOverride,
+  resolveCalendarForLanguage,
+  saveManualCalendarOverride,
+} from './utils/calendarPreference'
 import { initialSidebarCollapsed } from './utils/layout'
-import type { Calendar, Task, Project, Property, WeekStartDay } from './types'
+import type { Calendar, Language, Task, Project, Property, WeekStartDay } from './types'
 
 import Header from './components/Header.vue'
 import LoginPage from './components/LoginPage.vue'
@@ -67,13 +74,20 @@ const ChangePasswordModal = defineAsyncComponent(
 const weekStart = ref<WeekStartDay>(DEFAULT_WEEK_START)
 
 /**
- * The persisted calendar preference. Owned here so the week
- * navigation, the header, and the day columns can all react to a
- * single source of truth. Switching calendars is purely a display
- * concern — storage stays Gregorian ISO. Seeded with the
- * frontend's default to match the backend.
+ * The active calendar is a display preference; dates remain stored as
+ * Gregorian ISO. An explicit local manual choice takes precedence,
+ * otherwise the active language supplies the default.
  */
-const calendar = ref<Calendar>('gregorian')
+const {
+  language,
+  setLanguage,
+  t,
+  translateText,
+  formatDeleteProject,
+  formatDeleteProperty,
+} = useI18n()
+const manualCalendarOverride = ref<Calendar | null>(loadManualCalendarOverride())
+const calendar = ref<Calendar>(resolveCalendarForLanguage(language.value, manualCalendarOverride.value))
 
 /* ------------------------------------------------------------------ */
 /* Composables                                                          */
@@ -85,7 +99,7 @@ const {
   navigateWeek,
   goToToday,
   goToTodayTrigger,
-} = useWeekNavigation(weekStart, calendar)
+} = useWeekNavigation(weekStart, calendar, language)
 const { todayISO } = useTodayISO()
 
 // `useProjects` / `useTasks` / `useProperties` / `useNotes` each expose a
@@ -244,7 +258,7 @@ const weeklyPropertySums = computed(() => {
  *  calendar — Jalali labels and day numbers when `calendar.value ===
  *  'jalali'`, Gregorian otherwise. */
 const weekDisplay = computed<string>(() =>
-  formatWeekDisplay(currentWeekStart.value, calendar.value),
+  formatWeekDisplay(currentWeekStart.value, calendar.value, language.value),
 )
 
 /** Emphasize the displayed range when it contains today's local date. */
@@ -498,15 +512,36 @@ async function changeWeekStart(day: WeekStartDay): Promise<void> {
  * header / day columns repaint immediately. Mirrors `changeWeekStart`:
  * local update first, then the PUT, revert on failure.
  */
+async function changeLanguage(next: Language): Promise<void> {
+  if (next === language.value) return
+  setLanguage(next)
+  const nextCalendar = resolveCalendarForLanguage(next, manualCalendarOverride.value)
+  if (nextCalendar === calendar.value) return
+
+  calendar.value = nextCalendar
+  if (dataLoaded.value) {
+    try {
+      await api.updateSettings({ weekStart: weekStart.value, calendar: nextCalendar })
+    } catch {
+      // Keep the locale and calendar choice in the UI; api.ts exposes the error.
+    }
+  }
+}
+
 async function changeCalendar(c: Calendar): Promise<void> {
-  const previous = calendar.value
+  const previousCalendar = calendar.value
+  const previousOverride = manualCalendarOverride.value
   calendar.value = c
+  manualCalendarOverride.value = c
+  saveManualCalendarOverride(c)
   try {
     await api.updateSettings({ weekStart: weekStart.value, calendar: c })
   } catch {
-    // `api.ts` already populated `apiError`. Revert the local setting
-    // so the UI matches what's on disk on the next reload.
-    calendar.value = previous
+    // Roll back both persisted and in-memory manual choice with the displayed value.
+    calendar.value = previousCalendar
+    manualCalendarOverride.value = previousOverride
+    if (previousOverride === null) clearManualCalendarOverride()
+    else saveManualCalendarOverride(previousOverride)
   }
 }
 
@@ -659,10 +694,7 @@ async function saveProject(payload: {
 
 function confirmDeleteProject(project: Project): void {
   const taskCount = tasks.value.filter(t => t.projectId === project.id).length
-  deleteMessage.value =
-    taskCount > 0
-      ? `Delete "${project.name}"? ${taskCount} tasks will be moved to no project.`
-      : `Delete "${project.name}"?`
+  deleteMessage.value = formatDeleteProject(project.name, taskCount)
   pendingDelete = async () => {
     await deleteProject(project, tasks.value)
   }
@@ -693,7 +725,7 @@ async function saveProperty(payload: {
 }
 
 function confirmDeleteProperty(property: Property): void {
-  deleteMessage.value = `Delete "${property.name}"? All values will be removed.`
+  deleteMessage.value = formatDeleteProperty(property.name)
   pendingDelete = async () => {
     await deleteProperty(property)
   }
@@ -766,21 +798,29 @@ async function loadData(): Promise<void> {
     // Adopt the persisted week-start. The composable's `watch` on
     // `weekStart` will re-anchor `currentWeekStart` automatically.
     weekStart.value = state.settings.weekStart
-    calendar.value = state.settings.calendar
+    const resolvedCalendar = resolveCalendarForLanguage(language.value, manualCalendarOverride.value)
+    calendar.value = resolvedCalendar
+    if (state.settings.calendar !== resolvedCalendar) {
+      try {
+        await api.updateSettings({ weekStart: weekStart.value, calendar: resolvedCalendar })
+      } catch {
+        // Locale-derived calendar remains active even if server sync fails.
+      }
+    }
 
     // Seed an empty board with a default project so the user has
     // somewhere to attach the first task.
     if (projects.value.length === 0) {
       const project = await api.createProject({
         id: '',
-        name: 'General',
+        name: t('General'),
         color: '#E74C3C',
       })
       projects.value.push(project)
     }
     dataLoaded.value = true
   } catch (err) {
-    loadError.value = 'Could not load planner'
+    loadError.value = translateText('Could not load planner')
     dataLoaded.value = false
     // `api.ts` already sets `apiError`; we just log for devtools.
     // eslint-disable-next-line no-console
@@ -877,7 +917,7 @@ function closeChangePasswordModal(): void {
  */
 function handlePasswordChanged(): void {
   changePasswordModalOpen.value = false
-  setSuccessMessage('Password changed successfully.')
+  setSuccessMessage(translateText('Password changed successfully.'))
 }
 </script>
 
@@ -885,15 +925,15 @@ function handlePasswordChanged(): void {
   <ErrorBoundary>
     <!-- 1. Auth check failed -->
     <div v-if="auth.error !== null" class="loading">
-      <p>The planner isn't responding. Try again?</p>
+      <p>{{ t('The planner is not responding. Try again?') }}</p>
       <button class="btn btn-primary" type="button" @click="auth.retryStatus()">
-        Retry
+        {{ t('Retry') }}
       </button>
     </div>
 
     <!-- 2. Auth check in flight -->
     <div v-else-if="auth.loading" class="loading">
-      <p>Opening planner…</p>
+      <p>{{ t('Opening planner…') }}</p>
     </div>
 
     <!-- 3. Auth resolved, unauthenticated -->
@@ -904,14 +944,14 @@ function handlePasswordChanged(): void {
 
     <!-- 4. Authenticated, data loading -->
     <div v-else-if="dataLoading" class="loading">
-      <p>Opening planner…</p>
+      <p>{{ t('Opening planner…') }}</p>
     </div>
 
     <!-- 5. Board load error -->
     <div v-else-if="loadError" class="board-error" role="alert">
       <p>{{ loadError }}</p>
       <button type="button" class="btn btn-primary retry-btn" @click="retryLoad">
-        Retry
+        {{ t('Retry') }}
       </button>
     </div>
 
@@ -936,6 +976,7 @@ function handlePasswordChanged(): void {
           :theme="theme"
           :week-start="weekStart"
           :calendar="calendar"
+          :language="language"
           @select-project="selectedProject = $event"
           @add-project="openProjectModal()"
           @edit-project="openProjectModal"
@@ -944,6 +985,7 @@ function handlePasswordChanged(): void {
           @change-theme="setTheme"
           @change-week-start="changeWeekStart"
           @change-calendar="changeCalendar"
+          @change-language="changeLanguage"
         />
 
         <div
@@ -964,16 +1006,16 @@ function handlePasswordChanged(): void {
                 :style="{ backgroundColor: activeProject.color }"
                 aria-hidden="true"
               ></span>
-              <span class="filter-indicator-label">Filtered by:</span>
+              <span class="filter-indicator-label">{{ t('Filtered by:') }}</span>
               <strong class="filter-indicator-name">{{ activeProjectName }}</strong>
             </div>
             <button
               type="button"
               class="clear-filter-btn"
-              aria-label="Clear filter"
+              :aria-label="t('Clear filter')"
               @click="clearProjectFilter"
             >
-              Clear filter
+              {{ t('Clear filter') }}
             </button>
           </div>
 

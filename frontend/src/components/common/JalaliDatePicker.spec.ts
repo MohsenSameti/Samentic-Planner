@@ -7,6 +7,8 @@
  * emitted `update` events.
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import JalaliDatePicker from './JalaliDatePicker.vue'
 import { fromJalaliYMD } from '../../utils/jalali.js'
@@ -208,6 +210,22 @@ describe('JalaliDatePicker keyboard navigation', () => {
     expect(focused.attributes('data-jalali-date')).toBe('2024-03-21')
   })
 
+  it('inverts horizontal arrow keys when document direction is RTL', async () => {
+    document.documentElement.dir = 'rtl'
+    try {
+      const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+      const grid = wrapper.find('.grid')
+      // In RTL, ArrowLeft advances to next day and ArrowRight moves to previous day
+      await grid.trigger('keydown', { key: 'ArrowLeft' })
+      expect(wrapper.find('.day-cell.focused').attributes('data-jalali-date')).toBe('2024-03-21')
+
+      await grid.trigger('keydown', { key: 'ArrowRight' })
+      expect(wrapper.find('.day-cell.focused').attributes('data-jalali-date')).toBe('2024-03-20')
+    } finally {
+      document.documentElement.removeAttribute('dir')
+    }
+  })
+
   it('PageDown moves by one month without emitting update', async () => {
     const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
     const grid = wrapper.find('.grid')
@@ -370,5 +388,13 @@ describe('JalaliDatePicker keyboard navigation', () => {
 
     await cell.trigger('keydown', { key: ' ' })
     expect(wrapper.emitted('update')?.[1]).toEqual(['2024-03-20'])
+  })
+
+  it('declares RTL flip transform for month navigation chevrons', () => {
+    const sfcSource = readFileSync(
+      resolve(process.cwd(), 'src/components/common/JalaliDatePicker.vue'),
+      'utf8',
+    )
+    expect(sfcSource).toMatch(/:root\[dir="rtl"\]\s+\.nav-btn\s+svg\s*\{\s*transform:\s*scaleX\(-1\);/m)
   })
 })

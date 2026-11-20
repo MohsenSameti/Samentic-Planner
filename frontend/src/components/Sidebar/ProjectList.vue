@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Project } from '../../types'
+import { useI18n } from '../../composables/useI18n'
 
 defineProps<{
   projects: Project[]
@@ -9,6 +10,8 @@ defineProps<{
   /** Total active tasks across all projects; shown next to "All Tasks". */
   totalActiveTasks: number
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'select', id: string): void
@@ -29,7 +32,7 @@ const emit = defineEmits<{
       @keydown.space.prevent="emit('select', 'all')"
     >
       <div class="project-dot" style="background: var(--text-secondary)"></div>
-      <span class="project-name">All Tasks</span>
+      <span class="project-name">{{ t('All Tasks') }}</span>
       <span class="project-count">{{ totalActiveTasks }}</span>
     </div>
     <div
@@ -49,8 +52,8 @@ const emit = defineEmits<{
       <button
         type="button"
         class="project-edit-btn"
-        :aria-label="`Edit ${project.name}`"
-        title="Edit project"
+        :aria-label="`${t('Edit')} ${project.name}`"
+        :title="t('Edit project')"
         @click.stop="emit('edit', project)"
         @keydown.enter.stop
         @keydown.space.stop
@@ -85,7 +88,7 @@ const emit = defineEmits<{
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
-    Add Project
+    {{ t('Add Project') }}
   </button>
 </template>
 

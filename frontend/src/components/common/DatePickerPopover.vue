@@ -2,8 +2,11 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import JalaliDatePicker from './JalaliDatePicker.vue'
 import { formatDayNavigation, formatDayTitle } from '../../utils/date'
+import { useI18n } from '../../composables/useI18n'
 import { useTodayISO } from '../../composables/useTodayISO'
 import type { Calendar } from '../../types'
+
+const { language, t } = useI18n()
 
 const props = defineProps<{
   /** Current ISO date (`YYYY-MM-DD`). Displayed in the anchor text. */
@@ -46,9 +49,9 @@ const popoverRef = ref<HTMLElement | null>(null)
 // Keep the current-year abbreviation correct even across midnight / Nowruz.
 const { todayISO } = useTodayISO()
 const anchorLabel = computed<string>(() =>
-  formatDayNavigation(props.value, props.calendar, todayISO.value),
+  formatDayNavigation(props.value, props.calendar, todayISO.value, language.value),
 )
-const fullDateLabel = computed<string>(() => formatDayTitle(props.value, props.calendar))
+const fullDateLabel = computed<string>(() => formatDayTitle(props.value, props.calendar, language.value))
 
 /* ------------------------------------------------------------------ */
 /* Toggle                                                               */
@@ -180,7 +183,7 @@ void internalInteraction
       ref="anchorRef"
       type="button"
       class="date-anchor"
-      :aria-label="`${anchorLabel} — Pick a date: ${fullDateLabel}`"
+      :aria-label="`${anchorLabel} — ${t('Pick a date')}: ${fullDateLabel}`"
       :aria-haspopup="'dialog'"
       :aria-expanded="open"
       @click="toggle"
@@ -203,14 +206,14 @@ void internalInteraction
       ref="popoverRef"
       class="popover"
       role="dialog"
-      aria-label="Pick a date"
+      :aria-label="t('Pick a date')"
     >
       <input
         v-if="calendar === 'gregorian'"
         class="popover-input"
         type="date"
         :value="value"
-        aria-label="Pick a date"
+        :aria-label="t('Pick a date')"
         @change="onGregorianChange"
       />
       <JalaliDatePicker

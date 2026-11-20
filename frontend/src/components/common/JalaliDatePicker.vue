@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { fromLocalISODate, toLocalISODate } from '../../utils/date'
+import {
+  JALALI_MONTHS_FA,
+  WEEKDAYS_FA,
+  fromLocalISODate,
+  toLocalISODate,
+} from '../../utils/date'
+import { useI18n } from '../../composables/useI18n'
 import {
   JALALI_MONTH_LABELS,
   JALALI_WEEKDAY_LABELS,
@@ -37,6 +43,10 @@ interface DayCell {
   /** Whether this cell matches the currently-focused date. */
   isFocused: boolean
 }
+
+const { language, t } = useI18n()
+const persianMonths = JALALI_MONTHS_FA
+const persianWeekdays = WEEKDAYS_FA
 
 const props = defineProps<{
   /** Gregorian ISO date (`YYYY-MM-DD`). The canonical wire format. */
@@ -99,7 +109,9 @@ watch(
 /* ------------------------------------------------------------------ */
 
 /** Array of weekday labels for the column headers. */
-const WEEKDAY_HEADERS = computed<string[]>(() => [...JALALI_WEEKDAY_LABELS])
+const WEEKDAY_HEADERS = computed<string[]>(() => language.value === 'fa'
+  ? [...persianWeekdays]
+  : [...JALALI_WEEKDAY_LABELS])
 
 /**
  * 7 columns × 6 rows of day cells for the current view month. Days
@@ -285,14 +297,16 @@ function commitFocusedDate(): void {
  *  - Enter / Space: commit focused cell
  */
 function onKeydown(e: KeyboardEvent): void {
+  const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl'
+  const horizontalSign = isRtl ? -1 : 1
   switch (e.key) {
     case 'ArrowLeft':
       e.preventDefault()
-      focusShift(-1)
+      focusShift(-1 * horizontalSign)
       break
     case 'ArrowRight':
       e.preventDefault()
-      focusShift(1)
+      focusShift(1 * horizontalSign)
       break
     case 'ArrowUp':
       e.preventDefault()
@@ -373,7 +387,9 @@ function commitInputs(): void {
 
 function ariaLabelFor(cell: DayCell): string {
   const j = toJalaliYMD(cell.gregIso)
-  const monthLabel = JALALI_MONTH_LABELS[j.jm - 1] ?? ''
+  const monthLabel = language.value === 'fa'
+    ? persianMonths[j.jm - 1] ?? ''
+    : JALALI_MONTH_LABELS[j.jm - 1] ?? ''
   return `${monthLabel} ${j.jd}, ${j.jy} (${cell.gregIso})`
 }
 
@@ -415,7 +431,9 @@ const tabbableIso = computed<string | null>(() => {
  * "Far 1403".
  */
 const viewLabel = computed<string>(() => {
-  const label = JALALI_MONTH_LABELS[viewMonth.value - 1] ?? ''
+  const label = language.value === 'fa'
+    ? persianMonths[viewMonth.value - 1] ?? ''
+    : JALALI_MONTH_LABELS[viewMonth.value - 1] ?? ''
   return `${label} ${viewYear.value}`
 })
 
@@ -431,7 +449,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
       <button
         type="button"
         class="nav-btn"
-        aria-label="Previous month"
+        :aria-label="t('Previous month')"
         @click="shiftMonth(-1)"
       >
         <svg
@@ -450,16 +468,16 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
       <button
         type="button"
         class="view-label"
-        :aria-label="`Current view: ${viewLabel}. Click to reset.`"
+        :aria-label="`${t('Current view')}: ${viewLabel}. ${t('Click to reset')}.`"
         @click="resetToValue"
       >
         {{ viewLabel }}
-        <span v-if="isLeapViewYear" class="leap-badge" aria-hidden="true">leap</span>
+        <span v-if="isLeapViewYear" class="leap-badge" aria-hidden="true">{{ t('leap') }}</span>
       </button>
       <button
         type="button"
         class="nav-btn"
-        aria-label="Next month"
+        :aria-label="t('Next month')"
         @click="shiftMonth(1)"
       >
         <svg
@@ -479,7 +497,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 
     <div class="input-row">
       <label class="input-cell">
-        <span class="input-label">Year</span>
+        <span class="input-label">{{ t('Year') }}</span>
         <input
           v-model="inputYear"
           type="number"
@@ -488,13 +506,13 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
           step="1"
           inputmode="numeric"
           class="num-input"
-          aria-label="Jalali year"
+          :aria-label="t('Jalali year')"
           @blur="commitInputs"
           @keydown.enter.prevent="commitInputs"
         />
       </label>
       <label class="input-cell">
-        <span class="input-label">Month</span>
+        <span class="input-label">{{ t('Month') }}</span>
         <input
           v-model="inputMonth"
           type="number"
@@ -503,13 +521,13 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
           step="1"
           inputmode="numeric"
           class="num-input"
-          aria-label="Jalali month"
+          :aria-label="t('Jalali month')"
           @blur="commitInputs"
           @keydown.enter.prevent="commitInputs"
         />
       </label>
       <label class="input-cell">
-        <span class="input-label">Day</span>
+        <span class="input-label">{{ t('Day') }}</span>
         <input
           v-model="inputDay"
           type="number"
@@ -518,7 +536,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
           step="1"
           inputmode="numeric"
           class="num-input"
-          aria-label="Jalali day"
+          :aria-label="t('Jalali day')"
           @blur="commitInputs"
           @keydown.enter.prevent="commitInputs"
         />
@@ -528,7 +546,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
     <div
       class="grid"
       role="grid"
-      :aria-label="`Jalali month ${viewLabel}`"
+      :aria-label="`${t('Jalali month')} ${viewLabel}`"
       @keydown="onKeydown"
     >
       <div class="weekday-row" role="row">
@@ -610,7 +628,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 
 .leap-badge {
   display: inline-block;
-  margin-left: var(--space-2);
+  margin-inline-start: var(--space-2);
   font-size: 0.7rem;
   color: var(--accent);
   /* uppercase removed */
@@ -646,6 +664,10 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   height: 14px;
 }
 
+:root[dir="rtl"] .nav-btn svg {
+  transform: scaleX(-1);
+}
+
 .input-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -674,7 +696,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  text-align: right;
+  text-align: end;
   width: 100%;
 }
 

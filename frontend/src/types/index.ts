@@ -62,6 +62,9 @@ export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6
  */
 export type Calendar = 'gregorian' | 'jalali'
 
+/** Supported application interface languages. */
+export type Language = 'en' | 'fa'
+
 /**
  * User's *choice* for the theme setting. Persisted in `localStorage`
  * and exposed in the settings UI. The actual applied theme is a

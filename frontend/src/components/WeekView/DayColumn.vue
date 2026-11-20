@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import type { Task, Project, Property, PropertyValue } from '../../types'
 import { useDayActions } from '../../composables/useDayActions'
+import { useI18n } from '../../composables/useI18n'
 import TaskCard from './TaskCard.vue'
 import VirtualList from '../common/VirtualList.vue'
 import DayNotes from '../Notes/DayNotes.vue'
@@ -67,6 +68,7 @@ const props = defineProps<{
  * action channel moves.
  */
 const actions = useDayActions()
+const { t } = useI18n()
 
 /* ------------------------------------------------------------------ */
 /* Property values & notes                                               */
@@ -269,10 +271,10 @@ const hasNote = computed<boolean>(() => props.dayNoteValue.trim().length > 0)
  */
 const mobileMetaAriaLabel = computed<string>(() => {
   if (mobileMetaExpanded.value) {
-    return 'Hide day details'
+    return t('Hide day details')
   }
-  const suffix = `${props.properties.length > 0 ? ` (${mobileMetaSummary.value})` : ''}${hasNote.value ? ', has note' : ''}`
-  return `Show day details${suffix}`
+  const suffix = `${props.properties.length > 0 ? ` (${mobileMetaSummary.value})` : ''}${hasNote.value ? `, ${t('has note')}` : ''}`
+  return `${t('Show day details')}${suffix}`
 })
 </script>
 
@@ -305,7 +307,7 @@ const mobileMetaAriaLabel = computed<string>(() => {
         <button
           type="button"
           class="open-day-btn"
-          :aria-label="`Open ${dayName}`"
+          :aria-label="`${t('Open')} ${dayName}`"
           @click.stop="onOpenDay"
           @keydown.enter.stop.prevent="onOpenDay"
           @keydown.space.stop.prevent="onOpenDay"
@@ -326,7 +328,7 @@ const mobileMetaAriaLabel = computed<string>(() => {
         <button
           class="add-task-btn"
           type="button"
-          aria-label="Add task"
+          :aria-label="t('Add task')"
           @click.stop="onAddTask"
         >
           <svg
@@ -382,11 +384,11 @@ const mobileMetaAriaLabel = computed<string>(() => {
         v-if="taskCount === 0"
         type="button"
         class="empty-state-add"
-        :aria-label="`Add a task to ${dayName}`"
+        :aria-label="`${t('Add a task to')} ${dayName}`"
         @click="onAddTask"
       >
         <span class="empty-state-add-icon" aria-hidden="true">+</span>
-        <span class="empty-state-add-text">Add task</span>
+        <span class="empty-state-add-text">{{ t('Add task') }}</span>
       </button>
     </div>
 
@@ -439,9 +441,9 @@ const mobileMetaAriaLabel = computed<string>(() => {
       :aria-expanded="mobileMetaExpanded ? 'true' : 'false'"
       @click="mobileMetaExpanded = !mobileMetaExpanded"
     >
-      <span v-if="properties.length === 0 && !hasNote" class="meta-summary">Day details</span>
+      <span v-if="properties.length === 0 && !hasNote" class="meta-summary">{{ t('Day details') }}</span>
       <span v-else-if="properties.length > 0" class="meta-summary">{{ mobileMetaSummary }}</span>
-      <span v-else class="meta-summary">Notes</span>
+      <span v-else class="meta-summary">{{ t('Notes') }}</span>
       <span v-if="hasNote" class="meta-note-dot" aria-hidden="true"></span>
     </button>
   </div>
@@ -595,6 +597,10 @@ const mobileMetaAriaLabel = computed<string>(() => {
   height: 16px;
 }
 
+:root[dir="rtl"] .open-day-btn svg {
+  transform: scaleX(-1);
+}
+
 .add-task-btn {
   width: 28px;
   height: 28px;
@@ -744,7 +750,7 @@ const mobileMetaAriaLabel = computed<string>(() => {
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  text-align: right;
+  text-align: end;
   background: var(--bg);
 }
 

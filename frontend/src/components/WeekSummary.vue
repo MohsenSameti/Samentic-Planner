@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Task, Property } from '../types'
+import { useI18n } from '../composables/useI18n'
 
 /** A `Property` augmented with the running sum for the visible week. */
 type PropertyWithSum = Property & { sum: number }
+
+const { t } = useI18n()
 
 const props = defineProps<{
   tasks: Task[]
@@ -63,20 +66,20 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
         <line x1="12" y1="20" x2="12" y2="4" />
         <line x1="6" y1="20" x2="6" y2="14" />
       </svg>
-      Week Summary
+      {{ t('Week Summary') }}
     </h3>
     <div class="summary-stats">
       <div class="stat-item">
         <div class="stat-value" style="color: var(--success)">
           {{ completedCount }}
         </div>
-        <div class="stat-label">Completed</div>
+        <div class="stat-label">{{ t('Completed') }}</div>
       </div>
       <div class="stat-item">
         <div class="stat-value">
           {{ activeCount }}
         </div>
-        <div class="stat-label">Active</div>
+        <div class="stat-label">{{ t('Active') }}</div>
       </div>
       <!--
         Skipped stat renders only when count > 0 so weeks with no
@@ -87,13 +90,13 @@ const cancelledCount = computed<number>(() => weekTaskCounts.value.cancelled)
         <div class="stat-value" style="color: var(--muted)">
           {{ skippedCount }}
         </div>
-        <div class="stat-label">Skipped</div>
+        <div class="stat-label">{{ t('Skipped') }}</div>
       </div>
       <div class="stat-item">
         <div class="stat-value" style="color: var(--muted)">
           {{ cancelledCount }}
         </div>
-        <div class="stat-label">Cancelled</div>
+        <div class="stat-label">{{ t('Cancelled') }}</div>
       </div>
       <div v-for="prop in properties" :key="prop.id" class="stat-item">
         <div class="stat-value" style="color: var(--accent)">{{ prop.sum }}</div>

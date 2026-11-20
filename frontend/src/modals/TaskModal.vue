@@ -3,6 +3,9 @@ import { ref, watch } from 'vue'
 import Modal from '../components/common/Modal.vue'
 import JalaliDatePicker from '../components/common/JalaliDatePicker.vue'
 import type { Calendar, Task, Project } from '../types'
+import { useI18n } from '../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -89,40 +92,40 @@ function onPickDate(value: string): void {
 <template>
   <Modal
     :show="show"
-    :title="task ? 'Edit Task' : 'Add Task'"
+    :title="task ? t('Edit Task') : t('Add Task')"
     @close="emit('close')"
   >
     <form @submit.prevent="onSubmit">
       <div class="form-group">
-        <label for="task-title">Task</label>
+        <label for="task-title">{{ t('Task') }}</label>
         <input
           id="task-title"
           v-model="form.title"
           type="text"
-          placeholder="What needs to be done?"
+          :placeholder="t('What needs to be done?')"
           required
         />
       </div>
       <div class="form-group">
-        <label for="task-description">Description</label>
+        <label for="task-description">{{ t('Description') }}</label>
         <textarea
           id="task-description"
           v-model="form.description"
-          placeholder="Add a description..."
+          :placeholder="t('Add a description...')"
           rows="3"
         ></textarea>
       </div>
       <div class="form-group">
-        <label for="task-project">Project</label>
+        <label for="task-project">{{ t('Project') }}</label>
         <select id="task-project" v-model="form.projectId">
-          <option value="">No project</option>
+          <option value="">{{ t('No project') }}</option>
           <option v-for="p in projects" :key="p.id" :value="p.id">
             {{ p.name }}
           </option>
         </select>
       </div>
       <div class="form-group">
-        <label id="task-date-label">Date</label>
+        <label id="task-date-label">{{ t('Date') }}</label>
         <JalaliDatePicker
           v-if="calendar === 'jalali'"
           :value="form.date"
@@ -139,8 +142,8 @@ function onPickDate(value: string): void {
         />
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" @click="emit('close')">{{ t('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('Save') }}</button>
       </div>
     </form>
   </Modal>

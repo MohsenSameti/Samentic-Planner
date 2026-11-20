@@ -321,6 +321,10 @@ describe('Header', () => {
       expect(mobileStyles).toMatch(/\.header\s*\{[^}]*flex-wrap\s*:\s*wrap/)
       expect(mobileStyles).toMatch(/\.header\s*\{[^}]*(?:gap|row-gap)/)
     })
+
+    it('flips the logout icon in RTL mode', () => {
+      expect(source).toMatch(/:root\[dir="rtl"\]\s+\.logout-btn\s+svg\s*\{\s*transform:\s*scaleX\(-1\);/m)
+    })
   })
 })
 

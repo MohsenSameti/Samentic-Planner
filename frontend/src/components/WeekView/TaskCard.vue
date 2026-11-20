@@ -2,6 +2,7 @@
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import type { Task, Project } from '../../types'
 import { useDayActions } from '../../composables/useDayActions'
+import { useI18n } from '../../composables/useI18n'
 
 const props = defineProps<{
   task: Task
@@ -22,6 +23,7 @@ const props = defineProps<{
  * no-ops.
  */
 const actions = useDayActions()
+const { t } = useI18n()
 
 /* ------------------------------------------------------------------ */
 /* Local state                                                          */
@@ -37,9 +39,9 @@ let notesSaveSeq = 0
 let notesResetTimer: ReturnType<typeof setTimeout> | null = null
 
 const notesSaveStatusText = computed<string>(() => {
-  if (notesSaveStatus.value === 'saving') return 'Saving…'
-  if (notesSaveStatus.value === 'saved') return 'Saved'
-  if (notesSaveStatus.value === 'error') return 'Save failed'
+  if (notesSaveStatus.value === 'saving') return t('Saving…')
+  if (notesSaveStatus.value === 'saved') return t('Saved')
+  if (notesSaveStatus.value === 'error') return t('Save failed')
   return ''
 })
 
@@ -95,14 +97,14 @@ const ariaChecked = computed<'true' | 'mixed' | 'false'>(() => {
  */
 const checkboxAriaLabel = computed<string>(() => {
   if (props.task.status === 'completed') {
-    return `Mark '${props.task.title}' incomplete`
+    return `${t('Mark')} '${props.task.title}' ${t('incomplete')}`
   }
-  return `Mark '${props.task.title}' complete`
+  return `${t('Mark')} '${props.task.title}' ${t('complete')}`
 })
 
 /** Label for the Skip / Unskip menu item. Toggles by status. */
 const skipLabel = computed<string>(() =>
-  props.task.status === 'skipped' ? 'Unskip' : 'Skip',
+  props.task.status === 'skipped' ? t('Unskip') : t('Skip'),
 )
 
 /**
@@ -173,7 +175,7 @@ const menuRef = ref<HTMLElement | null>(null)
  * Menu position. Recomputed whenever the menu opens so we always have
  * a fresh viewport-relative box (window can resize between opens).
  */
-const menuPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
+const menuPosition = ref<{ top: number; inlineStart: number }>({ top: 0, inlineStart: 0 })
 
 function computeMenuPosition(): void {
   if (!menuAnchor.value) return
@@ -194,7 +196,10 @@ function computeMenuPosition(): void {
   }
   if (top < 8) top = 8
 
-  menuPosition.value = { top, left }
+  const inlineStart = document.documentElement.dir === 'rtl'
+    ? window.innerWidth - (left + menuWidth)
+    : left
+  menuPosition.value = { top, inlineStart }
 }
 
 function getMenuItems(): HTMLButtonElement[] {
@@ -408,7 +413,7 @@ function handleToggleStatus(): void {
           ref="menuAnchor"
           class="task-menu-btn"
           type="button"
-          aria-label="Task actions"
+          :aria-label="t('Task actions')"
           aria-haspopup="menu"
           :aria-expanded="menuOpen"
           @click.stop="toggleMenu"
@@ -432,7 +437,7 @@ function handleToggleStatus(): void {
           <div
             ref="menuRef"
             class="task-menu open"
-            :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
+            :style="{ top: menuPosition.top + 'px', insetInlineStart: menuPosition.inlineStart + 'px' }"
             role="menu"
             @click.stop
           >
@@ -447,7 +452,7 @@ function handleToggleStatus(): void {
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
-                Edit
+                {{ t('Edit') }}
               </button>
               <button
                 type="button"
@@ -459,7 +464,7 @@ function handleToggleStatus(): void {
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
-                {{ notesExpanded ? 'Hide Notes' : 'Add Notes' }}
+                {{ notesExpanded ? t('Hide Notes') : t('Add Notes') }}
               </button>
               <button
                 type="button"
@@ -475,7 +480,7 @@ function handleToggleStatus(): void {
                   <line x1="2" y1="12" x2="22" y2="12" />
                   <line x1="12" y1="2" x2="12" y2="22" />
                 </svg>
-                Move to...
+                {{ t('Move to...') }}
               </button>
               <button
                 type="button"
@@ -501,7 +506,7 @@ function handleToggleStatus(): void {
                   <line x1="15" y1="9" x2="9" y2="15" />
                   <line x1="9" y1="9" x2="15" y2="15" />
                 </svg>
-                Cancel
+                {{ t('Cancel') }}
               </button>
             </template>
             <template v-else>
@@ -515,7 +520,7 @@ function handleToggleStatus(): void {
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                 </svg>
-                Restore
+                {{ t('Restore') }}
               </button>
               <button
                 type="button"
@@ -527,7 +532,7 @@ function handleToggleStatus(): void {
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
-                Delete
+                {{ t('Delete') }}
               </button>
             </template>
           </div>
@@ -538,7 +543,7 @@ function handleToggleStatus(): void {
     <div class="task-notes" :class="{ expanded: notesExpanded }">
       <textarea
         v-model="notes"
-        placeholder="Add notes..."
+        :placeholder="t('Add notes...')"
         rows="2"
         @blur="handleNotesBlur"
       ></textarea>
@@ -571,7 +576,7 @@ function handleToggleStatus(): void {
 }
 
 .task-card.completed {
-  border-left: 3px solid var(--text-completed);
+  border-inline-start: 3px solid var(--text-completed);
   background: linear-gradient(to right, var(--task-completed-bg) 0%, var(--bg) 60%);
 }
 
@@ -586,7 +591,7 @@ function handleToggleStatus(): void {
 }
 
 .task-card.cancelled {
-  border-left: 3px solid var(--text-cancelled);
+  border-inline-start: 3px solid var(--text-cancelled);
   background: linear-gradient(to right, var(--task-cancelled-bg) 0%, var(--bg) 60%);
 }
 
@@ -607,7 +612,7 @@ function handleToggleStatus(): void {
  * the visual signal is the muted foreground colour + line-through
  * on title, description, and project name (spec §9). */
 .task-card.skipped {
-  border-left: 3px solid var(--text-skipped);
+  border-inline-start: 3px solid var(--text-skipped);
   background: linear-gradient(to right, var(--task-skipped-bg) 0%, var(--bg) 60%);
 }
 .task-card.skipped .task-title,
@@ -615,6 +620,18 @@ function handleToggleStatus(): void {
 .task-card.skipped .task-project-name {
   color: var(--text-skipped);
   text-decoration: line-through;
+}
+
+:root[dir="rtl"] .task-card.completed {
+  background: linear-gradient(to left, var(--task-completed-bg) 0%, var(--bg) 60%);
+}
+
+:root[dir="rtl"] .task-card.cancelled {
+  background: linear-gradient(to left, var(--task-cancelled-bg) 0%, var(--bg) 60%);
+}
+
+:root[dir="rtl"] .task-card.skipped {
+  background: linear-gradient(to left, var(--task-skipped-bg) 0%, var(--bg) 60%);
 }
 
 /* Spec §14: pending save state. A subtle dashed outline + a muted
@@ -778,7 +795,7 @@ function handleToggleStatus(): void {
   background: transparent;
   font-family: inherit;
   font-size: 0.85rem;
-  text-align: left;
+  text-align: start;
   color: inherit;
   display: flex;
   align-items: center;

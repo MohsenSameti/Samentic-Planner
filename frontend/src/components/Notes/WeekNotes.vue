@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from '../../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** ISO date (`YYYY-MM-DD`) of the Monday of the target week. */
@@ -61,11 +64,11 @@ function handleBlur(e: FocusEvent): void {
         <line x1="16" y1="13" x2="8" y2="13" />
         <line x1="16" y1="17" x2="8" y2="17" />
       </svg>
-      Week Notes
+      {{ t('Week Notes') }}
     </h3>
     <textarea
       v-model="value"
-      placeholder="Add notes about this week..."
+      :placeholder="t('Add notes about this week...')"
       @blur="handleBlur"
     ></textarea>
   </section>

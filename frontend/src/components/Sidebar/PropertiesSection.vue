@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { Property } from '../../types'
+import { useI18n } from '../../composables/useI18n'
 
 defineProps<{
   properties: Property[]
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'add'): void
@@ -19,8 +22,8 @@ const emit = defineEmits<{
       <button
         type="button"
         class="property-edit-btn"
-        :aria-label="`Edit ${prop.name}`"
-        title="Edit property"
+        :aria-label="`${t('Edit')} ${prop.name}`"
+        :title="t('Edit property')"
         @click.stop="emit('edit', prop)"
         @keydown.enter.stop
         @keydown.space.stop
@@ -41,7 +44,7 @@ const emit = defineEmits<{
       </button>
     </div>
   </div>
-  <p v-else class="property-empty">No trackers yet.</p>
+  <p v-else class="property-empty">{{ t('No trackers yet.') }}</p>
   <button class="add-btn" type="button" @click="emit('add')">
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -56,7 +59,7 @@ const emit = defineEmits<{
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
-    Add Property
+    {{ t('Add Property') }}
   </button>
 </template>
 

@@ -544,6 +544,14 @@ describe('DayColumn', () => {
         expect(actions.openDay).toHaveBeenCalledTimes(1)
       })
 
+      it('declares RTL flip transform for open-day drill-down chevron', () => {
+        const sfcSource = readFileSync(
+          resolve(process.cwd(), 'src/components/WeekView/DayColumn.vue'),
+          'utf8',
+        )
+        expect(sfcSource).toMatch(/:root\[dir="rtl"\]\s+\.open-day-btn\s+svg\s*\{\s*transform:\s*scaleX\(-1\);/m)
+      })
+
       it('keeps calling addTask when the + button is clicked', async () => {
         const { wrapper, actions } = mountWithActions(DayColumn, { props: baseProps })
         await wrapper.find('.add-task-btn').trigger('click')

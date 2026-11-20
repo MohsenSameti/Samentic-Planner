@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import { useDayActions } from '../../composables/useDayActions'
 
 const props = defineProps<{
@@ -9,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const actions = useDayActions()
+const { t } = useI18n()
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -17,9 +19,9 @@ let saveSeq = 0
 let resetTimer: ReturnType<typeof setTimeout> | null = null
 
 const saveStatusText = computed<string>(() => {
-  if (saveStatus.value === 'saving') return 'Saving…'
-  if (saveStatus.value === 'saved') return 'Saved'
-  if (saveStatus.value === 'error') return 'Save failed'
+  if (saveStatus.value === 'saving') return t('Saving…')
+  if (saveStatus.value === 'saved') return t('Saved')
+  if (saveStatus.value === 'error') return t('Save failed')
   return ''
 })
 
@@ -118,7 +120,7 @@ async function handleBlur(e: FocusEvent): Promise<void> {
         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
       </svg>
-      <span class="day-notes-label">Day Notes</span>
+      <span class="day-notes-label">{{ t('Day Notes') }}</span>
       <!-- Spec §19: indicator dot + single-line preview when the day
            has a non-empty note. .day-notes-preview is hidden via CSS
            when the day-notes section is expanded, so the toggle stays
@@ -137,7 +139,7 @@ async function handleBlur(e: FocusEvent): Promise<void> {
     <div class="day-notes-content" :class="{ expanded }">
       <textarea
         v-model="value"
-        placeholder="Add notes for this day..."
+        :placeholder="t('Add notes for this day...')"
         @blur="handleBlur"
       ></textarea>
       <div

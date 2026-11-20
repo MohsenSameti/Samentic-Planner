@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { successMessage } from '../../api'
+import { useI18n } from '../../composables/useI18n'
+const { t, translateText } = useI18n()
 
 /**
  * Toast-style notification that surfaces the most recent
@@ -41,13 +43,13 @@ function dismissSuccess(): void {
         >
           <polyline points="20 6 9 17 4 12" />
         </svg>
-        <span class="success-message">{{ successMessage }}</span>
+        <span class="success-message">{{ translateText(successMessage) }}</span>
       </div>
       <button
         class="success-dismiss"
         type="button"
         @click="dismissSuccess"
-        aria-label="Dismiss notification"
+        :aria-label="t('Dismiss notification')"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -71,7 +73,7 @@ function dismissSuccess(): void {
 .success-notification {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  inset-inline-end: 20px;
   background: var(--success);
   color: white;
   padding: var(--space-4) var(--space-5);
@@ -149,7 +151,7 @@ function dismissSuccess(): void {
    close button stays reachable with one thumb. */
 @media (max-width: 480px) {
   .success-notification {
-    left: 20px;
+    inset-inline-start: 20px;
     bottom: 20px;
   }
 }

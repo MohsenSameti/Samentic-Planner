@@ -7,6 +7,9 @@ const modalStack = ref<number[]>([])
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from '../../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -195,7 +198,7 @@ onUnmounted(() => {
         <button
           class="modal-close"
           type="button"
-          aria-label="Close"
+          :aria-label="t('Close')"
           @click="emit('close')"
         >
           <svg

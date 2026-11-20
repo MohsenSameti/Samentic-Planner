@@ -300,6 +300,11 @@ describe('monthMarkerFor (spec §17)', () => {
     expect(result.get('2024-04-01')).toBeNull()
   })
 
+  it('localizes Gregorian month-boundary markers in Persian', () => {
+    const result = monthMarkerFor(days('2024-01-29'), 'gregorian', 'fa')
+    expect(result.get('2024-02-01')).toBe('1 فوریه')
+  })
+
   it('marks the rollover column when a new month starts mid-week', () => {
     // 2024-01-29 is a Monday; week is Jan 29 - Feb 04. The Feb 1
     // column (Thursday) gets the marker.
@@ -384,6 +389,22 @@ describe('monthMarkerFor (spec §17)', () => {
         expect(v).not.toMatch(/^1 (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/)
       }
     }
+  })
+})
+
+describe('Persian date display', () => {
+  it('uses Persian calendar labels with Western numerals for Jalali dates', () => {
+    expect(formatWeekDisplay('2024-03-20', 'jalali', 'fa')).toContain('فروردین')
+    expect(formatDayNavigation('2024-03-20', 'jalali', '2024-03-20', 'fa')).toContain('چهارشنبه')
+    expect(formatDayTitle('2024-03-20', 'jalali', 'fa')).toContain('چهارشنبه')
+    expect(formatDayTitle('2024-03-20', 'jalali', 'fa')).toContain('1403')
+  })
+
+  it('localizes Gregorian month and weekday labels for Persian without Persian digits', () => {
+    expect(formatWeekDisplay('2024-03-20', 'gregorian', 'fa')).toContain('مارس')
+    expect(formatDayTitle('2024-03-20', 'gregorian', 'fa')).toContain('چهارشنبه')
+    expect(formatDayTitle('2024-03-20', 'gregorian', 'fa')).toContain('2024')
+    expect(formatDayTitle('2024-03-20', 'gregorian', 'fa')).not.toContain('۲۰۲۴')
   })
 })
 

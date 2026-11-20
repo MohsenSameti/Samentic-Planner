@@ -2,6 +2,9 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import Modal from '../components/common/Modal.vue'
 import { api } from '../api'
+import { useI18n } from '../composables/useI18n'
+
+const { t, translateText } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -33,13 +36,13 @@ const currentInput = ref<HTMLInputElement | null>(null)
  */
 const validationError = computed<string | null>(() => {
   if (newPassword.value.length > 0 && newPassword.value.length < 8) {
-    return 'New password must be at least 8 characters.'
+    return t('New password must be at least 8 characters.')
   }
   if (
     confirmPassword.value.length > 0 &&
     newPassword.value !== confirmPassword.value
   ) {
-    return 'Passwords do not match.'
+    return t('Passwords do not match.')
   }
   return null
 })
@@ -123,9 +126,9 @@ async function handleSubmit(): Promise<void> {
     // Auth errors surface inline — do NOT touch `apiError` (the
     // global toast would flash on top of the inline message).
     if (err instanceof Error) {
-      error.value = err.message
+      error.value = translateText(err.message)
     } else {
-      error.value = 'An unknown error occurred.'
+      error.value = translateText('An unknown error occurred.')
     }
   } finally {
     submitting.value = false
@@ -136,12 +139,12 @@ async function handleSubmit(): Promise<void> {
 <template>
   <Modal
     :show="show"
-    title="Change password"
+    :title="t('Change password')"
     @close="emit('close')"
   >
     <form class="change-password-form" @submit.prevent="handleSubmit">
       <div class="form-group">
-        <label for="current-password">Current password</label>
+        <label for="current-password">{{ t('Current password') }}</label>
         <input
           id="current-password"
           ref="currentInput"
@@ -155,7 +158,7 @@ async function handleSubmit(): Promise<void> {
       </div>
 
       <div class="form-group">
-        <label for="new-password">New password</label>
+        <label for="new-password">{{ t('New password') }}</label>
         <input
           id="new-password"
           v-model="newPassword"
@@ -168,7 +171,7 @@ async function handleSubmit(): Promise<void> {
       </div>
 
       <div class="form-group">
-        <label for="confirm-new-password">Confirm new password</label>
+        <label for="confirm-new-password">{{ t('Confirm new password') }}</label>
         <input
           id="confirm-new-password"
           v-model="confirmPassword"
@@ -197,14 +200,14 @@ async function handleSubmit(): Promise<void> {
           :disabled="submitting"
           @click="emit('close')"
         >
-          Cancel
+          {{ t('Cancel') }}
         </button>
         <button
           type="submit"
           class="btn btn-primary"
           :disabled="!canSubmit"
         >
-          {{ submitting ? 'Changing password…' : 'Change password' }}
+          {{ submitting ? t('Changing password…') : t('Change password') }}
         </button>
       </div>
     </form>

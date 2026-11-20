@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { useI18n } from '../composables/useI18n'
 
 defineProps<{
   /** Whether the sidebar is currently collapsed (controls the hamburger/X icon). */
   sidebarCollapsed: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'toggle-sidebar'): void
@@ -81,7 +84,7 @@ onUnmounted(() => {
       <button
         class="sidebar-toggle"
         type="button"
-        aria-label="Toggle menu"
+        :aria-label="t('Toggle menu')"
         @click="emit('toggle-sidebar')"
       >
         <svg
@@ -121,11 +124,11 @@ onUnmounted(() => {
           <line x1="9" y1="3" x2="9" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           <line x1="23" y1="3" x2="23" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
         </svg>
-        <h1>Planner</h1>
+        <h1>{{ t('Planner') }}</h1>
       </div>
     </div>
     <div class="header-right">
-      <button class="today-btn" type="button" @click="emit('go-today')">Today</button>
+      <button class="today-btn" type="button" @click="emit('go-today')">{{ t('Today') }}</button>
 
       <!-- Settings menu: gear button + dropdown. -->
       <div class="settings-wrapper">
@@ -133,8 +136,8 @@ onUnmounted(() => {
           ref="triggerRef"
           class="settings-btn"
           type="button"
-          aria-label="Settings"
-          title="Settings"
+          :aria-label="t('Settings')"
+          :title="t('Settings')"
           aria-haspopup="menu"
           :aria-expanded="menuOpen"
           @click="toggleMenu"
@@ -166,7 +169,7 @@ onUnmounted(() => {
               class="settings-menu-item"
               @click="handleChangePasswordClick"
             >
-              Change password
+              {{ t('Change password') }}
             </button>
           </li>
         </ul>
@@ -175,8 +178,8 @@ onUnmounted(() => {
       <button
         class="logout-btn"
         type="button"
-        aria-label="Log out"
-        title="Log out"
+        :aria-label="t('Log out')"
+        :title="t('Log out')"
         @click="emit('logout')"
       >
         <svg
@@ -288,6 +291,10 @@ onUnmounted(() => {
   height: 20px;
 }
 
+:root[dir="rtl"] .logout-btn svg {
+  transform: scaleX(-1);
+}
+
 /* Settings (gear) button + dropdown ------------------------------------- */
 
 .settings-wrapper {
@@ -327,7 +334,7 @@ onUnmounted(() => {
 .settings-menu {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  inset-inline-end: 0;
   min-width: 180px;
   margin: 0;
   padding: var(--space-2) 0;
@@ -341,7 +348,7 @@ onUnmounted(() => {
 
 .settings-menu-item {
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: var(--space-2) var(--space-3);
   background: transparent;
   border: none;
@@ -406,7 +413,7 @@ onUnmounted(() => {
   }
 
   .header-right {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 
   .logo h1 {
@@ -448,7 +455,7 @@ onUnmounted(() => {
   /* Keep the dropdown anchored to the right edge so it never
      overflows the viewport on narrow screens. */
   .settings-menu {
-    right: 0;
+    inset-inline-end: 0;
   }
 }
 </style>

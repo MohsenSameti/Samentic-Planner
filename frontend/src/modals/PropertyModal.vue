@@ -2,6 +2,9 @@
 import { ref, watch } from 'vue'
 import Modal from '../components/common/Modal.vue'
 import type { Property } from '../types'
+import { useI18n } from '../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -47,27 +50,27 @@ function onDelete(): void {
 <template>
   <Modal
     :show="show"
-    :title="property ? 'Edit Property' : 'Add Property'"
+    :title="property ? t('Edit Property') : t('Add Property')"
     @close="emit('close')"
   >
     <form @submit.prevent="onSubmit">
       <div class="form-group">
-        <label for="property-name">Name</label>
+        <label for="property-name">{{ t('Name') }}</label>
         <input
           id="property-name"
           v-model="form.name"
           type="text"
-          placeholder="e.g., Hours, Pages"
+          :placeholder="t('e.g., Hours, Pages')"
           required
         />
       </div>
       <div class="form-group">
-        <label for="property-unit">Unit</label>
+        <label for="property-unit">{{ t('Unit') }}</label>
         <input
           id="property-unit"
           v-model="form.unit"
           type="text"
-          placeholder="e.g., hrs, km"
+          :placeholder="t('e.g., hrs, km')"
         />
       </div>
       <div class="modal-actions">
@@ -77,10 +80,10 @@ function onDelete(): void {
           class="btn btn-danger"
           @click="onDelete"
         >
-          Delete
+          {{ t('Delete') }}
         </button>
-        <button type="button" class="btn btn-secondary" @click="emit('close')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" @click="emit('close')">{{ t('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('Save') }}</button>
       </div>
     </form>
   </Modal>

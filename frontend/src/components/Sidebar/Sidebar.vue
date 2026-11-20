@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Calendar, Project, Property, Task, Theme, WeekStartDay } from '../../types'
+import { useI18n } from '../../composables/useI18n'
+import type { Calendar, Language, Project, Property, Task, Theme, WeekStartDay } from '../../types'
 import ProjectList from './ProjectList.vue'
 import PropertiesSection from './PropertiesSection.vue'
 import SettingsSection from './SettingsSection.vue'
@@ -12,7 +13,9 @@ import SettingsSection from './SettingsSection.vue'
  */
 export type PropertyWithSum = Property & { sum: number }
 
-const props = defineProps<{
+const { t } = useI18n()
+
+const props = withDefaults(defineProps<{
   projects: Project[]
   properties: Property[]
   tasks: Task[]
@@ -24,13 +27,17 @@ const props = defineProps<{
   weekStart: WeekStartDay
   /** Current calendar preference. */
   calendar: Calendar
+  /** Current interface language. */
+  language?: Language
   /**
    * When `true`, the sidebar is visually collapsed (width: 0 on desktop,
    * slid off-screen on mobile) but stays in the DOM so the transition
    * can animate. The parent still owns the open/closed state.
    */
   collapsed: boolean
-}>()
+}>(), {
+  language: 'en',
+})
 
 const emit = defineEmits<{
   (e: 'select-project', id: string): void
@@ -41,6 +48,7 @@ const emit = defineEmits<{
   (e: 'change-theme', t: Theme): void
   (e: 'change-week-start', day: WeekStartDay): void
   (e: 'change-calendar', c: Calendar): void
+  (e: 'change-language', language: Language): void
 }>()
 
 /**
@@ -65,7 +73,7 @@ const totalActiveTasks = computed<number>(() =>
 <template>
   <aside class="sidebar" :class="{ collapsed }">
     <section class="sidebar-section">
-      <h3>Projects</h3>
+      <h3>{{ t('Projects') }}</h3>
       <ProjectList
         :projects="projects"
         :selected-project="selectedProject"
@@ -78,7 +86,7 @@ const totalActiveTasks = computed<number>(() =>
     </section>
 
     <section class="sidebar-section">
-      <h3>Custom Properties</h3>
+      <h3>{{ t('Custom Properties') }}</h3>
       <PropertiesSection
         :properties="properties"
         @add="emit('add-property')"
@@ -87,7 +95,7 @@ const totalActiveTasks = computed<number>(() =>
     </section>
 
     <section v-if="weeklyPropertySums.length > 0" class="sidebar-section">
-      <h3>Weekly Totals</h3>
+      <h3>{{ t('Weekly Totals') }}</h3>
       <div class="property-sums">
         <div v-for="prop in weeklyPropertySums" :key="prop.id" class="sum-card">
           <div class="sum-value">{{ prop.sum }}</div>
@@ -97,14 +105,16 @@ const totalActiveTasks = computed<number>(() =>
     </section>
 
     <section class="sidebar-section">
-      <h3>Settings</h3>
+      <h3>{{ t('Settings') }}</h3>
       <SettingsSection
         :theme="theme"
         :week-start="weekStart"
         :calendar="calendar"
+        :language="language"
         @change-theme="(t) => emit('change-theme', t)"
         @change-week-start="(day) => emit('change-week-start', day)"
         @change-calendar="(c) => emit('change-calendar', c)"
+        @change-language="(next) => emit('change-language', next)"
       />
     </section>
   </aside>
@@ -114,7 +124,7 @@ const totalActiveTasks = computed<number>(() =>
 .sidebar {
   width: 280px;
   background: var(--surface);
-  border-right: 1px solid var(--border);
+  border-inline-end: 1px solid var(--border);
   padding: var(--space-6);
   overflow-y: auto;
   transition: width 0.2s ease, padding 0.2s ease;
@@ -173,13 +183,21 @@ const totalActiveTasks = computed<number>(() =>
 @media (max-width: 1024px) {
   .sidebar {
     position: fixed;
-    left: 0;
+    inset-inline-start: 0;
     top: 0;
     bottom: 0;
     height: 100dvh;
     z-index: 150;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
+  }
+
+  :root[dir="rtl"] .sidebar {
+    transform: translateX(100%);
+  }
+
+  :root[dir="rtl"] .sidebar:not(.collapsed) {
+    transform: translateX(0);
   }
 
   .sidebar:not(.collapsed) {
