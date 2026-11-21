@@ -46,6 +46,14 @@ export function fromLocalISODate(iso: string): Date {
 /** A single day cell in the week grid. */
 export const JALALI_MONTHS_FA = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'] as const
 export const WEEKDAYS_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'] as const
+/**
+ * Abbreviated Persian weekday names, in the same order as
+ * `WEEKDAYS_FA` — indexed by `Date#getDay()` value (index 0 = Sunday
+ * … index 6 = Saturday). Used by the Jalali date picker's header row
+ * on narrow viewports, where the full names would overflow the
+ * 7-column grid.
+ */
+export const WEEKDAYS_FA_COMPACT = ['یک', 'دو', 'سه', 'چهار', 'پنج', 'جم', 'ش'] as const
 
 function formatLocaleDate(date: Date, language: Language, options: Intl.DateTimeFormatOptions): string {
   const locale = language === 'fa' ? 'fa-IR-u-ca-gregory-nu-latn' : 'en-US'

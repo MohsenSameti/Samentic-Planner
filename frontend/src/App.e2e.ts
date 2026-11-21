@@ -196,3 +196,71 @@ test('navigation and dialogs remain usable at the configured viewport', async ({
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(1)
 })
+
+test('jalali add-task dialog fits narrow mobile viewports without horizontal scroll', async ({ page }) => {
+  await openPlanner(page)
+
+  // Persian language also activates the Jalali calendar (forced locale sync).
+  await openSidebar(page)
+  const settingsPut = page.waitForResponse(response =>
+    response.url().includes('/api/settings') && response.request().method() === 'PUT',
+  )
+  await page.getByRole('complementary').getByRole('combobox', { name: 'Language', exact: true }).selectOption('fa')
+  await settingsPut
+  await closeSidebar(page)
+
+  // The picker must fit (no horizontal scroll) and stay fully tappable
+  // at these widths; the wide case additionally verifies the 320px
+  // `max-width` cap. `capped` is what this case asserts on the picker.
+  const cases: Array<{ width: number; height: number; capped: boolean }> = [
+    { width: 390, height: 844, capped: false },
+    { width: 360, height: 740, capped: false },
+    { width: 320, height: 568, capped: false },
+    { width: 1440, height: 900, capped: true },
+  ]
+
+  for (const { width, height, capped } of cases) {
+    await page.setViewportSize({ width, height })
+    // A desktop-wide start leaves the sidebar expanded; once the viewport
+    // narrows it becomes an overlay that intercepts clicks, so collapse it
+    // through the backdrop whenever one is visible.
+    if (await page.locator('.sidebar-backdrop').isVisible()) {
+      await closeSidebar(page)
+    }
+    await page.locator('.day-column.today').getByRole('button', { name: 'افزودن کار', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'افزودن کار', exact: true })
+    await expect(dialog).toBeVisible()
+
+    const picker = dialog.locator('.jalali-picker')
+    // `toBeVisible` alone would pass for a partially clipped element, so
+    // assert the picker's bounds explicitly: fully inside the viewport at
+    // this width, and within the cap on wide layouts.
+    const box = await picker.boundingBox()
+    expect(box).not.toBeNull()
+    if (!box) throw new Error('Jalali picker has no bounding box')
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(width)
+    if (capped) {
+      expect(box.width).toBeLessThanOrEqual(321)
+    }
+
+    // Neither the page nor the modal may develop a horizontal scrollbar:
+    // the picker must fit the modal content at this width.
+    const overflow = await page.evaluate(() => {
+      const pageDelta = document.documentElement.scrollWidth - document.documentElement.clientWidth
+      const modal = document.querySelector('.modal') as HTMLElement | null
+      const modalDelta = modal ? modal.scrollWidth - modal.clientWidth : 0
+      return Math.max(pageDelta, modalDelta)
+    })
+    expect(overflow).toBeLessThanOrEqual(1)
+
+    // Tappability: a day cell in the view month is clickable, and the
+    // selection moves to it (`aria-selected` mirrors the focused cell).
+    const dayCell = picker.getByRole('gridcell', { name: /اردیبهشت 14, 1405/ })
+    await dayCell.click()
+    await expect(dayCell).toHaveAttribute('aria-selected', 'true')
+
+    await page.getByRole('button', { name: 'انصراف', exact: true }).click()
+    await expect(dialog).toBeHidden()
+  }
+})

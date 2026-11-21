@@ -10,6 +10,8 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_WEEK_START,
   WEEKDAY_LABELS,
+  WEEKDAYS_FA_COMPACT,
+  WEEKDAYS_FA,
   formatDayTitle,
   formatDayNavigation,
   formatWeekDisplay,
@@ -490,6 +492,35 @@ describe('WEEKDAY_LABELS', () => {
     expect(WEEKDAY_LABELS).toHaveLength(7)
     expect(WEEKDAY_LABELS[0]).toBe('Sunday')
     expect(WEEKDAY_LABELS[6]).toBe('Saturday')
+  })
+})
+
+describe('WEEKDAYS_FA', () => {
+  it('has seven full Persian names in Date#getDay() order (index 0 = Sunday … index 6 = Saturday)', () => {
+    expect(WEEKDAYS_FA).toEqual([
+      'یکشنبه', // 0: Sunday (getDay 0)
+      'دوشنبه', // 1: Monday (1)
+      'سه‌شنبه', // 2: Tuesday (2)
+      'چهارشنبه', // 3: Wednesday (3)
+      'پنجشنبه', // 4: Thursday (4)
+      'جمعه', // 5: Friday (5)
+      'شنبه', // 6: Saturday (6)
+    ])
+  })
+})
+
+describe('WEEKDAYS_FA_COMPACT', () => {
+  it('has seven abbreviated entries in the same Date#getDay() order as WEEKDAYS_FA', () => {
+    expect(WEEKDAYS_FA_COMPACT).toHaveLength(7)
+    expect(WEEKDAYS_FA_COMPACT).toEqual([
+      'یک', // 0: Sunday (getDay 0)
+      'دو', // 1: Monday (1)
+      'سه', // 2: Tuesday (2)
+      'چهار', // 3: Wednesday (3)
+      'پنج', // 4: Thursday (4)
+      'جم', // 5: Friday (5)
+      'ش', // 6: Saturday (6)
+    ])
   })
 })
 

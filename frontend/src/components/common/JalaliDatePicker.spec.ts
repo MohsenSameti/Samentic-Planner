@@ -6,12 +6,58 @@
  * interactions (clicks, keyboard, input blur) and assert on the
  * emitted `update` events.
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import JalaliDatePicker from './JalaliDatePicker.vue'
-import { fromJalaliYMD } from '../../utils/jalali.js'
+import { fromJalaliYMD, JALALI_WEEKDAY_LABELS, JALALI_WEEKDAY_LABELS_COMPACT } from '../../utils/jalali.js'
+import { WEEKDAYS_FA, WEEKDAYS_FA_COMPACT } from '../../utils/date.js'
+import { useI18n } from '../../composables/useI18n'
+
+/**
+ * `matchMedia` stubs mirroring the `useTheme` test pattern: captures
+ * the stored `change` listener so a breakpoint crossing can be
+ * simulated without a real window resize.
+ */
+type MediaQueryListener = (event: { matches: boolean; type?: string }) => void
+
+function makeMatchMediaStub(initialMatches: boolean): {
+  matchMedia: (query: string) => {
+    matches: boolean
+    media: string
+    addEventListener: (type: 'change', cb: MediaQueryListener) => void
+    removeEventListener: (type: 'change', cb: MediaQueryListener) => void
+  }
+  fire: (matches: boolean) => void
+} {
+  let currentMatches = initialMatches
+  let listener: MediaQueryListener | null = null
+  return {
+    matchMedia: (query: string) => ({
+      get matches(): boolean {
+        return currentMatches
+      },
+      media: query,
+      addEventListener: (_type: 'change', cb: MediaQueryListener) => {
+        listener = cb
+      },
+      removeEventListener: (_type: 'change', _cb: MediaQueryListener) => {
+        listener = null
+      },
+    }),
+    fire: (matches: boolean) => {
+      currentMatches = matches
+      if (listener) listener({ matches, type: 'change' })
+    },
+  }
+}
+
+/** Read the seven weekday header texts in DOM order. */
+function weekdayHeaders(wrapper: ReturnType<typeof mount>): string[] {
+  return wrapper.findAll('.weekday').map(w => w.text())
+}
 
 describe('JalaliDatePicker', () => {
   it('renders the view label for the Jalali month of the value', () => {
@@ -196,6 +242,54 @@ describe('JalaliDatePicker', () => {
     const cell = wrapper.find(`[data-jalali-date="${target}"]`)
     await cell.trigger('click')
     expect(wrapper.emitted('update')?.[0]).toEqual([target])
+  })
+})
+
+describe('JalaliDatePicker narrow viewport weekday headers', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    useI18n().setLanguage('en')
+  })
+
+  it('shows the full English weekday headers when the viewport is wide', () => {
+    vi.stubGlobal('matchMedia', makeMatchMediaStub(false).matchMedia)
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    expect(weekdayHeaders(wrapper)).toEqual([...JALALI_WEEKDAY_LABELS])
+  })
+
+  it('shows the compact English weekday headers when the viewport is narrow', () => {
+    vi.stubGlobal('matchMedia', makeMatchMediaStub(true).matchMedia)
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    expect(weekdayHeaders(wrapper)).toEqual([...JALALI_WEEKDAY_LABELS_COMPACT])
+  })
+
+  it('shows the compact Persian weekday headers when the viewport is narrow and the language is Persian', () => {
+    vi.stubGlobal('matchMedia', makeMatchMediaStub(true).matchMedia)
+    useI18n().setLanguage('fa')
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    expect(weekdayHeaders(wrapper)).toEqual([...WEEKDAYS_FA_COMPACT])
+    expect(weekdayHeaders(wrapper)).not.toEqual([...WEEKDAYS_FA])
+  })
+
+  it('swaps between full and compact headers when the viewport crosses the breakpoint', async () => {
+    const stub = makeMatchMediaStub(false)
+    vi.stubGlobal('matchMedia', stub.matchMedia)
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    expect(weekdayHeaders(wrapper)).toEqual([...JALALI_WEEKDAY_LABELS])
+
+    stub.fire(true)
+    await nextTick()
+    expect(weekdayHeaders(wrapper)).toEqual([...JALALI_WEEKDAY_LABELS_COMPACT])
+
+    stub.fire(false)
+    await nextTick()
+    expect(weekdayHeaders(wrapper)).toEqual([...JALALI_WEEKDAY_LABELS])
+  })
+
+  it('defaults to the full headers when matchMedia is unavailable', () => {
+    vi.stubGlobal('matchMedia', undefined)
+    const wrapper = mount(JalaliDatePicker, { props: { value: '2024-03-20' } })
+    expect(weekdayHeaders(wrapper)).toEqual([...JALALI_WEEKDAY_LABELS])
   })
 })
 

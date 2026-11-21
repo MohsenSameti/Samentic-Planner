@@ -3,13 +3,16 @@ import { computed, nextTick, ref, watch } from 'vue'
 import {
   JALALI_MONTHS_FA,
   WEEKDAYS_FA,
+  WEEKDAYS_FA_COMPACT,
   fromLocalISODate,
   toLocalISODate,
 } from '../../utils/date'
 import { useI18n } from '../../composables/useI18n'
+import { useNarrowViewport } from '../../composables/useNarrowViewport'
 import {
   JALALI_MONTH_LABELS,
   JALALI_WEEKDAY_LABELS,
+  JALALI_WEEKDAY_LABELS_COMPACT,
   fromJalaliYMD,
   isLeapJalali,
   jalaliMonthLength,
@@ -46,7 +49,6 @@ interface DayCell {
 
 const { language, t } = useI18n()
 const persianMonths = JALALI_MONTHS_FA
-const persianWeekdays = WEEKDAYS_FA
 
 const props = defineProps<{
   /** Gregorian ISO date (`YYYY-MM-DD`). The canonical wire format. */
@@ -108,10 +110,21 @@ watch(
 /* Grid construction                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Array of weekday labels for the column headers. */
-const WEEKDAY_HEADERS = computed<string[]>(() => language.value === 'fa'
-  ? [...persianWeekdays]
-  : [...JALALI_WEEKDAY_LABELS])
+/**
+ * Array of weekday labels for the column headers. On narrow viewports
+ * (`useNarrowViewport(480)`) the header swaps to compact abbreviations:
+ * `WEEKDAYS_FA_COMPACT` for Persian, `JALALI_WEEKDAY_LABELS_COMPACT`
+ * for English. The swap is live - a resize that crosses the breakpoint
+ * updates the headers without remounting.
+ */
+const { isNarrow } = useNarrowViewport(480)
+
+const WEEKDAY_HEADERS = computed<string[]>(() => {
+  if (language.value === 'fa') {
+    return isNarrow.value ? [...WEEKDAYS_FA_COMPACT] : [...WEEKDAYS_FA]
+  }
+  return isNarrow.value ? [...JALALI_WEEKDAY_LABELS_COMPACT] : [...JALALI_WEEKDAY_LABELS]
+})
 
 /**
  * 7 columns × 6 rows of day cells for the current view month. Days
@@ -593,7 +606,13 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
   gap: var(--space-2);
   font-family: inherit;
   color: var(--text-primary);
-  min-width: 280px;
+  /* Fluid so the picker shrinks with its container (e.g. the Task
+   * modal content on small phones), capped so it doesn't stretch
+   * into an oversized grid on tablet/desktop. `DatePickerPopover`
+   * still pins a 280px width via its `:deep` override. */
+  width: 100%;
+  max-width: 320px;
+  min-width: 0;
 }
 
 .picker-header {
@@ -707,7 +726,10 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* `minmax(0, 1fr)` lets tracks shrink below their content's min
+   * width (long Persian weekday labels), so the grid can't force a
+   * horizontal overflow on narrow viewports. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-1);
   outline: none;
 }
@@ -718,6 +740,7 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 
 .weekday {
   text-align: center;
+  min-width: 0;
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-secondary);
@@ -767,5 +790,21 @@ const isLeapViewYear = computed<boolean>(() => isLeapJalali(viewYear.value))
 .day-cell.disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/*
+ * Narrow viewports: paired with `useNarrowViewport(480)` in <script
+ * setup>. The weekday header renders compact abbreviations there; the
+ * reduced label font keeps the abbreviated names inside the
+ * `minmax(0, 1fr)` grid tracks without clipping.
+ */
+@media (max-width: 480px) {
+  .weekday {
+    font-size: 0.6rem;
+    letter-spacing: 0;
+  }
+  .day-cell {
+    font-size: 0.75rem;
+  }
 }
 </style>
